@@ -1,5 +1,5 @@
 // =========================================================================
-// game.js : 公式スペック抽選・Re:Start非告知化・RUSH突発先バレ・画像カットイン対応
+// game.js (v3.0) : 公式スペック抽選・白鯨3000直撃・ネタバレ解消・答え合わせ枠
 // =========================================================================
 
 const SPEC = {
@@ -13,7 +13,7 @@ const SPEC = {
   ST_RESERVE: 4,            // 残保留4個（各1/99.9 厳密独立抽選）
   ST_DENSA: 140,            // 電サポ140回（各1/99.9）
   ST_PROB: 1 / 99.9,
-  HORYUREN_NOTICE_RATE: 0.50, // WEDDING以外の残保留当選を即「保留連」告知する確率（独立乱数）
+  HORYUREN_NOTICE_RATE: 0.50,
 
   R_6000: 0.25,             // 25%: 鬼がかり6000
   R_1500: 0.55,             // 55%: 鬼がかり1500
@@ -131,14 +131,6 @@ const busyNotice = document.getElementById('busyNotice');
 const normalCustomPanel = document.getElementById('normalCustomPanel');
 const rushCustomPanel = document.getElementById('rushCustomPanel');
 
-// 当選回数ラベルを「RUSH突入 / 初当り（分子 / 分母）」へ変更
-(function patchStatHitsLabel() {
-  const el = document.getElementById('statHits');
-  if (el && el.previousElementSibling) {
-    el.previousElementSibling.textContent = 'RUSH突入 / 初当り';
-  }
-})();
-
 // RUSHカスタムパネルを4モード＆3カスタムへ自動拡張
 (function enhanceRushCustomPanelUI() {
   if (!rushCustomPanel || document.getElementById('rushExtraCustomRow')) return;
@@ -153,7 +145,7 @@ const rushCustomPanel = document.getElementById('rushCustomPanel');
 
   const extraRow = document.createElement('div');
   extraRow.id = 'rushExtraCustomRow';
-  extraRow.className = 'hidden grid grid-cols-3 gap-1.5 mt-1.5 pt-1.5 border-t border-rose-950/80';
+  extraRow.className = 'hidden grid grid-cols-3 gap-1.5 mt-1.5 pt-1.5 border-t border-amber-900/60';
   extraRow.innerHTML = `
     <button id="toggleRushTrust" class="py-1.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
       🎯 信頼度先バレ: OFF
@@ -236,10 +228,10 @@ function addLog(spinTxt, tag, tagCls, detail, resTxt, resCls) {
   state.history.unshift({ spinTxt, tag, tagCls, detail, resTxt, resCls });
   if (state.history.length > 60) state.history.pop();
   document.getElementById('historyTableBody').innerHTML = state.history.map(h => `
-    <tr class="hover:bg-rose-950/30">
+    <tr class="hover:bg-amber-950/30">
       <td class="py-1.5 px-1.5 font-bold text-slate-300 whitespace-nowrap">${h.spinTxt}</td>
       <td class="py-1.5 px-1.5 whitespace-nowrap"><span class="px-1.5 py-0.5 rounded text-[10px] font-black ${h.tagCls}">${h.tag}</span></td>
-      <td class="py-1.5 px-1.5 text-rose-100/90">${h.detail}</td>
+      <td class="py-1.5 px-1.5 text-amber-100/90">${h.detail}</td>
       <td class="py-1.5 px-1.5 text-right font-black whitespace-nowrap ${h.resCls}">${h.resTxt}</td>
     </tr>
   `).join('');
@@ -292,40 +284,40 @@ function buildNormalScenario(res) {
   let isWhale = false, badge = '', title = '', sub = '';
   if (is3000) {
     isWhale = true;
-    badge = '🐋 白鯨襲来（1/3,499 超激熱!!）';
+    badge = '🐋 白鯨襲来';
     title = '白鯨攻略戦';
-    sub = '霧の魔獣を討伐せよ!! 勝利で鬼がかり3000＋RUSH直行!!';
+    sub = '霧の魔獣を討伐せよ!!';
   } else if (isPremier) {
-    badge = '🌈 プレミア・鬼がかってますね予告（濃厚!!）';
+    badge = '🌈 鬼がかってますね予告';
     title = '鬼がかったやり方SP「vs ウルガルム」';
-    sub = 'レム虹カットイン出現!! 脳が震える一撃を叩き込め!!';
+    sub = 'レム覚醒!! 運命の一撃を叩き込め!!';
   } else if (isHit) {
     const r = Math.random();
     if (r < 0.35) {
-      badge = '💙 鬼がかってますね予告（信頼度98%）';
+      badge = '💙 鬼がかってますね予告';
       title = '鬼がかったやり方SP「vs ウルガルム」';
-      sub = '激熱群パーティクル通過!! 最終PUSHへ!!';
+      sub = '最終ジャッジへ!!';
     } else if (r < 0.70) {
-      badge = '🔥 鬼がかり予告（信頼度75%）';
+      badge = '🔥 鬼がかり予告';
       title = '鬼がかったやり方SP「vs ペテルギウス」';
-      sub = '巨大カットイン炸裂!! 運命のPUSHを叩け!!';
+      sub = '運命のPUSHを叩け!!';
     } else {
-      badge = '🔥 鬼がかり予告（信頼度70%）';
+      badge = '🔥 鬼がかり予告';
       title = '鬼がかったやり方SP「vs エルザ」';
-      sub = '赤タイトル＆激熱チャンスアップ!!';
+      sub = '激熱バトル発展!!';
     }
   } else {
     const r = Math.random();
     if (r < 0.35) {
-      badge = '🔥 鬼がかり予告（信頼度75%）';
+      badge = '🔥 鬼がかり予告';
       title = '鬼がかったやり方SP「vs ペテルギウス」';
-      sub = '大チャンス到来!! 押し切れ!!';
+      sub = '大チャンス到来!!';
     } else if (r < 0.70) {
-      badge = '🔥 鬼がかり予告（信頼度65%）';
+      badge = '🔥 鬼がかり予告';
       title = '鬼がかったやり方SP「vs エルザ」';
-      sub = '期待度急上昇!! 運命のジャッジ!!';
+      sub = '運命のジャッジ!!';
     } else {
-      badge = '⚔ 抗えチャンス（信頼度32%）';
+      badge = '⚔ 抗えチャンス';
       title = '抗えSPリーチ';
       sub = '死の運命に抗え!!';
     }
@@ -347,33 +339,36 @@ async function startNormalReach(res) {
   if (sc.bareType === 'rainbow') {
     state.sakibareTotal++;
     StudioAudio.playPokyun(true);
+    setAmbientBg('rainbow');
+    setSunburst(true);
     triggerLamp('rainbow', '🌈 虹バレ!!');
     updateReserveSlots('NORMAL', 'RAINBOW');
     lcdFrame.classList.add('fx-rainbow', 'shake-burst');
     FxCanvas.burstRainbow(56);
-    reachYokokuBadge.textContent = '🌈 虹ポキュ↑ーン↓!!（3000濃厚!!）';
+    reachYokokuBadge.textContent = '🌈 虹先バレ';
     reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/85 border border-amber-300 rainbow-grad-text shadow-lg';
-    reachTitle.textContent = '虹ポキュ↑ーン↓!!';
+    reachTitle.textContent = 'ポキュ↑ーン↓!!';
     reachTitle.className = 'font-mincho text-3xl sm:text-4xl font-black rainbow-grad-text cutin-slam';
-    reachSub.textContent = `${state.currentSpin}回転目で至福の虹先バレ炸裂!!`;
+    reachSub.textContent = `${state.currentSpin}回転目`;
   } else if (sc.bareType === 'red') {
     state.sakibareTotal++;
     StudioAudio.playPokyun(false);
+    setAmbientBg('redbare');
     triggerLamp('red', '先バレ40%');
     updateReserveSlots('NORMAL', 'RED');
     lcdFrame.classList.add('fx-redbare', 'shake-burst');
     FxCanvas.burstFlames(34);
-    reachYokokuBadge.textContent = '🔥 先バレ発生（期待度40%）';
+    reachYokokuBadge.textContent = '🔥 先バレ';
     reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-rose-950/90 border border-rose-400 text-rose-200 shadow-lg';
     reachTitle.textContent = 'ポキュ↑ーン↓!!';
     reachTitle.className = 'text-3xl sm:text-5xl font-black crimson-grad-text cutin-slam';
-    reachSub.textContent = `${state.currentSpin}回転目・赤鬼保留出現！SPリーチへ発展…`;
+    reachSub.textContent = `${state.currentSpin}回転目・SPリーチ発展`;
   } else {
-    reachYokokuBadge.textContent = '⚡ サプライズSP発展!!';
+    reachYokokuBadge.textContent = '⚡ SP発展';
     reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/85 border border-amber-400 text-amber-300';
     reachTitle.textContent = 'リーチ発展!!';
     reachTitle.className = 'text-3xl font-black gold-grad-text pop-in';
-    reachSub.textContent = `${state.currentSpin}回転目から激熱展開!!`;
+    reachSub.textContent = `${state.currentSpin}回転目`;
   }
   updateStatsUI();
 
@@ -383,15 +378,14 @@ async function startNormalReach(res) {
 
     if (sc.isWhale) {
       StudioAudio.playWhaleSiren();
+      setAmbientBg('rainbow');
       lcdFrame.classList.add('fx-rainbow', 'shake-burst');
       triggerLamp('rainbow', '白鯨襲来!!');
       FxCanvas.spawnLightning('#38bdf8', 4);
     } else if (sc.isPremier) {
-      // ★プレミア予告時に全画面「鬼がかってますね」画像カットインを展開!!★
       await playOnigakariImageCutin({
-        caption: '鬼がかってますね!!（大当り濃厚）',
-        subCaption: '🌈 PREMIER CUT-IN 🌈',
-        dur: 1450,
+        caption: '鬼がかってますね',
+        dur: 3000,
         withPokyun: false,
         token: tok
       });
@@ -417,17 +411,19 @@ async function startNormalReach(res) {
     btnPushSub.textContent = sc.isWhale ? '白鯨討伐' : '当落ジャッジ';
     pushHintText.textContent = sc.isWhale
       ? 'タップで白鯨を撃破せよ!!'
-      : 'PUSHタップで当落ジャッジ！（右下のOKボタンで裏告知可）';
+      : 'PUSHで当落ジャッジ（右下OKで裏告知）';
 
     if (sc.ochiburu) {
       await wait(380, tok);
-      StudioAudio.playOchiburu();
+      StudioAudio.playOchiburu(true);
+      setAmbientBg('rainbow');
+      setSunburst(true);
       lcdFrame.classList.add('shake-intense', 'fx-gold');
       btnOniPush.classList.add('ochiburu-dome', 'push-dome-gold');
       setLed('rainbow');
       FxCanvas.spawnRing('#facc15', 300, 9);
       FxCanvas.spawnLightning('#fde047', 4);
-      reachYokokuBadge.textContent = '💥【落ちブル発動!!】3000BONUS＋RUSH濃厚!!';
+      reachYokokuBadge.textContent = '💥 鬼がかり3,000濃厚!!';
       reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow-lg pop-in';
     }
   } catch (e) {}
@@ -437,7 +433,15 @@ btnOniPush.addEventListener('click', () => {
   if (state.phase === 'REACH') resolveNormalReach();
 });
 
+// ★独立配置「OK（裏ボタン）」：通常リーチ中・仮表示中の割り込み昇格・RUSH前兆中に対応★
 btnSecretOk.addEventListener('click', () => {
+  // ① 仮表示中（300／1,500／Re:Start）の割り込み昇格！
+  if (canInterruptPromotion()) {
+    interruptPromotionByOk();
+    return;
+  }
+
+  // ② 通常時リーチ中の先行告知
   if (state.phase === 'REACH') {
     const sc = state.pendingReach;
     if (!sc || sc.secretRevealed || sc.ochiburu) return;
@@ -446,37 +450,43 @@ btnSecretOk.addEventListener('click', () => {
     sc.secretRevealed = true;
     if (sc.is3000) {
       sc.ochiburu = true;
-      StudioAudio.playOchiburu();
+      StudioAudio.playOchiburu(true);
+      setAmbientBg('rainbow');
+      setSunburst(true);
       lcdFrame.classList.add('shake-intense', 'fx-gold');
       btnOniPush.classList.add('ochiburu-dome', 'push-dome-gold');
-      triggerLamp('rainbow', '3000濃厚!!');
+      triggerLamp('rainbow', '3,000!!');
       setLed('rainbow');
       FxCanvas.spawnRing('#facc15', 300, 9);
       FxCanvas.spawnLightning('#fde047', 5);
       FxCanvas.burstRainbow(54);
-      reachYokokuBadge.textContent = '💥【OK裏ボタン→落ちブル!!】3000＋RUSH濃厚!!';
+      reachYokokuBadge.textContent = '💥 鬼がかり3,000濃厚!!';
       reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow-lg pop-in';
-      pushHintText.textContent = '3000BONUS濃厚!! 表のPUSHで図柄揃いへ!!';
+      pushHintText.textContent = 'PUSHで3,000BONUSへ!!';
     } else {
       StudioAudio.playKyuin();
+      setAmbientBg('rainbow');
       lcdFrame.classList.add('fx-rainbow', 'shake-burst');
       triggerLamp('rainbow', '一発告知!!');
       FxCanvas.spawnLightning('#fde047', 4);
       FxCanvas.burstRainbow(48);
-      reachYokokuBadge.textContent = '🌈【OK裏ボタン一発告知!!】キュイン!!';
+      reachYokokuBadge.textContent = '🌈 大当り濃厚!!';
       reachYokokuBadge.className = 'mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/95 border border-amber-300 rainbow-grad-text shadow-lg pop-in';
-      pushHintText.textContent = '大当り濃厚!! 表のPUSHで図柄揃いへ!!';
+      pushHintText.textContent = 'PUSHで図柄揃いへ!!';
     }
     return;
   }
 
+  // ③ RUSH中の前兆・違和感発生中に押すと、6,000当選時のみ落ちブル警報先行告知
   if (state.pendingRushHit && state.pendingRushHit.type === 'BONUS_6000' && !state.pendingRushHit.okRevealed) {
     state.pendingRushHit.okRevealed = true;
-    StudioAudio.playOchiburu();
-    triggerLamp('rainbow', 'OK 6000!!');
+    StudioAudio.playOchiburu(true);
+    setAmbientBg('rainbow');
+    setSunburst(true);
+    triggerLamp('rainbow', '6,000!!');
     FxCanvas.spawnLightning('#fde047', 5);
     rushTopBadge.classList.remove('hidden');
-    rushTopBadge.textContent = '💥【OK裏ボタン切り裂き確定!!】鬼がかり6000濃厚!!';
+    rushTopBadge.textContent = '💥 鬼がかり6,000濃厚!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in';
   }
 });
@@ -499,7 +509,7 @@ async function resolveNormalReach() {
     randomMissReels();
     normalTitle.textContent = 'ハズレ…';
     normalTitle.className = 'text-2xl sm:text-3xl font-black text-slate-400';
-    normalSub.textContent = `${sc.title}で敗北。次のポキュ↑ーン↓に期待！`;
+    normalSub.textContent = `${sc.title}で敗北。次の先バレに期待！`;
     setControlMode('NORMAL');
     if (sc.bareType) {
       addLog(`${state.currentSpin}回`, '先バレ', 'bg-rose-950 text-rose-300 border border-rose-700', sc.title, 'ハズレ', 'text-slate-400');
@@ -513,23 +523,12 @@ async function resolveNormalReach() {
   state.phase = 'ANIMATING';
   updateStatsUI();
 
-  fireRainbowBurst('🌈 初当り!!');
+  fireRainbowBurst('🌈 大当り!!');
 
   try {
     if (sc.hesoType === '3000_RUSH') {
-      await runGoldenPromotionSequence({
-        fakeSub: '🌈 図柄揃い大当り!! 🌈',
-        fakeTitle: '鬼がかり 1,500 BONUS!!',
-        fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-        fakeStyle: 'gold',
-        fakeIsRush: false,
-        fakeBurstGold: true,
-        finalSub: '🐋 白鯨討伐・1/3,499降臨!! 🐋',
-        finalTitle: '鬼がかり 3,000 BONUS!!',
-        finalExtra: '払出 3,000個（純増 2,800発）＋ 鬼がかりRUSH直行!!',
-        finalSound: '3000',
-        token: tok
-      });
+      // ★白鯨3,000：1,500仮表示を挟まずそのまま3,000ダイレクト直撃!!★
+      await runWhale3000Direct(tok);
       enterOnigakariRush(state.currentSpin, true);
     } else if (sc.hesoType === '1500_RUSH') {
       const isRevival = Math.random() < 0.35;
@@ -541,22 +540,25 @@ async function resolveNormalReach() {
           fakeStyle: 'despair',
           fakeIsRush: false,
           fakeBurstGold: false,
-          finalSub: '🔥 逆転死に戻り復活!! 🔥',
+          iwakanAnswer: '',
+          finalSub: '死に戻り復活',
           finalTitle: '鬼がかりRUSH 突入!!',
           finalExtra: '払出 1,500個（純増 1,400発）＋ ST144回獲得!!',
-          finalSound: '6000',
+          finalSound: '3000',
           token: tok
         });
         enterOnigakariRush(state.currentSpin, false);
       } else {
         StudioAudio.play1500Jackpot(false);
+        setAmbientBg('rainbow');
+        setSunburst(true);
         showFullscreenOverlay({
           mode: 'rainbow',
-          sub: '🌈 鬼がかりジャッジ成功!! 🌈',
+          sub: '鬼がかりジャッジ成功',
           main: '鬼がかりRUSH 突入!!',
           extra: '払出 1,500個（純増 1,400発）＋ ST144回獲得!!'
         });
-        FxCanvas.burstRainbow(75);
+        FxCanvas.burstRainbow(78);
         await wait(1650, tok);
         hideFullscreenOverlay();
         enterOnigakariRush(state.currentSpin, false);
@@ -581,7 +583,7 @@ async function resolveNormalReach() {
       setReels(sc.tenpaiNum, sc.tenpaiNum, sc.tenpaiNum);
       normalTitle.textContent = '通常 1,500 終了';
       normalTitle.className = 'text-2xl font-black text-amber-200';
-      normalSub.textContent = '純増1,400発を持って通常時へ！次の初当たりを狙おう！';
+      normalSub.textContent = '純増1,400発を持って通常時へ！';
       setControlMode('NORMAL');
       addLog(`${hitSpin}回`, '初当り(通常)', 'bg-slate-800 text-amber-200 border border-amber-700/60', sc.title, '1,500個 (1,400発)', 'text-amber-200');
       updateStatsUI();
@@ -590,7 +592,7 @@ async function resolveNormalReach() {
 }
 
 // =========================================================================
-// 鬼がかりRUSH（ST144回：Re:Start非大当たり化＋突発ポキュ↑ーン↓＋画像カットイン）
+// 鬼がかりRUSH（ST144回：事前落ちブル＝即6000／仮表示昇格＝ネタバレゼロ）
 // =========================================================================
 function enterOnigakariRush(hitSpin, is3000) {
   state.rushHits++;
@@ -636,13 +638,15 @@ async function afterBonusReserveCheck(prevType) {
 
         FxCanvas.setAmbient('wedding');
         FxCanvas.spawnFeathers(45);
+        setAmbientBg('rainbow');
+        setSunburst(true);
         StudioAudio.play6000Fanfare(true);
         triggerLamp('rainbow', '💒 12,000!!');
         showFullscreenOverlay({
           mode: 'wedding',
-          sub: `💒 奇跡の残保留${hitSlot.hitIndex}個目当選（約1/101） 💒`,
+          sub: 'PREMIUM WEDDING',
           main: '「スバルくん…愛しています」',
-          extra: '純白の奇跡・残保留6000連荘降臨!!'
+          extra: '残保留6,000連荘降臨!!'
         });
         await wait(1550, tok);
 
@@ -651,7 +655,7 @@ async function afterBonusReserveCheck(prevType) {
           mode: 'wedding',
           sub: '💒 PREMIUM WEDDING 💒',
           main: 'WEDDING BONUS 12,000!!',
-          extra: '鬼がかり6000＋6000＝計12,000個（実質純増 +11,200発）!!'
+          extra: '鬼がかり6,000＋6,000＝計12,000個（実質純増 +11,200発）!!'
         });
         await wait(2400, tok);
 
@@ -663,7 +667,7 @@ async function afterBonusReserveCheck(prevType) {
         return;
       }
 
-      // ② Re:Start以外の残保留当選のみ、独立乱数で「保留連即告知」を抽選（Re:Startは保留連告知しない）
+      // ② Re:Start以外の残保留当選のみ独立乱数で保留連即告知
       if (hitSlot.bonusType !== 'RESTART' && Math.random() < SPEC.HORYUREN_NOTICE_RATE) {
         state.rushHoryurenCount++;
         state.reserveQueue = [];
@@ -671,10 +675,12 @@ async function afterBonusReserveCheck(prevType) {
         setControlMode('BUSY');
         await wait(650, tok);
         StudioAudio.playPokyun(hitSlot.bonusType === 'BONUS_6000');
+        setAmbientBg('rainbow');
+        setSunburst(true);
         triggerLamp('rainbow', `残保${hitSlot.hitIndex}連!!`);
         FxCanvas.burstRainbow(54);
 
-        const label = hitSlot.bonusType === 'BONUS_6000' ? '鬼がかり 6,000 BONUS!!'
+        const label = hitSlot.bonusType === 'BONUS_6000' ? '超・鬼がかり 6,000 BONUS!!'
           : hitSlot.bonusType === 'BONUS_1500' ? '鬼がかり 1,500 BONUS!!'
           : '鬼がかり 300 BONUS!!';
 
@@ -682,10 +688,10 @@ async function afterBonusReserveCheck(prevType) {
         else StudioAudio.play1500Jackpot(true);
 
         showFullscreenOverlay({
-          mode: hitSlot.bonusType === 'BONUS_6000' ? '6000' : 'rainbow',
-          sub: `⚡ 残保留${hitSlot.hitIndex}個目で即引き戻し!! ⚡`,
-          main: `保留連!! ${label}`,
-          extra: '大当り終了直後の残保留で奇跡の連荘!!'
+          mode: 'rainbow',
+          sub: `保留連!!（残保留${hitSlot.hitIndex}個目）`,
+          main: label,
+          extra: '大当り直後の奇跡の連荘!!'
         });
         await wait(1900, tok);
         hideFullscreenOverlay();
@@ -725,6 +731,7 @@ function applyRushModeVisuals() {
 
   if (state.rushMode === 'onigakari') {
     FxCanvas.setAmbient('rush');
+    setAmbientBg('rush');
     lcdFrame.classList.add('fx-gold');
     setLed('red');
     updateReserveSlots('NORMAL');
@@ -733,10 +740,11 @@ function applyRushModeVisuals() {
     stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-950 border border-amber-400 text-amber-300 shadow whitespace-nowrap';
     rushModeBanner.textContent = 'ONIGAKARI RUSH (1/99.9)';
     rushIdleSub.textContent = state.rushCustNoNotice
-      ? '🤫【予告無し中】何か予告が出た瞬間に6,000濃厚!!'
-      : '🔥 点滅保留・カウントダウン法則崩れ・突発先バレに注目!!';
+      ? '🤫 予告無しカスタム中'
+      : '🔥 25%の「鬼がかり6000」を引け！';
   } else if (state.rushMode === 'brain') {
     FxCanvas.setAmbient('rush');
+    setAmbientBg('brain');
     lcdFrame.classList.add('mode-brain-bg');
     setLed('brain');
     updateReserveSlots('BRAIN');
@@ -744,9 +752,10 @@ function applyRushModeVisuals() {
     stateBadge.textContent = '🧠 脳が震えるRUSH';
     stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-purple-950 border border-fuchsia-400 text-fuchsia-200 shadow whitespace-nowrap';
     rushModeBanner.textContent = 'BRAIN TREMBLE RUSH';
-    rushIdleSub.textContent = '🧠「脳が」約50%／🖐️見えざる手は当たれば6000濃厚!!';
+    rushIdleSub.textContent = '🧠 文字保留が震えれば大当り!!';
   } else if (state.rushMode === 'rem') {
     FxCanvas.setAmbient('rem');
+    setAmbientBg('rem');
     lcdFrame.classList.add('mode-rem-bg');
     setLed('rem');
     updateReserveSlots('NORMAL');
@@ -754,9 +763,10 @@ function applyRushModeVisuals() {
     stateBadge.textContent = '💙 レム告知モード';
     stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-sky-950 border border-sky-400 text-sky-200 shadow whitespace-nowrap';
     rushModeBanner.textContent = 'REM NOTICE MODE';
-    rushIdleSub.textContent = '💙 静寂から点灯で濃厚！徐々に点灯・再点灯は6000濃厚!!';
+    rushIdleSub.textContent = '💙 静寂からランプ点灯で大当り!!';
   } else {
     FxCanvas.setAmbient('zero');
+    setAmbientBg('zero');
     lcdFrame.classList.add('mode-zero-bg');
     setLed('');
     updateReserveSlots('NORMAL');
@@ -764,7 +774,7 @@ function applyRushModeVisuals() {
     stateBadge.textContent = '⚡ ゼロかRUSH';
     stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-zinc-900 border border-zinc-400 text-zinc-100 shadow whitespace-nowrap';
     rushModeBanner.textContent = 'ZERO OR 6000 RUSH';
-    rushIdleSub.textContent = '⚡ 先読み一切なし！静寂を裂く一撃即決モード!!';
+    rushIdleSub.textContent = '⚡ 先読みなし・一撃即決モード';
   }
 }
 
@@ -837,7 +847,7 @@ async function playRushTeaserAndResume(teaser, resumeAuto = false) {
     if (state.rushCustTrust && teaser === 'TRUST_GAZE') {
       const tr = pickTrustPercent({ isHit: false });
       rushTopBadge.classList.remove('hidden');
-      rushTopBadge.textContent = `🎯 期待度 ${tr.txt}`;
+      rushTopBadge.textContent = `🎯 ${tr.txt}`;
       rushTopBadge.className = `mb-1 px-3 py-0.5 rounded-full text-xs font-black bg-black/90 border shadow-lg ${tr.cls}`;
       await wait(620, tok);
       rushTopBadge.classList.add('hidden');
@@ -850,7 +860,7 @@ async function playRushTeaserAndResume(teaser, resumeAuto = false) {
       await playOnigakariCountdown({ isHit: false, is6000: false, token: tok });
     } else if (teaser === 'ONI_BLINK_GAZE') {
       updateReserveSlots('NORMAL', 'BLINK');
-      rushIdleSub.textContent = '✨ 点滅保留出現!! チャンス…!?';
+      rushIdleSub.textContent = '✨ 点滅保留出現!!';
       await wait(520, tok);
       updateReserveSlots('NORMAL', null);
     }
@@ -865,10 +875,20 @@ async function playRushTeaserAndResume(teaser, resumeAuto = false) {
   } catch (e) {}
 }
 
+function award6000AndContinue() {
+  state.rushChains++;
+  state.rush6000Count++;
+  state.rushDisp += SPEC.DISP_6000;
+  state.rushNet += SPEC.NET_6000;
+  state.balls += SPEC.NET_6000;
+  updateStatsUI();
+  afterBonusReserveCheck('BONUS_6000');
+}
+
 // =========================================================================
 // RUSH当選シーケンス
-// ・Re:Start（14%）＝演出的には非大当たり扱い（前兆・違和感・ランプ告知一切なし！）
-// ・6,000当選時の一部も「偽Re:Start（無告知）」から油断撃ち抜きポキュ↑ーン↓／昇格！
+// ・事前落ちブルが鳴った場合は仮表示を挟まず即6,000直撃（音ネタバレ解消！）
+// ・仮表示からの昇格時は事前落ちブルを鳴らさない
 // =========================================================================
 async function handleRushHitSequence(bonusType) {
   const tok = ++seqToken;
@@ -878,154 +898,144 @@ async function handleRushHitSequence(bonusType) {
   setControlMode('BUSY');
   updateStatsUI();
 
+  let currentIwakan = '';
+  let direct6000AlreadyAnnounced = false;
+  let alarmAlreadyPlaying = false;
+
   try {
-    // ★① 本物のRe:Start（14%）：大当たり告知・違和感・ランプを一切出さず突然Re:Startへ★
+    // ① 本物のRe:Start（14%）：非大当たり扱い（前兆・違和感・ランプ一切なし）
     if (bonusType === 'RESTART') {
       clearIwakanEffects();
       state.pendingRushHit = null;
-      await runNormalRushBonusSequence('RESTART');
+      await runNormalRushBonusSequence('RESTART', '');
       return;
     }
 
-    // ★② 6,000当選時の特殊サプライズ分岐★
+    // ② 6,000当選時の特殊サプライズ直撃分岐（前兆ゼロ）
     if (is6000) {
       const surprise = Math.random();
 
-      // (a) 偽Re:Start（無告知で突然Re:Start表示 → 油断したところで「ポキュ↑ーン↓!!」or「これから脳が震える…」で6,000!!）
-      if (surprise < 0.28) {
+      // (a) 突発・新落ちブル警報ロングトーン直撃!!（前兆ゼロで即6,000）
+      if (surprise < (state.custOchiburu ? 0.24 : 0.12)) {
+        state.rushIwakanNotes.push('🚨 突発落ちブル警報');
+        state.pendingRushHit = null;
+        await runSuddenOchiburu6000({ sub: '鬼がかりRUSH', token: tok });
+        award6000AndContinue();
+        return;
+      }
+
+      // (b) 偽Re:Start（無告知で突然Re:Start → 油断撃ち抜き虹ポキュ↑ーン↓／昇格）
+      if (surprise < 0.48) {
         clearIwakanEffects();
         state.pendingRushHit = null;
-        await runRush6000Sequence({ forceFake: 'restart' });
+        await runRush6000Sequence({ forceFake: 'restart', iwakanAnswer: '' });
         return;
       }
 
-      // (b) 突発3秒ブラックアウトフリーズ → 全画面「鬼がかってますね」画像降臨 → 6,000!!
-      if (surprise < 0.50) {
-        state.rushIwakanNotes.push('💀 3秒フリーズ→鬼がかってますね降臨!!');
+      // (c) 突発3秒ブラックアウトフリーズ → 全画面「鬼がかってますね」(3.0s) → 6,000!!
+      if (surprise < 0.66) {
+        state.rushIwakanNotes.push('💀 3秒フリーズ');
         state.pendingRushHit = null;
         await runSudden3sFreeze6000(tok);
-        state.rushChains++;
-        state.rush6000Count++;
-        state.rushDisp += SPEC.DISP_6000;
-        state.rushNet += SPEC.NET_6000;
-        state.balls += SPEC.NET_6000;
-        updateStatsUI();
-        afterBonusReserveCheck('BONUS_6000');
+        award6000AndContinue();
         return;
       }
 
-      // (c) 鬼がかりRUSH・ゼロかRUSH限定：変動中いきなり「虹ポキュ↑ーン↓!!」一撃6,000直撃!!
-      if ((state.rushMode === 'onigakari' || state.rushMode === 'zero') && surprise < 0.68) {
-        state.rushIwakanNotes.push('🌈 RUSH中突発・虹ポキュ↑ーン↓!!');
+      // (d) 鬼がかりRUSH・ゼロかRUSH限定：変動中いきなり「虹ポキュ↑ーン↓!!」一撃6,000直撃
+      if ((state.rushMode === 'onigakari' || state.rushMode === 'zero') && surprise < 0.80) {
+        state.rushIwakanNotes.push('🌈 突発虹先バレ');
         state.pendingRushHit = null;
         StudioAudio.playPokyun(true);
         fireRainbowBurst('🌈 ポキュ↑ーン↓!!');
         showFullscreenOverlay({
           mode: 'rainbow',
-          sub: '🔥 RUSH中突発・虹先バレ炸裂!! 🔥',
+          sub: '鬼がかりRUSH',
           main: 'ポキュ↑ーン↓!!',
-          extra: '鬼がかり6,000BONUS直撃降臨!!'
+          extra: ''
         });
         await wait(1250, tok);
-        StudioAudio.playOchiburu();
-        fireShatterFly();
-        showFullscreenOverlay({
-          mode: '6000',
-          sub: '🌈【突発ポキュ↑ーン↓直撃!!】🌈',
-          main: '鬼がかり 6,000 BONUS!!',
-          extra: '払出 6,000個（実質純増 5,600発）獲得!!'
-        });
-        StudioAudio.play6000Fanfare(false);
-        await wait(2200, tok);
-        hideFullscreenOverlay();
-        state.rushChains++;
-        state.rush6000Count++;
-        state.rushDisp += SPEC.DISP_6000;
-        state.rushNet += SPEC.NET_6000;
-        state.balls += SPEC.NET_6000;
-        updateStatsUI();
-        afterBonusReserveCheck('BONUS_6000');
+        await runSuddenOchiburu6000({ sub: '鬼がかりRUSH', skipAlarm: false, token: tok });
+        award6000AndContinue();
         return;
       }
     }
 
-    // ③ 信頼度先バレカスタムON時：期待度数値を表示
+    // ③ 信頼度先バレカスタムON時
     if (state.rushCustTrust) {
       const tr = pickTrustPercent({ isHit: true, is6000 });
       rushTopBadge.classList.remove('hidden');
-      rushTopBadge.textContent = `🎯 期待度 ${tr.txt}`;
+      rushTopBadge.textContent = `🎯 ${tr.txt}`;
       rushTopBadge.className = `mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-black/95 border shadow-lg pop-in ${tr.cls}`;
       await wait(520, tok);
     }
 
-    // ④ 違和感演出（違和感UP時は約72%、OFF時は約25%で発動）
+    // ④ 違和感演出（本家答え合わせ枠に使うため currentIwakan へ保持）
     const iwakanChance = state.rushCustIwakan ? 0.72 : 0.25;
     if (Math.random() < iwakanChance) {
-      const iwLabel = await playIwakanEffect({ is6000, rushMode: state.rushMode, token: tok });
-      if (iwLabel) state.rushIwakanNotes.push(iwLabel);
+      currentIwakan = await playIwakanEffect({ is6000, rushMode: state.rushMode, token: tok });
+      if (currentIwakan) state.rushIwakanNotes.push(currentIwakan);
     }
 
-    // ⑤ 予告無しカスタムON時の法則：予告が出たら6,000濃厚！
+    // ⑤ 予告無しカスタムON時：1,500以下は予告なしで即大当りへ
     if (state.rushCustNoNotice && !is6000) {
       clearIwakanEffects();
       state.pendingRushHit = null;
-      await runNormalRushBonusSequence(bonusType);
+      await runNormalRushBonusSequence(bonusType, currentIwakan);
       return;
     }
 
-    // ⑥ モード別の告知演出
+    // ⑥ モード別告知（ここで落ちブルが鳴ったら仮表示を挟まず即6,000直撃へ！）
     if (state.rushMode === 'rem') {
       if (Math.random() < 0.38) {
         updateReserveSlots('NORMAL', is6000 ? 'BLINK_RED' : 'BLINK');
-        rushIdleSub.textContent = '💙 点滅保留発生!!（大当り濃厚!!）';
+        rushIdleSub.textContent = '💙 点滅保留発生!!';
         await wait(480, tok);
       }
       const remNote = await playRemNoticePattern({ is6000, token: tok });
-      if (is6000 && remNote.includes('6000')) state.rushIwakanNotes.push(remNote);
-
-      if (is6000 && !state.pendingRushHit.okRevealed && Math.random() < (state.custOchiburu ? 0.75 : 0.20)) {
-        StudioAudio.playOchiburu();
-        lcdFrame.classList.add('shake-burst');
-        await wait(500, tok);
+      if (remNote) {
+        if (!currentIwakan) currentIwakan = remNote;
+        state.rushIwakanNotes.push(remNote);
+      }
+      if (is6000 && (state.pendingRushHit.okRevealed || Math.random() < (state.custOchiburu ? 0.45 : 0.15))) {
+        direct6000AlreadyAnnounced = true;
+        alarmAlreadyPlaying = state.pendingRushHit.okRevealed;
       }
     } else if (state.rushMode === 'brain') {
       const isHands = is6000 && Math.random() < 0.42;
-      const bNote = await playBrainModeSequence({
+      const bRes = await playBrainModeSequence({
         isHit: true, is6000, bonusType, isHands,
         custOchiburu: state.custOchiburu, token: tok
       });
-      if (bNote) state.rushIwakanNotes.push(bNote);
+      if (bRes.note) state.rushIwakanNotes.push(bRes.note);
+      if (bRes.triggeredOchiburu || state.pendingRushHit.okRevealed) {
+        direct6000AlreadyAnnounced = true;
+        alarmAlreadyPlaying = true;
+      }
     } else if (state.rushMode === 'zero') {
       if (is6000) {
-        if (Math.random() < (state.custOchiburu ? 0.85 : 0.35)) {
-          StudioAudio.playOchiburu();
-          lcdFrame.classList.add('shake-burst');
-          triggerLamp('rainbow', 'ZERO→6000!!');
-          await wait(550, tok);
-        } else {
-          StudioAudio.playPuchun();
-          await wait(380, tok);
-        }
+        direct6000AlreadyAnnounced = true;
+        alarmAlreadyPlaying = state.pendingRushHit.okRevealed;
       } else {
         StudioAudio.playKyuin();
-        triggerLamp('red', '即当り!!');
+        triggerLamp('red', '大当り!!');
         await wait(320, tok);
       }
     } else {
       if (is6000 && Math.random() < 0.35) {
         updateReserveSlots('NORMAL', 'BLINK_RED');
-        rushIdleSub.textContent = '🔥 特殊高速赤点滅保留!!（当たれば6000濃厚!!）';
+        rushIdleSub.textContent = '🔥 赤点滅保留!!';
         await wait(520, tok);
       }
       if (Math.random() < 0.52) {
         const cdNote = await playOnigakariCountdown({ isHit: true, is6000, token: tok });
-        if (cdNote && cdNote.includes('6000')) state.rushIwakanNotes.push(cdNote);
+        if (cdNote) {
+          if (!currentIwakan) currentIwakan = cdNote;
+          state.rushIwakanNotes.push(cdNote);
+        }
       }
-      if (is6000 && !state.pendingRushHit.okRevealed && Math.random() < (state.custOchiburu ? 0.85 : 0.25)) {
-        StudioAudio.playOchiburu();
-        lcdFrame.classList.add('shake-burst');
-        triggerLamp('rainbow', '6000濃厚!!');
-        await wait(550, tok);
+      if (is6000 && (state.pendingRushHit.okRevealed || Math.random() < (state.custOchiburu ? 0.42 : 0.18))) {
+        direct6000AlreadyAnnounced = true;
+        alarmAlreadyPlaying = state.pendingRushHit.okRevealed;
       }
     }
 
@@ -1033,9 +1043,16 @@ async function handleRushHitSequence(bonusType) {
     state.pendingRushHit = null;
 
     if (is6000) {
-      await runRush6000Sequence({ forceFake: null });
+      if (direct6000AlreadyAnnounced) {
+        // 事前落ちブル確定ルート → 仮表示を挟まず即6,000直撃!!
+        await runSuddenOchiburu6000({ sub: '鬼がかりRUSH', skipAlarm: alarmAlreadyPlaying, token: tok });
+        award6000AndContinue();
+      } else {
+        // 仮表示からの昇格ルート → 事前落ちブルは鳴っていないのでネタバレゼロ！
+        await runRush6000Sequence({ forceFake: null, iwakanAnswer: currentIwakan });
+      }
     } else {
-      await runNormalRushBonusSequence(bonusType);
+      await runNormalRushBonusSequence(bonusType, currentIwakan);
     }
   } catch (e) {
     state.pendingRushHit = null;
@@ -1047,7 +1064,7 @@ function handleRushEvent(ev, { fromAuto = false } = {}) {
   if (!ev) return;
   if (ev.type === 'MISS') {
     if (state.rushMode === 'onigakari' && state.stRemaining <= 15) {
-      rushIdleSub.textContent = '🔥 最終カウントダウン!! ここで引き戻せ!!';
+      rushIdleSub.textContent = '🔥 最終カウントダウン!!';
     }
     rushBigRemain.className = state.stRemaining <= 15
       ? 'text-6xl sm:text-7xl font-black crimson-grad-text leading-none tracking-tight'
@@ -1066,13 +1083,12 @@ function handleRushEvent(ev, { fromAuto = false } = {}) {
   handleRushHitSequence(ev.type);
 }
 
-// 右打ち鬼がかり6000当選（25%）→ 本物と完全一致の仮表示からぶっ飛び昇格
-async function runRush6000Sequence({ forceFake = null } = {}) {
+// 右打ち鬼がかり6000昇格（本物と完全一致の仮表示 → ネタバレなし昇格）
+async function runRush6000Sequence({ forceFake = null, iwakanAnswer = '' } = {}) {
   const tok = ++seqToken;
   state.phase = 'ANIMATING';
   setControlMode('BUSY');
 
-  // 通常の前兆経由時は300または1500から昇格（偽Re:Startは上の無告知ルート専用で呼ばれる）
   const pick = forceFake || (Math.random() < 0.45 ? '300' : '1500');
   let opts;
   if (pick === '300') {
@@ -1084,14 +1100,14 @@ async function runRush6000Sequence({ forceFake = null } = {}) {
       fakeRestart: false,
       fakeIsRush: true,
       fakeBurstGold: false,
-      finalSub: '💥【鬼300 切り裂き昇格!!】💥',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
+      iwakanAnswer,
+      finalSub: '鬼がかりRUSH',
+      finalTitle: '超・鬼がかり 6,000 BONUS!!',
+      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
       finalSound: '6000',
       crashType: 'auto'
     };
   } else if (pick === 'restart') {
-    // 偽Re:Startは55%で油断撃ち抜き「虹ポキュ↑ーン↓!!」昇格、残りは4ステップ昇格！
     opts = {
       fakeSub: '⏪ 死に戻り ⏪',
       fakeTitle: 'Re:Start',
@@ -1100,9 +1116,10 @@ async function runRush6000Sequence({ forceFake = null } = {}) {
       fakeRestart: true,
       fakeIsRush: true,
       fakeBurstGold: false,
-      finalSub: '💥【Re:Start 逆転切り裂き!!】💥',
+      iwakanAnswer: '',
+      finalSub: 'Re:Start 逆転昇格',
       finalTitle: '超・鬼がかり 6,000 BONUS!!',
-      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
+      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
       finalSound: '6000',
       crashType: Math.random() < 0.55 ? 'pokyun' : 'auto'
     };
@@ -1115,9 +1132,10 @@ async function runRush6000Sequence({ forceFake = null } = {}) {
       fakeRestart: false,
       fakeIsRush: true,
       fakeBurstGold: true,
-      finalSub: '🔥【1500 切り裂き昇格!!】🔥',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
+      iwakanAnswer,
+      finalSub: '鬼がかりRUSH',
+      finalTitle: '超・鬼がかり 6,000 BONUS!!',
+      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
       finalSound: '6000',
       crashType: 'auto'
     };
@@ -1125,25 +1143,22 @@ async function runRush6000Sequence({ forceFake = null } = {}) {
 
   try {
     await runGoldenPromotionSequence({ ...opts, token: tok });
-    state.rushChains++;
-    state.rush6000Count++;
-    state.rushDisp += SPEC.DISP_6000;
-    state.rushNet += SPEC.NET_6000;
-    state.balls += SPEC.NET_6000;
-    updateStatsUI();
-    afterBonusReserveCheck('BONUS_6000');
+    award6000AndContinue();
   } catch (e) {}
 }
 
-async function runNormalRushBonusSequence(type) {
+async function runNormalRushBonusSequence(type, iwakanAnswer = '') {
   const tok = ++seqToken;
   state.phase = 'ANIMATING';
   setControlMode('BUSY');
   setActiveScene('bonus');
+  hideIwakanAnswer();
 
   try {
     if (type === 'BONUS_1500') {
       StudioAudio.play1500Jackpot(true);
+      setAmbientBg('rainbow');
+      setSunburst(true);
       lcdFrame.classList.add('fx-gold');
       FxCanvas.burstGold(34);
       bonusSubLabel.textContent = '🔥 右打ち 55% 🔥';
@@ -1151,7 +1166,9 @@ async function runNormalRushBonusSequence(type) {
       bonusMainTitle.textContent = '鬼がかり 1,500 BONUS!!';
       bonusMainTitle.className = 'text-3xl sm:text-4xl font-black gold-grad-text pop-in';
       bonusDesc.textContent = '払出 1,500個（実質純増 +1,400発）獲得！';
-      await wait(1250, tok);
+      if (iwakanAnswer) showIwakanAnswer(iwakanAnswer, false);
+      await wait(1350, tok);
+      setSunburst(false);
       state.rushChains++; state.rushDisp += SPEC.DISP_1500; state.rushNet += SPEC.NET_1500; state.balls += SPEC.NET_1500;
       updateStatsUI();
       afterBonusReserveCheck('BONUS_1500');
@@ -1163,12 +1180,12 @@ async function runNormalRushBonusSequence(type) {
       bonusMainTitle.textContent = '鬼がかり 300 BONUS';
       bonusMainTitle.className = 'text-3xl sm:text-4xl font-black text-slate-200 pop-in';
       bonusDesc.textContent = '実質純増 +280発 ＆ ST144回リセット！';
-      await wait(1200, tok);
+      if (iwakanAnswer) showIwakanAnswer(iwakanAnswer, false);
+      await wait(1300, tok);
       state.rushChains++; state.rushDisp += SPEC.DISP_300; state.rushNet += SPEC.NET_300; state.balls += SPEC.NET_300;
       updateStatsUI();
       afterBonusReserveCheck('BONUS_300');
     } else {
-      // 本物のRe:Start（非大当たり扱い：偽Re:Startと文言・見た目を100%統一）
       StudioAudio.playReStart();
       lcdFrame.classList.add('fx-restart', 'mode-despair-bg');
       bonusSubLabel.textContent = '⏪ 死に戻り ⏪';
@@ -1189,6 +1206,8 @@ function finishRush() {
   StudioAudio.playFail();
   state.phase = 'ANIMATING';
   setControlMode('BUSY');
+  setAmbientBg('');
+  setSunburst(false);
   FxCanvas.setAmbient('ember');
 
   document.getElementById('resChains').textContent = `${state.rushChains} 連`;
@@ -1197,11 +1216,11 @@ function finishRush() {
   document.getElementById('resNet').textContent = `${state.rushNet.toLocaleString()} 発`;
   const cashEst = Math.round(state.rushNet * exchangeRate);
   const lastIwakan = state.rushIwakanNotes.length > 0
-    ? `\n👁️ 発生演出：${state.rushIwakanNotes.slice(-2).join(' / ')}`
+    ? `\n${state.rushIwakanNotes.slice(-2).join(' / ')}`
     : '';
   document.getElementById('resSummaryText').textContent =
     `総獲得払出 ${state.rushDisp.toLocaleString()}個（換金目安 ${cashEst.toLocaleString()}円）` +
-    (state.rushWeddingCount > 0 ? `\n💒 奇跡のWEDDING 12,000 ×${state.rushWeddingCount}回!!` : '') +
+    (state.rushWeddingCount > 0 ? `\n💒 WEDDING 12,000 ×${state.rushWeddingCount}回!!` : '') +
     lastIwakan;
   resultModal.classList.remove('hidden');
 
@@ -1210,7 +1229,6 @@ function finishRush() {
   if (state.rushWeddingCount > 0) tags.push(`💒12000×${state.rushWeddingCount}`);
   if (state.rushHoryurenCount > 0) tags.push(`保留連×${state.rushHoryurenCount}`);
   if (state.rushRestartCount > 0) tags.push(`Re:Start×${state.rushRestartCount}`);
-  if (state.rushIwakanNotes.length > 0) tags.push(`演出${state.rushIwakanNotes.length}回`);
   addLog(
     `${state.rushStartSpin}回`,
     '鬼がかりRUSH',
@@ -1223,98 +1241,90 @@ function finishRush() {
 }
 
 // =========================================================================
-// 「🎬 昇格テスト」ボタン（新作①3秒フリーズ＋画像、②偽Re:Start→虹ポキュ↑ーン↓から順番に確認！）
+// 「🎬 テスト ▾」ミニ選択メニュー（1タップで好きな演出を個別再生）
 // =========================================================================
-let promoTestCycle = 0;
-document.getElementById('btnTestPromo').addEventListener('click', async () => {
-  if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
-  stopAuto();
-  document.getElementById('tabPlay').click();
+const promoTestMenu = document.getElementById('promoTestMenu');
+document.getElementById('btnTestPromo').addEventListener('click', () => {
+  promoTestMenu.classList.toggle('hidden');
+});
+document.getElementById('btnClosePromoMenu').addEventListener('click', () => {
+  promoTestMenu.classList.add('hidden');
+});
 
-  const prevPhase = state.phase;
-  const prevScene = state.activeScene;
-  const tok = ++seqToken;
-  state.phase = 'ANIMATING';
-  setControlMode('BUSY');
+let randomCrashIdx = 0;
+document.querySelectorAll('.promo-test-item').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
+    promoTestMenu.classList.add('hidden');
+    stopAuto();
+    document.getElementById('tabPlay').click();
 
-  const variants = [
-    {
-      fakeSub: '右打ち 6%',
-      fakeTitle: '鬼がかり 300 BONUS',
-      fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
-      fakeStyle: 'despair', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false,
-      finalSub: '🌈【鬼がかってますね・6000降臨!!】🌈',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト①：3秒フリーズ → 全画面「鬼がかってますね」画像 → 6,000!!',
-      finalSound: '6000', crashType: 'freeze3s'
-    },
-    {
-      fakeSub: '⏪ 死に戻り ⏪',
-      fakeTitle: 'Re:Start',
-      fakeDesc: '出玉なし・ST144回へ巻き戻し',
-      fakeStyle: 'despair', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false,
-      finalSub: '🌈【虹ポキュ↑ーン↓逆転昇格!!】🌈',
-      finalTitle: '超・鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト②：偽Re:Start → 油断撃ち抜き「虹ポキュ↑ーン↓!!」→ 6,000!!',
-      finalSound: '6000', crashType: 'pokyun'
-    },
-    {
-      fakeSub: '右打ち 6%',
-      fakeTitle: '鬼がかり 300 BONUS',
-      fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
-      fakeStyle: 'despair', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false,
-      finalSub: '⬇️【画面物理落下クラッシュ!!】⬇️',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト③：画面物理落下クラッシュ → 6,000降臨!!',
-      finalSound: '6000', crashType: 'drop'
-    },
-    {
-      fakeSub: '🔥 右打ち 55% 🔥',
-      fakeTitle: '鬼がかり 1,500 BONUS!!',
-      fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-      fakeStyle: 'gold', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true,
-      finalSub: '💥【画面3D粉砕吹き飛び!!】💥',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト④：画面6分割3D粉砕 → 6,000降臨!!',
-      finalSound: '6000', crashType: 'shatter'
-    },
-    {
-      fakeSub: '🔥 右打ち 55% 🔥',
-      fakeTitle: '鬼がかり 1,500 BONUS!!',
-      fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-      fakeStyle: 'gold', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true,
-      finalSub: '⚡【画面全体・超激震＆RGB破壊!!】⚡',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト⑤：ページ全体超激震＋RGB色ズレ → 6,000降臨!!',
-      finalSound: '6000', crashType: 'quake'
-    },
-    {
-      fakeSub: '🔥 右打ち 55% 🔥',
-      fakeTitle: '鬼がかり 1,500 BONUS!!',
-      fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-      fakeStyle: 'gold', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true,
-      finalSub: '💥【斜め真っ二つ切り裂き昇格!!】💥',
-      finalTitle: '鬼がかり 6,000 BONUS!!',
-      finalExtra: 'テスト⑥：王道の斜め真っ二つ切り裂き → 6,000降臨!!',
-      finalSound: '6000', crashType: 'slash'
-    }
-  ];
-  const v = variants[promoTestCycle % variants.length];
-  promoTestCycle++;
+    const kind = btn.dataset.test;
+    const prevPhase = state.phase;
+    const prevScene = state.activeScene;
+    const tok = ++seqToken;
+    state.phase = 'ANIMATING';
+    setControlMode('BUSY');
 
-  try {
-    await runGoldenPromotionSequence({ ...v, token: tok });
-    state.phase = prevPhase;
-    clearVisualEffects();
-    setActiveScene(prevScene);
-    if (prevPhase === 'RUSH') {
-      applyRushModeVisuals();
-      setControlMode('RUSH');
-    } else {
-      FxCanvas.setAmbient('ember');
-      setControlMode('NORMAL');
-    }
-  } catch (e) {}
+    try {
+      if (kind === 'freeze3s') {
+        await runSudden3sFreeze6000(tok);
+      } else if (kind === 'suddenOchi') {
+        await runSuddenOchiburu6000({ sub: '鬼がかりRUSH', token: tok });
+      } else if (kind === 'whale3000') {
+        await runWhale3000Direct(tok);
+      } else if (kind === 'pokyun') {
+        await runGoldenPromotionSequence({
+          fakeSub: '⏪ 死に戻り ⏪',
+          fakeTitle: 'Re:Start',
+          fakeDesc: '出玉なし・ST144回へ巻き戻し',
+          fakeStyle: 'despair', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false,
+          iwakanAnswer: '',
+          finalSub: 'Re:Start 逆転昇格',
+          finalTitle: '超・鬼がかり 6,000 BONUS!!',
+          finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
+          finalSound: '6000', crashType: 'pokyun', token: tok
+        });
+      } else if (kind === 'whisper') {
+        await runGoldenPromotionSequence({
+          fakeSub: '右打ち 6%',
+          fakeTitle: '鬼がかり 300 BONUS',
+          fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
+          fakeStyle: 'despair', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false,
+          iwakanAnswer: '',
+          finalSub: '鬼がかりRUSH',
+          finalTitle: '超・鬼がかり 6,000 BONUS!!',
+          finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
+          finalSound: '6000', crashType: 'whisper', token: tok
+        });
+      } else {
+        const modes = ['drop', 'shatter', 'quake', 'slash'];
+        const pickMode = modes[randomCrashIdx++ % modes.length];
+        await runGoldenPromotionSequence({
+          fakeSub: '🔥 右打ち 55% 🔥',
+          fakeTitle: '鬼がかり 1,500 BONUS!!',
+          fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
+          fakeStyle: 'gold', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true,
+          iwakanAnswer: '👁️ サイドLED片側消灯',
+          finalSub: '鬼がかりRUSH',
+          finalTitle: '超・鬼がかり 6,000 BONUS!!',
+          finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
+          finalSound: '6000', crashType: pickMode, token: tok
+        });
+      }
+
+      state.phase = prevPhase;
+      clearVisualEffects();
+      setActiveScene(prevScene);
+      if (prevPhase === 'RUSH') {
+        applyRushModeVisuals();
+        setControlMode('RUSH');
+      } else {
+        FxCanvas.setAmbient('ember');
+        setControlMode('NORMAL');
+      }
+    } catch (e) {}
+  });
 });
 
 // =========================================================================
@@ -1331,11 +1341,11 @@ document.getElementById('btnCloseResult').addEventListener('click', () => {
   stRemainingWrap.classList.add('hidden');
   rushStatusBar.classList.add('hidden');
   stateBadge.textContent = '通常時 1/349.9';
-  stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-black/80 border border-rose-500/70 text-rose-300 shadow whitespace-nowrap';
+  stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-black/80 border border-amber-500/70 text-amber-200 shadow whitespace-nowrap';
   setActiveScene('normal');
   normalTitle.textContent = '通常時';
   normalTitle.className = 'text-2xl sm:text-3xl font-black text-white';
-  normalSub.textContent = '鬼がかりRUSH終了！次の極上ポキュ↑ーン↓を狙おう！';
+  normalSub.textContent = '鬼がかりRUSH終了！次の先バレを狙おう！';
   setControlMode('NORMAL');
   updateStatsUI();
 });
@@ -1351,7 +1361,7 @@ document.getElementById('btnSpin1').addEventListener('click', () => {
     randomMissReels();
     normalTitle.textContent = `${state.currentSpin} 回転`;
     normalTitle.className = 'text-2xl sm:text-3xl font-black text-white';
-    normalSub.textContent = '通常変動中…（図柄揃い 1/349.9）';
+    normalSub.textContent = '通常変動中…（1/349.9）';
     updateStatsUI();
   }
 });
@@ -1387,7 +1397,7 @@ document.getElementById('btnAutoSakibare').addEventListener('click', () => {
     setReels(Math.floor(Math.random()*7)+1, Math.floor(Math.random()*7)+1, Math.floor(Math.random()*7)+1, { spinning: [true, true, true] });
     normalTitle.textContent = `${state.currentSpin} 回転`;
     normalTitle.className = 'text-2xl sm:text-3xl font-black text-white';
-    normalSub.textContent = '爆音ポキュ↑ーン↓待機中… 高速回転中！';
+    normalSub.textContent = '先バレ待機中… 高速回転中！';
     updateStatsUI();
   }, 32);
 });
@@ -1411,7 +1421,7 @@ document.getElementById('btnAutoHit').addEventListener('click', () => {
     setReels(Math.floor(Math.random()*7)+1, Math.floor(Math.random()*7)+1, Math.floor(Math.random()*7)+1, { spinning: [true, true, true] });
     normalTitle.textContent = `${state.currentSpin} 回転`;
     normalTitle.className = 'text-2xl sm:text-3xl font-black text-white';
-    normalSub.textContent = '大当りまで超高速オート消化中…';
+    normalSub.textContent = '大当りまで高速オート消化中…';
     updateStatsUI();
   }, 30);
 });
@@ -1442,11 +1452,11 @@ document.getElementById('btnResetPlay').addEventListener('click', () => {
   setActiveScene('normal');
   setReels(7, 3, 7);
   stateBadge.textContent = '通常時 1/349.9';
-  stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-black/80 border border-rose-500/70 text-rose-300 shadow whitespace-nowrap';
+  stateBadge.className = 'px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-black/80 border border-amber-500/70 text-amber-200 shadow whitespace-nowrap';
   normalTitle.textContent = 'STANDBY';
   normalTitle.className = 'text-2xl sm:text-3xl font-black text-white';
   normalSub.textContent = 'データをリセットしました。';
-  document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="4" class="py-5 text-center text-slate-500">まだ履歴はありません。</td></tr>';
+  document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="4" class="py-5 text-center text-amber-200/50">まだ履歴はありません。</td></tr>';
   setControlMode('NORMAL');
   updateStatsUI();
 });
@@ -1513,7 +1523,7 @@ document.getElementById('toggleOchiburu').addEventListener('click', e => {
   state.custOchiburu = !state.custOchiburu;
   e.target.textContent = `💥 落ちブルUP: ${state.custOchiburu ? 'ON' : 'OFF'}`;
   e.target.className = state.custOchiburu
-    ? 'py-2 px-1 rounded-xl text-[11px] font-black border transition bg-amber-600/65 border-amber-300 text-amber-100 active:scale-95'
+    ? 'py-2 px-1 rounded-xl text-[11px] font-black border transition bg-amber-600/70 border-amber-300 text-amber-50 active:scale-95'
     : 'py-2 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
 });
 document.getElementById('togglePremier').addEventListener('click', e => {
@@ -1734,12 +1744,25 @@ function drawSlumpChart(points) {
 // =========================================================================
 document.getElementById('btnTestPokyun').addEventListener('click', () => {
   StudioAudio.playPokyun(false);
+  setAmbientBg('redbare');
   triggerLamp('red', 'ポキュ↑ーン↓');
   lcdFrame.classList.remove('fx-redbare', 'shake-burst');
   void lcdFrame.offsetWidth;
   lcdFrame.classList.add('fx-redbare', 'shake-burst');
   FxCanvas.burstFlames(30);
+  setTimeout(() => {
+    if (state.phase === 'NORMAL') setAmbientBg('');
+  }, 1100);
 });
+
+const btnTestOchiburu = document.getElementById('btnTestOchiburu');
+if (btnTestOchiburu) {
+  btnTestOchiburu.addEventListener('click', () => StudioAudio.playOchiburu(true));
+}
+const btnTestPuchun = document.getElementById('btnTestPuchun');
+if (btnTestPuchun) {
+  btnTestPuchun.addEventListener('click', () => StudioAudio.playPuchun());
+}
 
 document.getElementById('btnToggleTuner').addEventListener('click', () => {
   document.getElementById('audioTunerDrawer').classList.toggle('hidden');
@@ -1823,8 +1846,8 @@ document.getElementById('btnMute').addEventListener('click', e => {
 document.getElementById('tabPlay').addEventListener('click', () => {
   document.getElementById('playModeContainer').classList.remove('hidden');
   document.getElementById('sim100Container').classList.add('hidden');
-  document.getElementById('tabPlay').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-rose-700 via-red-700 to-amber-700 text-white shadow border border-amber-400/50';
-  document.getElementById('tabSim100').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-slate-900/90 text-slate-400 hover:text-slate-200 border border-slate-800';
+  document.getElementById('tabPlay').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white shadow border border-yellow-200/60';
+  document.getElementById('tabSim100').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-[#1e0d08]/90 text-amber-200/70 hover:text-amber-100 border border-amber-900/60';
   setTimeout(FxCanvas.resize, 30);
 });
 
@@ -1832,8 +1855,8 @@ document.getElementById('tabSim100').addEventListener('click', () => {
   stopAuto();
   document.getElementById('playModeContainer').classList.add('hidden');
   document.getElementById('sim100Container').classList.remove('hidden');
-  document.getElementById('tabSim100').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-amber-600 via-rose-600 to-red-800 text-white shadow border border-amber-400/50';
-  document.getElementById('tabPlay').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-slate-900/90 text-slate-400 hover:text-slate-200 border border-slate-800';
+  document.getElementById('tabSim100').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-amber-600 via-rose-600 to-red-800 text-white shadow border border-yellow-200/60';
+  document.getElementById('tabPlay').className = 'flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-[#1e0d08]/90 text-amber-200/70 hover:text-amber-100 border border-amber-900/60';
   if (lastSimPoints.length === 0) runSim100();
   else setTimeout(() => drawSlumpChart(lastSimPoints), 30);
 });
