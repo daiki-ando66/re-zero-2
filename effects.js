@@ -1,8 +1,8 @@
 // =========================================================================
-// effects.js : Canvasエフェクト・RUSH違和感・ぶっ飛び演出＆3秒ガチフリーズ
+// effects.js : Canvasエフェクト・RUSH違和感・ぶっ飛び演出・全画面画像カットイン
 // =========================================================================
 
-// RUSH追加演出・違和感・ぶっ飛び物理崩壊・虹フラッシュ用CSSを自動注入
+// RUSH追加演出・違和感・ぶっ飛び物理崩壊・全画面画像カットイン用CSSを自動注入
 (function injectRushExtraStyles() {
   if (document.getElementById('rush-extra-css')) return;
   const st = document.createElement('style');
@@ -55,7 +55,7 @@
     }
     .fx-rgb-glitch { animation: rgbGlitchAnim 0.10s steps(2) infinite !important; }
 
-    /* ★ぶっ飛び演出②：液晶パネルごと重力で物理落下（ドロップクラッシュ）★ */
+    /* ★ぶっ飛び演出：液晶パネルごと重力で物理落下（ドロップクラッシュ）★ */
     @keyframes dropCrashAnim {
       0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
       16%  { transform: translateY(-6px) rotate(-3.5deg); opacity: 1; }
@@ -71,7 +71,7 @@
       animation: dropCrashAnim 0.82s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
     }
 
-    /* ★ぶっ飛び演出③：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★ */
+    /* ★ぶっ飛び演出：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★ */
     @keyframes shardFly {
       0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; }
       18%  { transform: translate3d(calc(var(--tx) * 0.12), calc(var(--ty) * 0.12), 20px) rotate(calc(var(--rot) * 0.15)) scale(1.05); opacity: 1; }
@@ -83,6 +83,25 @@
       border: 2px solid rgba(254, 240, 138, 0.92);
       box-shadow: inset 0 0 24px rgba(239, 68, 68, 0.78), 0 0 18px rgba(250, 204, 21, 0.65);
       animation: shardFly 0.84s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* ★全画面「鬼がかってますね」画像カットイン＆虹色オーラ★ */
+    @keyframes cutinZoomIn {
+      0%   { opacity: 0; transform: scale(1.45); filter: brightness(2.4); }
+      24%  { opacity: 1; transform: scale(0.98); filter: brightness(1.2); }
+      100% { opacity: 1; transform: scale(1.04); filter: brightness(1.02); }
+    }
+    .cutin-img-zoom {
+      animation: cutinZoomIn 1.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes rainbowFrameSpin {
+      0%   { box-shadow: 0 0 38px 10px rgba(250,204,21,0.9), 0 0 70px 18px rgba(236,72,153,0.65); border-color: #fde047; }
+      33%  { box-shadow: 0 0 42px 12px rgba(56,189,248,0.95), 0 0 74px 20px rgba(192,132,252,0.7); border-color: #38bdf8; }
+      66%  { box-shadow: 0 0 42px 12px rgba(244,63,94,0.95), 0 0 74px 20px rgba(250,204,21,0.7); border-color: #f472b6; }
+      100% { box-shadow: 0 0 38px 10px rgba(250,204,21,0.9), 0 0 70px 18px rgba(236,72,153,0.65); border-color: #fde047; }
+    }
+    .cutin-rainbow-border {
+      animation: rainbowFrameSpin 0.75s linear infinite;
     }
 
     /* ★初当たり＆6000解放：虹色フラッシュ＆虹オーラ背景★ */
@@ -126,7 +145,7 @@
       animation: remClassicFlash 0.12s steps(2) infinite !important;
     }
 
-    /* 保留点滅（通常点滅・特殊高速赤点滅） */
+    /* 保留点滅 */
     @keyframes slotBlink {
       0%, 100% { opacity: 1; transform: scale(1.06); }
       50% { opacity: 0.35; transform: scale(0.95); }
@@ -150,11 +169,29 @@
   document.head.appendChild(st);
 })();
 
+// =========================================================================
+// ★カットイン画像（onigakari.jpg）事前プリロード＆自動フォールバック★
+// =========================================================================
+let onigakariImageSrc = null;
+(function preloadCutinImage() {
+  const candidates = ['onigakari.jpg', 'onigakari.png', 'image_3da6a7.jpg'];
+  let idx = 0;
+  function tryNext() {
+    if (idx >= candidates.length) return;
+    const src = candidates[idx++];
+    const img = new Image();
+    img.onload = () => { onigakariImageSrc = src; };
+    img.onerror = tryNext;
+    img.src = src;
+  }
+  tryNext();
+})();
+
 const FxCanvas = (() => {
   const canvas = document.getElementById('fxCanvas');
   const ctx = canvas.getContext('2d');
   let w = 360, h = 360;
-  let ambientMode = 'ember'; // 'ember' | 'rush' | 'rem' | 'zero' | 'wedding' | 'none'
+  let ambientMode = 'ember';
 
   const particles = [], rings = [], bolts = [], cracks = [];
 
@@ -191,7 +228,6 @@ const FxCanvas = (() => {
     }
   }
 
-  // 見えざる手オーラ（脳が震えるRUSH特殊演出用）
   function spawnPurpleHands(count = 28) {
     for (let i = 0; i < count; i++) {
       const side = i % 2 === 0 ? 0 : w;
@@ -209,7 +245,6 @@ const FxCanvas = (() => {
     }
   }
 
-  // Step 3用：漆黒の画面に走る赤い亀裂
   function spawnRedCracks() {
     cracks.length = 0;
     const cx = w * 0.5, cy = h * 0.5;
@@ -242,7 +277,6 @@ const FxCanvas = (() => {
     }
   }
 
-  // ★初当たり＆6000解放用：レインボー紙吹雪＆星粒子★
   function burstRainbow(count = 75) {
     const colors = ['#fde047', '#fb7185', '#c084fc', '#38bdf8', '#34d399', '#fb923c', '#ffffff'];
     for (let i = 0; i < count; i++) {
@@ -412,7 +446,7 @@ function wait(ms, token = seqToken) {
   });
 }
 
-// 3秒フリーズ専用ウェイト（高速モードでも極上の静寂を最低1.8秒は確保）
+// 3秒フリーズ専用ウェイト（高速モードでも静寂の余韻を最低1.8秒確保）
 function waitFreeze(ms, token = seqToken) {
   const dur = fastMode ? Math.round(ms * 0.60) : ms;
   return new Promise((resolve, reject) => {
@@ -434,7 +468,7 @@ const fsMain = document.getElementById('fsMain');
 const fsExtra = document.getElementById('fsExtra');
 const res4Dots = document.querySelectorAll('.res4-dot');
 
-// 画面全体演出用（電源断ブラックアウト幕＆虹色閃光幕）
+// 画面全体演出用（電源断ブラックアウト幕・虹色閃光幕・全画面画像カットイン幕）
 const globalBlackoutCurtain = document.createElement('div');
 globalBlackoutCurtain.id = 'globalBlackoutCurtain';
 globalBlackoutCurtain.className = 'hidden fixed inset-0 z-[999] bg-black pointer-events-none';
@@ -444,6 +478,11 @@ const globalRainbowFlash = document.createElement('div');
 globalRainbowFlash.id = 'globalRainbowFlash';
 globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none';
 document.body.appendChild(globalRainbowFlash);
+
+const globalCutinOverlay = document.createElement('div');
+globalCutinOverlay.id = 'globalCutinOverlay';
+globalCutinOverlay.className = 'hidden fixed inset-0 z-[1000] bg-black/96 flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden';
+document.body.appendChild(globalCutinOverlay);
 
 const pageShakeTargets = [document.querySelector('header'), document.querySelector('main')].filter(Boolean);
 
@@ -474,7 +513,6 @@ const lampEmoji = document.getElementById('lampEmoji');
 const reserveLabel = document.getElementById('reserveLabel');
 const resSlots = [0,1,2,3,4].map(i => document.getElementById(`resSlot${i}`));
 
-// ★scene-rush-idle内にRUSH演出用サブ要素（信頼度バッジ・煽り／カウントダウン・隠レム）を排他配置★
 const rushIdlePane = scenePanes['rush-idle'];
 rushIdlePane.classList.add('relative', 'h-full');
 
@@ -494,9 +532,14 @@ rushNoiseVeil.id = 'rushNoiseVeil';
 rushNoiseVeil.className = 'hidden pointer-events-none absolute inset-0 z-20 crt-scanlines bg-black/20';
 lcdFrame.appendChild(rushNoiseVeil);
 
-// ★画面全体の暗転・超激震・RGB色ズレの安全な制御関数★
+// ★画面全体の暗転・超激震・RGB色ズレ・画像カットイン制御★
 function setGlobalBlackout(on) {
   globalBlackoutCurtain.classList.toggle('hidden', !on);
+}
+
+function hideGlobalCutin() {
+  globalCutinOverlay.classList.add('hidden');
+  globalCutinOverlay.innerHTML = '';
 }
 
 function setPageMegaShake(on) {
@@ -513,9 +556,53 @@ function fireGlobalRainbowFlash() {
 
 function clearGlobalChaosEffects() {
   setGlobalBlackout(false);
+  hideGlobalCutin();
   setPageMegaShake(false);
   lcdFrame.classList.remove('fx-rgb-glitch');
   slashHost.innerHTML = '';
+}
+
+// ★全画面「鬼がかってますね」ドパドパカットイン（onigakari.jpg自動表示＋未配置時は虹文字自動切替）★
+async function playOnigakariImageCutin({
+  caption = '🌈 鬼がかってますね!! 🌈',
+  subCaption = 'ONIGAKARI PREMIUM FREEZE',
+  dur = 1750,
+  withPokyun = true,
+  token
+}) {
+  if (withPokyun) StudioAudio.playPokyun(true);
+  fireGlobalRainbowFlash();
+  setLed('rainbow');
+
+  if (onigakariImageSrc) {
+    globalCutinOverlay.innerHTML = `
+      <div class="w-full max-w-lg flex flex-col items-center gap-3">
+        <div class="text-xs sm:text-sm font-black tracking-[0.26em] rainbow-grad-text drop-shadow pop-in">${subCaption}</div>
+        <div class="relative w-full aspect-video rounded-2xl overflow-hidden border-4 cutin-rainbow-border bg-black">
+          <img src="${onigakariImageSrc}" alt="鬼がかってますね" class="w-full h-full object-cover cutin-img-zoom">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"></div>
+        </div>
+        <div class="font-mincho text-2xl sm:text-3xl font-black rainbow-grad-text tracking-wider drop-shadow pop-in">${caption}</div>
+      </div>
+    `;
+  } else {
+    globalCutinOverlay.innerHTML = `
+      <div class="w-full max-w-lg rounded-3xl overlay-rainbow border-4 cutin-rainbow-border p-8 text-center shadow-2xl pop-in">
+        <div class="text-xs font-black tracking-[0.28em] text-yellow-200 mb-3">${subCaption}</div>
+        <div class="font-mincho text-4xl sm:text-5xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)] tracking-wider leading-tight">
+          鬼がかってますね!!
+        </div>
+        <div class="mt-3 text-sm font-black text-yellow-100">${caption}</div>
+      </div>
+    `;
+  }
+
+  globalCutinOverlay.classList.remove('hidden');
+  try {
+    await wait(dur, token);
+  } finally {
+    hideGlobalCutin();
+  }
 }
 
 // ★初当たり用：虹色バースト演出★
@@ -530,7 +617,7 @@ function fireRainbowBurst(lampLabel = '🌈 大当り!!') {
   setTimeout(() => lcdFrame.classList.remove('shake-burst'), 720);
 }
 
-// ★単一シーン排他切替関数（文字重なりを構造的にゼロ化）★
+// ★単一シーン排他切替関数★
 function setActiveScene(sceneName) {
   if (typeof state !== 'undefined') state.activeScene = sceneName;
   Object.entries(scenePanes).forEach(([key, el]) => {
@@ -550,7 +637,6 @@ function setActiveScene(sceneName) {
   btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach' || sceneName === 'rush-idle');
 }
 
-// 完全不透明 全画面オーバーレイ制御（虹モード追加）
 function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra = '', scanlines = false }) {
   fullscreenOverlay.classList.remove('hidden', 'overlay-blackout', 'overlay-6000', 'overlay-wedding', 'overlay-rainbow');
   crtScanLayer.classList.toggle('hidden', !scanlines);
@@ -810,7 +896,7 @@ function fireMegaQuakeBrainBreak() {
 }
 
 // =========================================================================
-// ★RUSH専用：全10種の違和感演出エンジン（大当り直前に発動）★
+// ★RUSH専用：全10種の違和感演出エンジン★
 // =========================================================================
 async function playIwakanEffect({ is6000, rushMode, token }) {
   const bigRem = document.getElementById('rushBigRemain');
@@ -1085,7 +1171,7 @@ async function playOnigakariCountdown({ isHit, is6000, token }) {
 }
 
 // =========================================================================
-// ★RUSH中6,000限定：突発「3秒間ガチフリーズ」直撃演出★
+// ★RUSH中6,000限定：突発「3秒間ガチフリーズ」→ 全画面「鬼がかってますね」画像降臨★
 // =========================================================================
 async function runSudden3sFreeze6000(token) {
   try {
@@ -1093,25 +1179,35 @@ async function runSudden3sFreeze6000(token) {
     FxCanvas.setAmbient('none');
     FxCanvas.clearAll();
     setLed('off');
+
     // スマホ画面全体を完全ブラックアウト＆完全無音で3秒フリーズ！
     setGlobalBlackout(true);
     await waitFreeze(3000, token);
-
-    // 3秒後：爆音解放＋3D粉砕吹き飛び＋ページ全体超激震＋虹爆発!!
     setGlobalBlackout(false);
+
+    // 3秒後：全画面「鬼がかってますね」画像カットイン＋虹ポキュ↑ーン↓!!
+    await playOnigakariImageCutin({
+      caption: '鬼がかってますね!!',
+      subCaption: '💀 3秒間ブラックアウトフリーズ解放!! 💀',
+      dur: 1850,
+      withPokyun: true,
+      token
+    });
+
+    // 画像カットイン直後：爆音＋3D粉砕吹き飛び＋ページ全体超激震で6,000降臨!!
     StudioAudio.playSlash();
     StudioAudio.playOchiburu();
     fireShatterFly();
 
     showFullscreenOverlay({
       mode: 'rainbow',
-      sub: '💀【3秒間ブラックアウトフリーズ降臨!!】💀',
+      sub: '🌈【鬼がかってますね・6000降臨!!】🌈',
       main: '鬼がかり 6,000 BONUS!!',
-      extra: '完全無音からの衝撃解放!! 払出 6,000個（実質純増 5,600発）獲得!!',
+      extra: '払出 6,000個（実質純増 5,600発）獲得!!',
       scanlines: false
     });
     StudioAudio.play6000Fanfare(false);
-    triggerLamp('rainbow', '3秒フリーズ!!');
+    triggerLamp('rainbow', '鬼がかり6000!!');
     lcdFrame.classList.add('fx-rainbow');
     setLed('rainbow');
 
@@ -1123,8 +1219,8 @@ async function runSudden3sFreeze6000(token) {
 }
 
 // =========================================================================
-// ★★★ 黄金4ステップ時差ドパ昇格シーケンス（5種のぶっ飛び演出分岐）★★★
-// crashType: 'auto' | 'slash' | 'drop' | 'shatter' | 'quake' | 'freeze3s'
+// ★★★ 黄金4ステップ時差ドパ昇格シーケンス（全6種のぶっ飛び＆虹ポキュ↑ーン↓昇格）★★★
+// crashType: 'auto' | 'pokyun' | 'freeze3s' | 'drop' | 'shatter' | 'quake' | 'slash'
 // =========================================================================
 async function runGoldenPromotionSequence({
   fakeSub, fakeTitle, fakeDesc, fakeStyle = 'despair', fakeRestart = false,
@@ -1132,11 +1228,16 @@ async function runGoldenPromotionSequence({
   finalSub, finalTitle, finalExtra, finalSound = '6000',
   crashType = 'auto', token
 }) {
-  // ぶっ飛び演出タイプの決定（6,000時の一部で3秒フリーズ、他は4種をランダム）
   let mode = crashType;
   if (mode === 'auto') {
-    if (finalSound === '6000' && Math.random() < 0.22) {
-      mode = 'freeze3s';
+    if (finalSound === '6000') {
+      const r = Math.random();
+      if (r < 0.24) mode = 'pokyun';        // 油断撃ち抜き・虹ポキュ↑ーン↓昇格！
+      else if (r < 0.44) mode = 'freeze3s'; // 3秒フリーズ → 全画面「鬼がかってますね」画像！
+      else {
+        const pool = ['slash', 'drop', 'shatter', 'quake'];
+        mode = pool[Math.floor(Math.random() * pool.length)];
+      }
     } else {
       const pool = ['slash', 'drop', 'shatter', 'quake'];
       mode = pool[Math.floor(Math.random() * pool.length)];
@@ -1144,7 +1245,7 @@ async function runGoldenPromotionSequence({
   }
 
   try {
-    // --- Step 1：大当たり表示（1.3秒）※見た目・音ともに通常当たりと完全一致 ---
+    // --- Step 1：大当たり（or Re:Start）表示（1.3秒）※本物と完全一致 ---
     setActiveScene('bonus');
     subtleWhisperSlot.classList.add('hidden');
     subtleWhisperSlot.classList.remove('fx-whisper-in');
@@ -1175,6 +1276,45 @@ async function runGoldenPromotionSequence({
     await wait(1300, token);
     lcdFrame.classList.remove('fx-restart');
 
+    // ★分岐A：油断撃ち抜き「突発・虹ポキュ↑ーン↓!!」昇格ルート★
+    if (mode === 'pokyun') {
+      // 「リスタートかー…」と思った瞬間に、前触れゼロで爆音ポキュ↑ーン↓!!
+      StudioAudio.playPokyun(true);
+      fireGlobalRainbowFlash();
+      triggerLamp('rainbow', '🌈 ポキュ↑ーン↓!!');
+      lcdFrame.classList.remove('mode-despair-bg');
+      lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+      FxCanvas.burstRainbow(65);
+      showFullscreenOverlay({
+        mode: 'rainbow',
+        sub: fakeRestart ? '🔥 Re:Start からの油断撃ち抜き!! 🔥' : '🔥 突発・虹先バレ炸裂!! 🔥',
+        main: 'ポキュ↑ーン↓!!',
+        extra: 'まだ終わらせない!! 超昇格突入!!',
+        scanlines: false
+      });
+      await wait(1250, token);
+      lcdFrame.classList.remove('shake-burst');
+
+      // そのまま爆音落ちブル＋画面切り裂きで6,000降臨!!
+      StudioAudio.playSlash();
+      StudioAudio.playOchiburu();
+      firePhysicalSplitSlash();
+      showFullscreenOverlay({
+        mode: '6000',
+        sub: '🌈【虹ポキュ↑ーン↓逆転昇格!!】🌈',
+        main: finalTitle,
+        extra: finalExtra,
+        scanlines: false
+      });
+      StudioAudio.play6000Fanfare(false);
+      triggerLamp('rainbow', '鬼がかり6000!!');
+      lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+      setLed('rainbow');
+      await wait(2200, token);
+      lcdFrame.classList.remove('shake-burst');
+      return;
+    }
+
     // --- Step 2：こじんまりと「これから脳が震える…」（1.1秒・微かな鼓動SE） ---
     StudioAudio.playSoftHeartbeat();
     subtleWhisperText.textContent = 'これから脳が震える…';
@@ -1184,7 +1324,7 @@ async function runGoldenPromotionSequence({
 
     await wait(1100, token);
 
-    // --- Step 3：フリーズ暗転（3秒ガチフリーズ or 通常1.1秒フリーズ） ---
+    // --- Step 3：フリーズ暗転（3秒ガチフリーズ＋画像カットイン or 通常1.1秒フリーズ） ---
     StudioAudio.playPuchun();
     FxCanvas.setAmbient('none');
     FxCanvas.clearAll();
@@ -1192,10 +1332,18 @@ async function runGoldenPromotionSequence({
     lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg', 'mode-zero-bg');
 
     if (mode === 'freeze3s') {
-      // スマホ画面全体を完全ブラックアウト＆完全無音で3.0秒フリーズ!!
       setGlobalBlackout(true);
       await waitFreeze(3000, token);
       setGlobalBlackout(false);
+
+      // ★3秒フリーズ明けに全画面「鬼がかってますね」画像ドパドパ降臨＋虹ポキュ↑ーン↓!!★
+      await playOnigakariImageCutin({
+        caption: '鬼がかってますね!!',
+        subCaption: '💀 3秒間ガチフリーズ解放!! 💀',
+        dur: 1850,
+        withPokyun: true,
+        token
+      });
     } else {
       showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
       await wait(600, token);
@@ -1208,7 +1356,7 @@ async function runGoldenPromotionSequence({
       lcdFrame.classList.remove('fx-glitch');
     }
 
-    // --- Step 4：選んだぶっ飛び破壊演出で6,000 / 3,000降臨！！ ---
+    // --- Step 4：ぶっ飛び破壊演出で 6,000 / 3,000 降臨！！ ---
     FxCanvas.clearCracks();
     StudioAudio.playSlash();
     StudioAudio.playOchiburu();
@@ -1225,7 +1373,7 @@ async function runGoldenPromotionSequence({
       subText = `⚡【画面全体・超激震＆RGB破壊!!】⚡`;
     } else if (mode === 'freeze3s') {
       fireShatterFly();
-      subText = `💀【3秒間ガチフリーズ解放!!】💀`;
+      subText = `🌈【鬼がかってますね・6000降臨!!】🌈`;
     } else {
       firePhysicalSplitSlash();
     }
