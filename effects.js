@@ -435,9 +435,10 @@ function firePhysicalSplitSlash() {
 // =========================================================================
 async function runGoldenPromotionSequence({
   fakeSub, fakeTitle, fakeDesc, fakeStyle = 'despair', fakeRestart = false,
+  fakeIsRush = false, fakeBurstGold = false,
   finalSub, finalTitle, finalExtra, finalSound = '6000', token
 }) {
-  // --- Step 1：大当たり表示（1.3秒）※scene-bonusへ完全排他切替 ---
+  // --- Step 1：大当たり表示（1.3秒）※見た目・音ともに通常当たりと完全一致 ---
   setActiveScene('bonus');
   subtleWhisperSlot.classList.add('hidden');
   subtleWhisperSlot.classList.remove('fx-whisper-in');
@@ -446,10 +447,13 @@ async function runGoldenPromotionSequence({
     StudioAudio.playReStart();
     lcdFrame.classList.add('fx-restart', 'mode-despair-bg');
   } else {
-    // 仮表示時は標準の1500大当たり音（上位への余白を残す）
-    StudioAudio.play1500Jackpot(false);
-    if (fakeStyle === 'despair') lcdFrame.classList.add('mode-despair-bg');
-    else lcdFrame.classList.add('fx-gold');
+    StudioAudio.play1500Jackpot(fakeIsRush);
+    if (fakeStyle === 'despair') {
+      lcdFrame.classList.add('mode-despair-bg');
+    } else {
+      lcdFrame.classList.add('fx-gold');
+      if (fakeBurstGold) FxCanvas.burstGold(34);
+    }
   }
 
   bonusSubLabel.textContent = fakeSub;
@@ -505,7 +509,6 @@ async function runGoldenPromotionSequence({
     scanlines: false
   });
 
-  // 場面別大当たり音（通常3000＝重厚／RUSH6000＝最上位MAX）
   if (finalSound === '3000') {
     StudioAudio.play3000Jackpot();
   } else {
