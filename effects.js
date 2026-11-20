@@ -1,8 +1,8 @@
 // =========================================================================
-// effects.js : 最前面HTML5 Canvasエフェクト・液晶演出・RUSH違和感＆4ステップ昇格
+// effects.js : Canvasエフェクト・RUSH違和感・ぶっ飛び演出＆3秒ガチフリーズ
 // =========================================================================
 
-// RUSH追加演出＆違和感専用CSSを自動注入（index.html無改修で動作）
+// RUSH追加演出・違和感・ぶっ飛び物理崩壊・虹フラッシュ用CSSを自動注入
 (function injectRushExtraStyles() {
   if (document.getElementById('rush-extra-css')) return;
   const st = document.createElement('style');
@@ -19,7 +19,7 @@
     }
     .iwakan-rempuru { animation: remPuru 0.09s linear infinite !important; }
 
-    /* 脳が震えるRUSH：弱／中シェイク（強は既存のshake-intense＋落ちブル） */
+    /* 脳が震えるRUSH：弱／中シェイク */
     @keyframes brainShakeWeak {
       0%, 100% { transform: translate(0, 0); }
       25% { transform: translate(-2.5px, 1px); }
@@ -32,6 +32,79 @@
     }
     .shake-weak { animation: brainShakeWeak 0.11s linear infinite; }
     .shake-mid { animation: brainShakeMid 0.10s linear infinite; }
+
+    /* ★ページ全体・超激震（脳破壊シェイク）★ */
+    @keyframes pageMegaShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      12% { transform: translate(-11px, -7px) rotate(-1.4deg); }
+      25% { transform: translate(11px, 6px) rotate(1.4deg); }
+      37% { transform: translate(-13px, 5px) rotate(-1.8deg); }
+      50% { transform: translate(12px, -8px) rotate(1.6deg); }
+      62% { transform: translate(-9px, -6px) rotate(-1.2deg); }
+      75% { transform: translate(10px, 7px) rotate(1.3deg); }
+      87% { transform: translate(-7px, 4px) rotate(-0.9deg); }
+    }
+    .page-mega-shake { animation: pageMegaShake 0.11s linear infinite !important; }
+
+    /* ★RGB色ズレ（色収差グリッチ）★ */
+    @keyframes rgbGlitchAnim {
+      0% { filter: drop-shadow(-5px 0 0 rgba(255,0,80,0.95)) drop-shadow(5px 0 0 rgba(0,240,255,0.95)) contrast(135%); transform: skewX(-4deg); }
+      33% { filter: drop-shadow(6px -2px 0 rgba(255,0,80,0.95)) drop-shadow(-6px 2px 0 rgba(0,240,255,0.95)) saturate(200%); transform: skewX(5deg); }
+      66% { filter: drop-shadow(-4px 3px 0 rgba(250,204,21,0.95)) drop-shadow(4px -3px 0 rgba(168,85,247,0.95)) contrast(150%); transform: skewX(-3deg); }
+      100% { filter: drop-shadow(0 0 0 transparent); transform: skewX(0deg); }
+    }
+    .fx-rgb-glitch { animation: rgbGlitchAnim 0.10s steps(2) infinite !important; }
+
+    /* ★ぶっ飛び演出②：液晶パネルごと重力で物理落下（ドロップクラッシュ）★ */
+    @keyframes dropCrashAnim {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      16%  { transform: translateY(-6px) rotate(-3.5deg); opacity: 1; }
+      28%  { transform: translateY(10px) rotate(4.2deg); opacity: 1; }
+      100% { transform: translateY(135%) rotate(18deg) scale(0.92); opacity: 0; }
+    }
+    .drop-crash-panel {
+      position: absolute; inset: 0; z-index: 56; pointer-events: none;
+      background: linear-gradient(180deg, #1b0614 0%, #050208 55%, #2b0712 100%);
+      border: 3px solid rgba(250, 204, 21, 0.9);
+      box-shadow: inset 0 0 42px rgba(239, 68, 68, 0.85), 0 18px 40px rgba(0,0,0,0.95);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      animation: dropCrashAnim 0.82s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+    }
+
+    /* ★ぶっ飛び演出③：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★ */
+    @keyframes shardFly {
+      0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; }
+      18%  { transform: translate3d(calc(var(--tx) * 0.12), calc(var(--ty) * 0.12), 20px) rotate(calc(var(--rot) * 0.15)) scale(1.05); opacity: 1; }
+      100% { transform: translate3d(var(--tx), var(--ty), 120px) rotate(var(--rot)) scale(1.45); opacity: 0; }
+    }
+    .shatter-shard {
+      position: absolute; z-index: 56; pointer-events: none;
+      background: linear-gradient(135deg, #120410 0%, #030105 60%, #4c0519 100%);
+      border: 2px solid rgba(254, 240, 138, 0.92);
+      box-shadow: inset 0 0 24px rgba(239, 68, 68, 0.78), 0 0 18px rgba(250, 204, 21, 0.65);
+      animation: shardFly 0.84s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* ★初当たり＆6000解放：虹色フラッシュ＆虹オーラ背景★ */
+    @keyframes rainbowBgFlow {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .overlay-rainbow {
+      background: linear-gradient(135deg, #7f1d1d 0%, #854d0e 18%, #065f46 36%, #075985 54%, #581c87 74%, #9d174d 90%, #7f1d1d 100%);
+      background-size: 260% 260%;
+      animation: rainbowBgFlow 2.0s ease infinite;
+    }
+    @keyframes globalRainbowBurstAnim {
+      0%   { opacity: 0.92; }
+      35%  { opacity: 0.55; }
+      100% { opacity: 0; }
+    }
+    .global-rainbow-burst {
+      background: conic-gradient(from 0deg at 50% 50%, rgba(253,224,71,0.9), rgba(244,63,94,0.9), rgba(168,85,247,0.9), rgba(56,189,248,0.9), rgba(52,211,153,0.9), rgba(253,224,71,0.9));
+      animation: globalRainbowBurstAnim 0.72s ease-out forwards;
+    }
 
     /* レム告知：4種ランプ点灯パターン */
     @keyframes remSlowGlow {
@@ -66,15 +139,13 @@
       background: radial-gradient(circle at 50% 45%, #18181b 0%, #09090b 65%, #020203 100%) !important;
     }
 
-    /* 隠レム・告知バナー */
+    /* 隠レム */
     @keyframes hiddenRemPulse {
       0% { opacity: 0; transform: scale(0.75); }
       50% { opacity: 0.42; transform: scale(1.02); }
       100% { opacity: 0.28; transform: scale(1); }
     }
-    .hidden-rem-mark {
-      animation: hiddenRemPulse 0.9s ease-out forwards;
-    }
+    .hidden-rem-mark { animation: hiddenRemPulse 0.9s ease-out forwards; }
   `;
   document.head.appendChild(st);
 })();
@@ -167,6 +238,23 @@ const FxCanvas = (() => {
         size: 4 + Math.random() * 5, rot: Math.random() * Math.PI, vrot: (Math.random() - 0.5) * 0.25,
         color: ['#fde047', '#facc15', '#ef4444', '#ffffff', '#fb7185'][i % 5],
         alpha: 1, decay: 0.011 + Math.random() * 0.008
+      });
+    }
+  }
+
+  // ★初当たり＆6000解放用：レインボー紙吹雪＆星粒子★
+  function burstRainbow(count = 75) {
+    const colors = ['#fde047', '#fb7185', '#c084fc', '#38bdf8', '#34d399', '#fb923c', '#ffffff'];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2.6 + Math.random() * 7.2;
+      particles.push({
+        type: i % 3 === 0 ? 'spark' : 'confetti',
+        x: w * 0.5, y: h * 0.48,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2.2,
+        size: 3.8 + Math.random() * 5.2, rot: Math.random() * Math.PI, vrot: (Math.random() - 0.5) * 0.28,
+        color: colors[i % colors.length],
+        alpha: 1, decay: 0.010 + Math.random() * 0.008
       });
     }
   }
@@ -303,7 +391,8 @@ const FxCanvas = (() => {
   return {
     resize, clearAll,
     setAmbient: m => { ambientMode = m; },
-    spawnRing, spawnLightning, spawnPurpleHands, spawnRedCracks, clearCracks, burstGold, burstFlames, spawnFeathers
+    spawnRing, spawnLightning, spawnPurpleHands, spawnRedCracks, clearCracks,
+    burstGold, burstRainbow, burstFlames, spawnFeathers
   };
 })();
 
@@ -323,6 +412,17 @@ function wait(ms, token = seqToken) {
   });
 }
 
+// 3秒フリーズ専用ウェイト（高速モードでも極上の静寂を最低1.8秒は確保）
+function waitFreeze(ms, token = seqToken) {
+  const dur = fastMode ? Math.round(ms * 0.60) : ms;
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (token !== seqToken) reject('CANCELLED');
+      else resolve();
+    }, dur);
+  });
+}
+
 const lcdFrame = document.getElementById('lcdFrame');
 const ledLeft = document.getElementById('ledLeft');
 const ledRight = document.getElementById('ledRight');
@@ -333,6 +433,19 @@ const fsSub = document.getElementById('fsSub');
 const fsMain = document.getElementById('fsMain');
 const fsExtra = document.getElementById('fsExtra');
 const res4Dots = document.querySelectorAll('.res4-dot');
+
+// 画面全体演出用（電源断ブラックアウト幕＆虹色閃光幕）
+const globalBlackoutCurtain = document.createElement('div');
+globalBlackoutCurtain.id = 'globalBlackoutCurtain';
+globalBlackoutCurtain.className = 'hidden fixed inset-0 z-[999] bg-black pointer-events-none';
+document.body.appendChild(globalBlackoutCurtain);
+
+const globalRainbowFlash = document.createElement('div');
+globalRainbowFlash.id = 'globalRainbowFlash';
+globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none';
+document.body.appendChild(globalRainbowFlash);
+
+const pageShakeTargets = [document.querySelector('header'), document.querySelector('main')].filter(Boolean);
 
 // 排他シーン要素（同時に1つしか表示されない）
 const scenePanes = {
@@ -381,6 +494,42 @@ rushNoiseVeil.id = 'rushNoiseVeil';
 rushNoiseVeil.className = 'hidden pointer-events-none absolute inset-0 z-20 crt-scanlines bg-black/20';
 lcdFrame.appendChild(rushNoiseVeil);
 
+// ★画面全体の暗転・超激震・RGB色ズレの安全な制御関数★
+function setGlobalBlackout(on) {
+  globalBlackoutCurtain.classList.toggle('hidden', !on);
+}
+
+function setPageMegaShake(on) {
+  pageShakeTargets.forEach(el => el.classList.toggle('page-mega-shake', on));
+}
+
+function fireGlobalRainbowFlash() {
+  globalRainbowFlash.className = 'fixed inset-0 z-[998] pointer-events-none global-rainbow-burst';
+  void globalRainbowFlash.offsetWidth;
+  setTimeout(() => {
+    globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none';
+  }, 750);
+}
+
+function clearGlobalChaosEffects() {
+  setGlobalBlackout(false);
+  setPageMegaShake(false);
+  lcdFrame.classList.remove('fx-rgb-glitch');
+  slashHost.innerHTML = '';
+}
+
+// ★初当たり用：虹色バースト演出★
+function fireRainbowBurst(lampLabel = '🌈 大当り!!') {
+  fireGlobalRainbowFlash();
+  triggerLamp('rainbow', lampLabel);
+  lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+  setLed('rainbow');
+  FxCanvas.spawnRing('#fde047', 320, 9);
+  FxCanvas.spawnRing('#38bdf8', 250, 7);
+  FxCanvas.burstRainbow(72);
+  setTimeout(() => lcdFrame.classList.remove('shake-burst'), 720);
+}
+
 // ★単一シーン排他切替関数（文字重なりを構造的にゼロ化）★
 function setActiveScene(sceneName) {
   if (typeof state !== 'undefined') state.activeScene = sceneName;
@@ -401,9 +550,9 @@ function setActiveScene(sceneName) {
   btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach' || sceneName === 'rush-idle');
 }
 
-// 完全不透明 全画面オーバーレイ制御
+// 完全不透明 全画面オーバーレイ制御（虹モード追加）
 function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra = '', scanlines = false }) {
-  fullscreenOverlay.classList.remove('hidden', 'overlay-blackout', 'overlay-6000', 'overlay-wedding');
+  fullscreenOverlay.classList.remove('hidden', 'overlay-blackout', 'overlay-6000', 'overlay-wedding', 'overlay-rainbow');
   crtScanLayer.classList.toggle('hidden', !scanlines);
 
   if (mode === 'wedding') {
@@ -411,6 +560,11 @@ function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra =
     fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.22em] text-rose-600 mb-2';
     fsMain.className = 'relative z-10 font-mincho text-2xl sm:text-4xl font-black text-rose-700 tracking-wider leading-snug pop-in px-1';
     fsExtra.className = 'relative z-10 mt-3 text-xs sm:text-sm font-bold text-rose-900/90 max-w-md';
+  } else if (mode === 'rainbow') {
+    fullscreenOverlay.classList.add('overlay-rainbow');
+    fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.22em] text-yellow-200 drop-shadow mb-2';
+    fsMain.className = 'relative z-10 text-3xl sm:text-5xl font-black text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] tracking-wider leading-tight pop-in px-1';
+    fsExtra.className = 'relative z-10 mt-3 text-xs sm:text-sm font-black text-yellow-100 drop-shadow max-w-md';
   } else if (mode === '6000') {
     fullscreenOverlay.classList.add('overlay-6000');
     fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.22em] text-amber-300 mb-2';
@@ -436,11 +590,12 @@ function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra =
 function hideFullscreenOverlay() {
   fullscreenOverlay.classList.add('hidden');
   crtScanLayer.classList.add('hidden');
+  clearGlobalChaosEffects();
   FxCanvas.clearCracks();
 }
 
 // =========================================================================
-// 演出UIヘルパー（LED・リール・保留・ランプ・物理スラッシュ・違和感）
+// 演出UIヘルパー（LED・リール・保留・ランプ・各種ぶっ飛び破壊演出）
 // =========================================================================
 function setLed(style) {
   [ledLeft, ledRight].forEach(el => {
@@ -524,7 +679,7 @@ function updateRes4Dots(activeCount) {
 }
 
 function clearIwakanEffects() {
-  lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid');
+  lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid', 'fx-rgb-glitch');
   oniLamp.classList.remove('iwakan-rempuru', 'lamp-rem-slow', 'lamp-rem-classic');
   const bigRem = document.getElementById('rushBigRemain');
   if (bigRem) bigRem.classList.remove('iwakan-fade-remain');
@@ -535,6 +690,7 @@ function clearIwakanEffects() {
 
 function clearVisualEffects() {
   clearIwakanEffects();
+  clearGlobalChaosEffects();
   lcdFrame.classList.remove('fx-redbare', 'fx-rainbow', 'fx-gold', 'fx-restart', 'fx-glitch', 'shake-intense', 'shake-burst', 'mode-brain-bg', 'mode-rem-bg', 'mode-despair-bg', 'mode-zero-bg');
   btnOniPush.classList.remove('ochiburu-dome', 'push-dome-gold');
   oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow');
@@ -571,7 +727,7 @@ function triggerLamp(type, label) {
   }
 }
 
-// ★物理真っ二つ引き裂き（Step 4）★
+// ★ぶっ飛び演出①：物理真っ二つ引き裂き★
 function firePhysicalSplitSlash() {
   const beam = document.createElement('div'); beam.className = 'slash-beam';
   const pL = document.createElement('div'); pL.className = 'split-panel-left';
@@ -583,7 +739,74 @@ function firePhysicalSplitSlash() {
   FxCanvas.spawnLightning('#fde047', 5);
   FxCanvas.burstGold(68);
   FxCanvas.burstFlames(45);
-  setTimeout(() => { beam.remove(); pL.remove(); pR.remove(); }, 800);
+  setTimeout(() => { beam.remove(); pL.remove(); pR.remove(); }, 820);
+}
+
+// ★ぶっ飛び演出②：液晶ごと重力で物理落下（ドロップクラッシュ）★
+function fireDropCrash(fakeTitle = '') {
+  const panel = document.createElement('div');
+  panel.className = 'drop-crash-panel';
+  panel.innerHTML = `<div class="text-xs font-black text-rose-400 tracking-widest mb-1">SYSTEM COLLAPSE</div><div class="text-2xl sm:text-3xl font-black text-slate-200">${fakeTitle || 'CRUSH!!'}</div>`;
+  slashHost.appendChild(panel);
+
+  setPageMegaShake(true);
+  fireGlobalRainbowFlash();
+  FxCanvas.spawnRing('#fde047', 360, 11);
+  FxCanvas.burstRainbow(72);
+  setTimeout(() => {
+    panel.remove();
+    setPageMegaShake(false);
+  }, 860);
+}
+
+// ★ぶっ飛び演出③：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★
+function fireShatterFly() {
+  const configs = [
+    { l: '0%',    t: '0%',  w: '34%', h: '51%', tx: '-140%', ty: '-120%', rot: '-52deg' },
+    { l: '33%',   t: '0%',  w: '34%', h: '51%', tx: '10%',   ty: '-150%', rot: '28deg'  },
+    { l: '66%',   t: '0%',  w: '35%', h: '51%', tx: '145%',  ty: '-115%', rot: '58deg'  },
+    { l: '0%',    t: '50%', w: '34%', h: '51%', tx: '-145%', ty: '125%',  rot: '-44deg' },
+    { l: '33%',   t: '50%', w: '34%', h: '51%', tx: '-12%',  ty: '155%',  rot: '-26deg' },
+    { l: '66%',   t: '50%', w: '35%', h: '51%', tx: '140%',  ty: '130%',  rot: '48deg'  }
+  ];
+  const nodes = configs.map(c => {
+    const d = document.createElement('div');
+    d.className = 'shatter-shard';
+    d.style.left = c.l; d.style.top = c.t; d.style.width = c.w; d.style.height = c.h;
+    d.style.setProperty('--tx', c.tx);
+    d.style.setProperty('--ty', c.ty);
+    d.style.setProperty('--rot', c.rot);
+    slashHost.appendChild(d);
+    return d;
+  });
+
+  setPageMegaShake(true);
+  lcdFrame.classList.add('fx-rgb-glitch');
+  fireGlobalRainbowFlash();
+  FxCanvas.spawnLightning('#fde047', 6);
+  FxCanvas.spawnLightning('#38bdf8', 4);
+  FxCanvas.burstRainbow(85);
+  setTimeout(() => {
+    nodes.forEach(n => n.remove());
+    lcdFrame.classList.remove('fx-rgb-glitch');
+    setPageMegaShake(false);
+  }, 880);
+}
+
+// ★ぶっ飛び演出④：ページ全体・超激震＋RGB色ズレ（脳破壊モード）★
+function fireMegaQuakeBrainBreak() {
+  setPageMegaShake(true);
+  lcdFrame.classList.add('fx-rgb-glitch');
+  fireGlobalRainbowFlash();
+  FxCanvas.spawnRing('#ef4444', 360, 12);
+  FxCanvas.spawnRing('#fde047', 290, 9);
+  FxCanvas.spawnLightning('#fde047', 7);
+  FxCanvas.burstRainbow(80);
+  FxCanvas.burstFlames(55);
+  setTimeout(() => {
+    lcdFrame.classList.remove('fx-rgb-glitch');
+    setPageMegaShake(false);
+  }, 1050);
 }
 
 // =========================================================================
@@ -595,7 +818,6 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     'LED_ONE_OFF', 'LED_ALL_OFF', 'MONO_SCREEN', 'FADE_REMAIN',
     'REM_PURU', 'GLITCH_BLINK', 'HIDDEN_REM', 'SILENT_STILL'
   ];
-  // 6,000当選時は6,000濃厚プレミア違和感も候補に加える
   const pool = is6000 ? [...commonPool, 'COUNT_6000', 'RAINBOW_GLINT'] : commonPool;
   const pick = pool[Math.floor(Math.random() * pool.length)];
 
@@ -691,7 +913,6 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
 // ★レム告知モード：4種ランプ点灯パターン演出★
 // =========================================================================
 async function playRemNoticePattern({ is6000, token }) {
-  // 6,000当選時はプレミア点灯3種（徐々に点灯／一瞬消えて再点灯／旧レム風フラッシュ）を高確率で選択
   let pat = 'NORMAL';
   if (is6000 && Math.random() < 0.72) {
     const p6 = ['SLOW_GLOW', 'DOUBLE_BLINK', 'CLASSIC_FLASH'];
@@ -786,11 +1007,9 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
     return null;
   }
 
-  // 当選時：震える告知（弱／中／強＝落ちブル）※落ちブルは6,000濃厚時のみ！
   updateReserveSlots('BRAIN', 'HIT');
   let vibNote = '';
   if (is6000 && Math.random() < (custOchiburu ? 0.85 : 0.35)) {
-    // 強震え（落ちブル発動＝6,000濃厚）
     vibNote = '🧠 強震え＋落ちブル（6000濃厚!!）';
     rushTopBadge.textContent = '💥【脳が震える・強＋落ちブル!!】6000濃厚!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in';
@@ -801,7 +1020,6 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
     await wait(780, token);
     lcdFrame.classList.remove('shake-intense');
   } else if (bonusType === 'BONUS_1500' || is6000) {
-    // 中震え（1,500以上濃厚・落ちブル音は鳴らさない）
     vibNote = '🧠 震える告知・中（1500以上濃厚）';
     rushTopBadge.textContent = '🧠【脳が震える・中!!】大当り濃厚!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-fuchsia-950/95 border border-amber-300 text-amber-200 shadow-lg pop-in';
@@ -812,7 +1030,6 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
     await wait(520, token);
     lcdFrame.classList.remove('shake-mid');
   } else {
-    // 弱震え（大当り濃厚・300/Re:Start含む）
     vibNote = '🧠 震える告知・弱（大当り濃厚）';
     rushTopBadge.textContent = '🧠【脳が震える・弱!!】大当り!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-purple-950/95 border border-fuchsia-300 text-fuchsia-100 shadow-lg pop-in';
@@ -860,7 +1077,7 @@ async function playOnigakariCountdown({ isHit, is6000, token }) {
       : 'mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg';
     FxCanvas.spawnRing(isPrem ? '#fde047' : '#ef4444', 180 + i * 35, 5);
     await wait(240, token);
-    if (!isHit && i === 2) break; // ガセは途中で途切れる
+    if (!isHit && i === 2) break;
   }
 
   rushTopBadge.classList.add('hidden');
@@ -868,95 +1085,173 @@ async function playOnigakariCountdown({ isHit, is6000, token }) {
 }
 
 // =========================================================================
-// ★★★ 黄金4ステップ時差ドパ昇格シーケンス（共通エンジン）★★★
+// ★RUSH中6,000限定：突発「3秒間ガチフリーズ」直撃演出★
+// =========================================================================
+async function runSudden3sFreeze6000(token) {
+  try {
+    StudioAudio.playPuchun();
+    FxCanvas.setAmbient('none');
+    FxCanvas.clearAll();
+    setLed('off');
+    // スマホ画面全体を完全ブラックアウト＆完全無音で3秒フリーズ！
+    setGlobalBlackout(true);
+    await waitFreeze(3000, token);
+
+    // 3秒後：爆音解放＋3D粉砕吹き飛び＋ページ全体超激震＋虹爆発!!
+    setGlobalBlackout(false);
+    StudioAudio.playSlash();
+    StudioAudio.playOchiburu();
+    fireShatterFly();
+
+    showFullscreenOverlay({
+      mode: 'rainbow',
+      sub: '💀【3秒間ブラックアウトフリーズ降臨!!】💀',
+      main: '鬼がかり 6,000 BONUS!!',
+      extra: '完全無音からの衝撃解放!! 払出 6,000個（実質純増 5,600発）獲得!!',
+      scanlines: false
+    });
+    StudioAudio.play6000Fanfare(false);
+    triggerLamp('rainbow', '3秒フリーズ!!');
+    lcdFrame.classList.add('fx-rainbow');
+    setLed('rainbow');
+
+    await wait(2300, token);
+  } finally {
+    clearGlobalChaosEffects();
+    hideFullscreenOverlay();
+  }
+}
+
+// =========================================================================
+// ★★★ 黄金4ステップ時差ドパ昇格シーケンス（5種のぶっ飛び演出分岐）★★★
+// crashType: 'auto' | 'slash' | 'drop' | 'shatter' | 'quake' | 'freeze3s'
 // =========================================================================
 async function runGoldenPromotionSequence({
   fakeSub, fakeTitle, fakeDesc, fakeStyle = 'despair', fakeRestart = false,
   fakeIsRush = false, fakeBurstGold = false,
-  finalSub, finalTitle, finalExtra, finalSound = '6000', token
+  finalSub, finalTitle, finalExtra, finalSound = '6000',
+  crashType = 'auto', token
 }) {
-  // --- Step 1：大当たり表示（1.3秒）※見た目・音ともに通常当たりと完全一致 ---
-  setActiveScene('bonus');
-  subtleWhisperSlot.classList.add('hidden');
-  subtleWhisperSlot.classList.remove('fx-whisper-in');
-
-  if (fakeRestart) {
-    StudioAudio.playReStart();
-    lcdFrame.classList.add('fx-restart', 'mode-despair-bg');
-  } else {
-    StudioAudio.play1500Jackpot(fakeIsRush);
-    if (fakeStyle === 'despair') {
-      lcdFrame.classList.add('mode-despair-bg');
+  // ぶっ飛び演出タイプの決定（6,000時の一部で3秒フリーズ、他は4種をランダム）
+  let mode = crashType;
+  if (mode === 'auto') {
+    if (finalSound === '6000' && Math.random() < 0.22) {
+      mode = 'freeze3s';
     } else {
-      lcdFrame.classList.add('fx-gold');
-      if (fakeBurstGold) FxCanvas.burstGold(34);
+      const pool = ['slash', 'drop', 'shatter', 'quake'];
+      mode = pool[Math.floor(Math.random() * pool.length)];
     }
   }
 
-  bonusSubLabel.textContent = fakeSub;
-  bonusSubLabel.className = fakeStyle === 'despair'
-    ? 'text-[11px] sm:text-xs font-black tracking-[0.18em] text-slate-400 mb-1.5'
-    : 'text-[11px] sm:text-xs font-black tracking-[0.18em] text-amber-300 mb-1.5';
-  bonusMainTitle.textContent = fakeTitle;
-  bonusMainTitle.className = fakeStyle === 'despair'
-    ? 'text-3xl sm:text-4xl font-black text-slate-200 tracking-tight leading-tight pop-in'
-    : 'text-3xl sm:text-4xl font-black gold-grad-text tracking-tight leading-tight pop-in';
-  bonusDesc.textContent = fakeDesc;
+  try {
+    // --- Step 1：大当たり表示（1.3秒）※見た目・音ともに通常当たりと完全一致 ---
+    setActiveScene('bonus');
+    subtleWhisperSlot.classList.add('hidden');
+    subtleWhisperSlot.classList.remove('fx-whisper-in');
 
-  await wait(1300, token);
-  lcdFrame.classList.remove('fx-restart');
+    if (fakeRestart) {
+      StudioAudio.playReStart();
+      lcdFrame.classList.add('fx-restart', 'mode-despair-bg');
+    } else {
+      StudioAudio.play1500Jackpot(fakeIsRush);
+      if (fakeStyle === 'despair') {
+        lcdFrame.classList.add('mode-despair-bg');
+      } else {
+        lcdFrame.classList.add('fx-gold');
+        if (fakeBurstGold) FxCanvas.burstGold(34);
+      }
+    }
 
-  // --- Step 2：こじんまりと「これから脳が震える…」（1.1秒・微かな鼓動SE） ---
-  StudioAudio.playSoftHeartbeat();
-  subtleWhisperText.textContent = 'これから脳が震える…';
-  subtleWhisperSlot.classList.remove('hidden');
-  void subtleWhisperSlot.offsetWidth;
-  subtleWhisperSlot.classList.add('fx-whisper-in');
+    bonusSubLabel.textContent = fakeSub;
+    bonusSubLabel.className = fakeStyle === 'despair'
+      ? 'text-[11px] sm:text-xs font-black tracking-[0.18em] text-slate-400 mb-1.5'
+      : 'text-[11px] sm:text-xs font-black tracking-[0.18em] text-amber-300 mb-1.5';
+    bonusMainTitle.textContent = fakeTitle;
+    bonusMainTitle.className = fakeStyle === 'despair'
+      ? 'text-3xl sm:text-4xl font-black text-slate-200 tracking-tight leading-tight pop-in'
+      : 'text-3xl sm:text-4xl font-black gold-grad-text tracking-tight leading-tight pop-in';
+    bonusDesc.textContent = fakeDesc;
 
-  await wait(1100, token);
+    await wait(1300, token);
+    lcdFrame.classList.remove('fx-restart');
 
-  // --- Step 3：フリーズ演出（1.1秒：プチュン完全暗転0.6s無音 → ノイズ＆赤い亀裂0.5s） ---
-  StudioAudio.playPuchun();
-  FxCanvas.setAmbient('none');
-  FxCanvas.clearAll();
-  setLed('off');
-  lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg', 'mode-zero-bg');
+    // --- Step 2：こじんまりと「これから脳が震える…」（1.1秒・微かな鼓動SE） ---
+    StudioAudio.playSoftHeartbeat();
+    subtleWhisperText.textContent = 'これから脳が震える…';
+    subtleWhisperSlot.classList.remove('hidden');
+    void subtleWhisperSlot.offsetWidth;
+    subtleWhisperSlot.classList.add('fx-whisper-in');
 
-  showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
-  await wait(600, token);
+    await wait(1100, token);
 
-  StudioAudio.playCrackNoise();
-  crtScanLayer.classList.remove('hidden');
-  lcdFrame.classList.add('fx-glitch');
-  FxCanvas.spawnRedCracks();
-  await wait(500, token);
-  lcdFrame.classList.remove('fx-glitch');
+    // --- Step 3：フリーズ暗転（3秒ガチフリーズ or 通常1.1秒フリーズ） ---
+    StudioAudio.playPuchun();
+    FxCanvas.setAmbient('none');
+    FxCanvas.clearAll();
+    setLed('off');
+    lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg', 'mode-zero-bg');
 
-  // --- Step 4：引き裂きズバァァン！！ → 6,000 / 3,000降臨！！ ---
-  FxCanvas.clearCracks();
-  StudioAudio.playSlash();
-  StudioAudio.playOchiburu();
-  firePhysicalSplitSlash();
+    if (mode === 'freeze3s') {
+      // スマホ画面全体を完全ブラックアウト＆完全無音で3.0秒フリーズ!!
+      setGlobalBlackout(true);
+      await waitFreeze(3000, token);
+      setGlobalBlackout(false);
+    } else {
+      showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
+      await wait(600, token);
 
-  showFullscreenOverlay({
-    mode: finalSound === '3000' ? 'gold' : '6000',
-    sub: finalSub,
-    main: finalTitle,
-    extra: finalExtra,
-    scanlines: false
-  });
+      StudioAudio.playCrackNoise();
+      crtScanLayer.classList.remove('hidden');
+      lcdFrame.classList.add('fx-glitch');
+      FxCanvas.spawnRedCracks();
+      await wait(500, token);
+      lcdFrame.classList.remove('fx-glitch');
+    }
 
-  if (finalSound === '3000') {
-    StudioAudio.play3000Jackpot();
-  } else {
-    StudioAudio.play6000Fanfare(false);
+    // --- Step 4：選んだぶっ飛び破壊演出で6,000 / 3,000降臨！！ ---
+    FxCanvas.clearCracks();
+    StudioAudio.playSlash();
+    StudioAudio.playOchiburu();
+
+    let subText = finalSub;
+    if (mode === 'drop') {
+      fireDropCrash(fakeTitle);
+      subText = `⬇️【画面物理落下クラッシュ!!】⬇️`;
+    } else if (mode === 'shatter') {
+      fireShatterFly();
+      subText = `💥【画面3D粉砕吹き飛び!!】💥`;
+    } else if (mode === 'quake') {
+      fireMegaQuakeBrainBreak();
+      subText = `⚡【画面全体・超激震＆RGB破壊!!】⚡`;
+    } else if (mode === 'freeze3s') {
+      fireShatterFly();
+      subText = `💀【3秒間ガチフリーズ解放!!】💀`;
+    } else {
+      firePhysicalSplitSlash();
+    }
+
+    showFullscreenOverlay({
+      mode: finalSound === '3000' ? 'rainbow' : '6000',
+      sub: subText,
+      main: finalTitle,
+      extra: finalExtra,
+      scanlines: false
+    });
+
+    if (finalSound === '3000') {
+      StudioAudio.play3000Jackpot();
+    } else {
+      StudioAudio.play6000Fanfare(false);
+    }
+
+    triggerLamp('rainbow', '脳震え!!');
+    lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+    setLed('rainbow');
+
+    await wait(2200, token);
+    lcdFrame.classList.remove('shake-burst');
+  } finally {
+    clearGlobalChaosEffects();
+    hideFullscreenOverlay();
   }
-
-  triggerLamp('rainbow', '脳震え!!');
-  lcdFrame.classList.add('fx-rainbow', 'shake-burst');
-  setLed('rainbow');
-
-  await wait(2200, token);
-  lcdFrame.classList.remove('shake-burst');
-  hideFullscreenOverlay();
 }
