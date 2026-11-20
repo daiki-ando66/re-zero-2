@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>e Re:ゼロ 鬼がかり2 完全修正版シミュレーター</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&family=Shippori+Mincho:wght@600;800&display=swap');
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #060409;
+      color: #f4f1f8;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .font-mincho {
+      font-family: 'Shippori Mincho', 'Noto Sans JP', serif;
+    }
+
+    .bg-obsidian {
+      background: radial-gradient(circle at 50% 0%, #2b0715 0%, #0d0613 46%, #050308 100%);
+    }
+
+    /* =====================================================================
+       筐体サイドLEDバー
+       ===================================================================== */
+    .led-bar {
+      width: 6px;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, #4c0519, #881337, #4c0519);
+      box-shadow: 0 0 8px rgba(225, 29, 72, 0.35);
+      transition: all 0.25s ease;
+    }
+    .led-red {
+      background: linear-gradient(180deg, #fecdd3, #ef4444, #991b1b, #ef4444, #fecdd3);
+      background-size: 100% 200%;
+      animation: ledChase 0.35s linear infinite;
+      box-shadow: 0 0 18px 4px rgba(239, 68, 68, 0.95);
+    }
+    .led-rainbow {
+      background: linear-gradient(180deg, #fde047, #fb7185, #c084fc, #38bdf8, #34d399, #fde047);
+      background-size: 100% 250%;
+      animation: ledChase 0.5s linear infinite;
+      box-shadow: 0 0 22px 5px rgba(250, 204, 21, 0.95);
+    }
+    .led-rem {
+      background: linear-gradient(180deg, #082f49, #38bdf8, #e0f2fe, #38bdf8, #082f49);
+      background-size: 100% 200%;
+      animation: ledChase 1.8s ease-in-out infinite;
+      box-shadow: 0 0 16px 3px rgba(56, 189, 248, 0.85);
+    }
+    .led-brain {
+      background: linear-gradient(180deg, #3b0764, #a855f7, #e11d48, #a855f7, #3b0764);
+      background-size: 100% 200%;
+      animation: ledChase 0.7s linear infinite;
+      box-shadow: 0 0 18px 4px rgba(168, 85, 247, 0.9);
+    }
+    .led-off {
+      background: #09060c;
+      box-shadow: none;
+    }
+    @keyframes ledChase {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 0% 200%; }
+    }
+
+    /* =====================================================================
+       激震・背景モード・落ちブル・3DドームPUSH
+       ===================================================================== */
+    @keyframes brainShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      15% { transform: translate(-7px, -4px) rotate(-1deg); }
+      30% { transform: translate(7px, 4px) rotate(1deg); }
+      45% { transform: translate(-8px, 3px) rotate(-1.2deg); }
+      60% { transform: translate(8px, -3px) rotate(1.2deg); }
+      75% { transform: translate(-6px, -4px) rotate(-0.8deg); }
+      90% { transform: translate(6px, 4px) rotate(0.8deg); }
+    }
+    .shake-intense { animation: brainShake 0.14s linear infinite; }
+    .shake-burst { animation: brainShake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) 2; }
+
+    /* Step 2用：こじんまり静かに現れる不穏な「これから脳が震える…」 */
+    @keyframes subtleWhisperIn {
+      0% { opacity: 0; transform: translateY(6px) scale(0.96); letter-spacing: 0.14em; }
+      60% { opacity: 0.92; transform: translateY(0) scale(1); letter-spacing: 0.22em; }
+      100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.26em; }
+    }
+    @keyframes microQuiver {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-0.7px, 0.5px); }
+      50% { transform: translate(0.7px, -0.5px); }
+      75% { transform: translate(-0.5px, -0.5px); }
+    }
+    .fx-whisper-in {
+      animation: subtleWhisperIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards, microQuiver 0.18s steps(2) 0.55s infinite;
+    }
+
+    /* 脳が震えるRUSH 妖しい背景 */
+    @keyframes brainWarp {
+      0%, 100% { filter: hue-rotate(0deg) saturate(125%); }
+      50% { filter: hue-rotate(16deg) saturate(175%) contrast(112%); }
+    }
+    .mode-brain-bg {
+      background: radial-gradient(circle at 50% 45%, #3b0764 0%, #1c0424 54%, #07030b 100%) !important;
+      animation: brainWarp 2.6s ease-in-out infinite;
+    }
+    .mode-rem-bg {
+      background: radial-gradient(circle at 50% 35%, #0c4a6e 0%, #082036 55%, #040b14 100%) !important;
+    }
+    .mode-despair-bg {
+      background: radial-gradient(circle at 50% 40%, #0f172a 0%, #060914 60%, #020308 100%) !important;
+    }
+
+    /* 落ちブル：3D立体ドームPUSHボタン落下＆激震 */
+    @keyframes domeDrop {
+      0% { transform: translateY(-26px) scale(1.12); }
+      38% { transform: translateY(10px) scale(0.93); }
+      68% { transform: translateY(4px) scale(1.04); }
+      100% { transform: translateY(7px) scale(1); }
+    }
+    .ochiburu-dome {
+      animation: domeDrop 0.17s cubic-bezier(0.22, 1, 0.36, 1) forwards, brainShake 0.09s linear 0.17s infinite !important;
+      box-shadow: 0 0 42px 14px rgba(250, 204, 21, 0.98), 0 0 75px 24px rgba(225, 29, 72, 0.85), inset 0 0 24px rgba(255,255,255,0.95) !important;
+    }
+
+    .push-dome {
+      background: radial-gradient(circle at 32% 24%, #fecdd3 0%, #ef4444 26%, #b91c1c 62%, #450a0a 100%);
+      box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.85),
+        0 0 24px rgba(225, 29, 72, 0.72),
+        inset 0 6px 12px rgba(255, 255, 255, 0.55),
+        inset 0 -10px 18px rgba(69, 10, 10, 0.9);
+      transition: transform 0.08s ease, box-shadow 0.15s ease;
+    }
+    .push-dome:active {
+      transform: translateY(4px) scale(0.95);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.9), 0 0 32px rgba(250, 204, 21, 0.95), inset 0 4px 10px rgba(255,255,255,0.7);
+    }
+    .push-dome-gold {
+      background: radial-gradient(circle at 32% 24%, #fef9c3 0%, #facc15 30%, #d97706 68%, #713f12 100%);
+      box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.85),
+        0 0 30px rgba(250, 204, 21, 0.88),
+        inset 0 6px 14px rgba(255, 255, 255, 0.75),
+        inset 0 -10px 18px rgba(113, 63, 18, 0.9);
+    }
+
+    /* 液晶フレーム発光 */
+    @keyframes redBareFlash {
+      0% { box-shadow: inset 0 0 0 0 rgba(239,68,68,0); border-color: #7f1d1d; }
+      14% { box-shadow: inset 0 0 110px 36px rgba(239,68,68,0.98), 0 0 65px 16px rgba(220,38,38,0.95); border-color: #fecaca; }
+      60% { box-shadow: inset 0 0 44px 12px rgba(220,38,38,0.65), 0 0 26px 6px rgba(185,28,28,0.62); border-color: #ef4444; }
+      100% { box-shadow: inset 0 0 18px 4px rgba(185,28,28,0.35); border-color: #dc2626; }
+    }
+    .fx-redbare { animation: redBareFlash 0.9s ease-out forwards; }
+
+    @keyframes rainbowGlow {
+      0% { border-color: #fde047; box-shadow: inset 0 0 60px 16px rgba(250,204,21,0.8), 0 0 36px 8px rgba(250,204,21,0.75); }
+      25% { border-color: #fb7185; box-shadow: inset 0 0 60px 16px rgba(244,63,94,0.8), 0 0 36px 8px rgba(244,63,94,0.75); }
+      50% { border-color: #38bdf8; box-shadow: inset 0 0 60px 16px rgba(56,189,248,0.8), 0 0 36px 8px rgba(56,189,248,0.75); }
+      75% { border-color: #c084fc; box-shadow: inset 0 0 60px 16px rgba(192,132,252,0.8), 0 0 36px 8px rgba(192,132,252,0.75); }
+      100% { border-color: #fde047; box-shadow: inset 0 0 60px 16px rgba(250,204,21,0.8), 0 0 36px 8px rgba(250,204,21,0.75); }
+    }
+    .fx-rainbow { animation: rainbowGlow 0.95s linear infinite; }
+
+    @keyframes goldFlash {
+      0%, 100% { border-color: #facc15; box-shadow: inset 0 0 28px 6px rgba(250,204,21,0.42), 0 0 20px 5px rgba(234,179,8,0.42); }
+      50% { border-color: #fef9c3; box-shadow: inset 0 0 68px 18px rgba(254,240,138,0.85), 0 0 42px 12px rgba(250,204,21,0.85); }
+    }
+    .fx-gold { animation: goldFlash 0.8s ease-in-out infinite; }
+
+    /* CRTノイズ＆走査線 */
+    @keyframes glitchJitter {
+      0% { transform: translate(0, 0) skew(0deg); }
+      25% { transform: translate(-5px, 2px) skew(-4deg); }
+      50% { transform: translate(5px, -2px) skew(5deg); }
+      75% { transform: translate(-4px, -2px) skew(-3deg); }
+      100% { transform: translate(0, 0) skew(0deg); }
+    }
+    .fx-glitch { animation: glitchJitter 0.1s steps(2) infinite; }
+
+    .crt-scanlines {
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.42) 0px,
+        rgba(0, 0, 0, 0.42) 2px,
+        rgba(255, 255, 255, 0.05) 2px,
+        rgba(255, 255, 255, 0.05) 4px
+      );
+    }
+
+    /* ★物理スラッシュ：漆黒の画面が斜め真っ二つに裂けて左右へ吹き飛ぶ★ */
+    @keyframes splitLeftFly {
+      0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+      18% { transform: translate(-12px, -10px) rotate(-1.5deg); opacity: 1; }
+      100% { transform: translate(-120%, -48%) rotate(-15deg); opacity: 0; }
+    }
+    @keyframes splitRightFly {
+      0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+      18% { transform: translate(12px, 10px) rotate(1.5deg); opacity: 1; }
+      100% { transform: translate(120%, 48%) rotate(15deg); opacity: 0; }
+    }
+    .split-panel-left {
+      position: absolute; inset: 0; z-index: 54; pointer-events: none;
+      background: linear-gradient(135deg, #09030a 0%, #020103 65%, #3b0712 100%);
+      border: 2px solid rgba(254, 240, 138, 0.9);
+      clip-path: polygon(0 0, 100% 0, 100% 24%, 0 76%);
+      box-shadow: inset 0 0 36px rgba(239, 68, 68, 0.75);
+      animation: splitLeftFly 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    .split-panel-right {
+      position: absolute; inset: 0; z-index: 54; pointer-events: none;
+      background: linear-gradient(315deg, #09030a 0%, #020103 65%, #713f12 100%);
+      border: 2px solid rgba(254, 240, 138, 0.9);
+      clip-path: polygon(0 76%, 100% 24%, 100% 100%, 0 100%);
+      box-shadow: inset 0 0 36px rgba(250, 204, 21, 0.75);
+      animation: splitRightFly 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes slashLineAnim {
+      0% { transform: translate(-120%, -120%) rotate(-27deg) scaleX(0.3); opacity: 1; }
+      34% { transform: translate(0%, 0%) rotate(-27deg) scaleX(1.9); opacity: 1; }
+      100% { transform: translate(120%, 120%) rotate(-27deg) scaleX(2.6); opacity: 0; }
+    }
+    .slash-beam {
+      position: absolute; top: 45%; left: -40%; width: 180%; height: 26px;
+      background: linear-gradient(90deg, transparent, #ffffff, #fef08a, #ef4444, #ffffff, transparent);
+      box-shadow: 0 0 46px 18px rgba(254, 240, 138, 1), 0 0 78px 30px rgba(239, 68, 68, 0.95);
+      pointer-events: none; z-index: 56;
+      animation: slashLineAnim 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Re:Start モノクロ逆回転 */
+    @keyframes rewindFlip {
+      0% { transform: rotate(0deg) scale(1); filter: grayscale(100%) contrast(150%); }
+      50% { transform: rotate(-180deg) scale(1.04); filter: grayscale(100%) invert(18%) contrast(185%); }
+      100% { transform: rotate(-360deg) scale(1); filter: grayscale(100%) contrast(130%); }
+    }
+    .fx-restart { animation: rewindFlip 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+
+    /* 上部鬼ランプ発光＆二重衝撃波 */
+    @keyframes rippleExpand {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(3.4); opacity: 0; }
+    }
+    .lamp-ripple {
+      position: absolute; inset: 0; border-radius: 9999px;
+      border: 3px solid #ef4444; pointer-events: none;
+      animation: rippleExpand 0.72s cubic-bezier(0, 0.2, 0.8, 1) forwards;
+    }
+    .lamp-red {
+      background: radial-gradient(circle at 35% 30%, #fee2e2 0%, #ef4444 40%, #991b1b 82%, #450a0a 100%) !important;
+      box-shadow: 0 0 30px 10px rgba(239,68,68,0.98), inset 0 0 14px rgba(255,255,255,0.95) !important;
+      border-color: #fecaca !important;
+    }
+    .lamp-rem {
+      background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 42%, #0284c7 82%, #082f49 100%) !important;
+      box-shadow: 0 0 30px 10px rgba(56,189,248,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
+      border-color: #bae6fd !important;
+    }
+    .lamp-rainbow {
+      background: conic-gradient(from 0deg, #fde047, #fb7185, #c084fc, #38bdf8, #34d399, #fde047) !important;
+      box-shadow: 0 0 34px 12px rgba(250,204,21,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
+      border-color: #ffffff !important;
+    }
+
+    /* 3桁デジタル図柄リール */
+    .reel-box {
+      background: linear-gradient(180deg, rgba(15,6,20,0.95) 0%, rgba(36,11,30,0.9) 50%, rgba(15,6,20,0.95) 100%);
+      box-shadow: inset 0 4px 12px rgba(0,0,0,0.9), 0 0 14px rgba(225,29,72,0.28);
+    }
+    .reel-tenpai {
+      border-color: #facc15 !important;
+      box-shadow: inset 0 0 16px rgba(250,204,21,0.55), 0 0 22px rgba(250,204,21,0.85) !important;
+    }
+    @keyframes reelBlurSpin {
+      0% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; }
+      50% { transform: translateY(6px); filter: blur(1.8px); opacity: 1; }
+      100% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; }
+    }
+    .reel-spinning { animation: reelBlurSpin 0.08s linear infinite; }
+
+    /* テキスト装飾 */
+    .gold-grad-text {
+      background: linear-gradient(180deg, #fef9c3 0%, #facc15 48%, #d97706 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 3px 12px rgba(250,204,21,0.55));
+    }
+    .crimson-grad-text {
+      background: linear-gradient(180deg, #fecaca 0%, #ef4444 50%, #991b1b 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 3px 14px rgba(239,68,68,0.7));
+    }
+    .rainbow-grad-text {
+      background: linear-gradient(90deg, #fde047, #fb7185, #38bdf8, #c084fc, #fde047);
+      background-size: 200% auto;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: shineTxt 1.15s linear infinite;
+    }
+    @keyframes shineTxt { to { background-position: 200% center; } }
+
+    @keyframes popIn {
+      0% { transform: scale(0.48); opacity: 0; }
+      60% { transform: scale(1.12); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .pop-in { animation: popIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    @keyframes cutinSlam {
+      0% { transform: scale(1.9) skewX(-10deg); opacity: 0; }
+      55% { transform: scale(0.95) skewX(-5deg); opacity: 1; }
+      100% { transform: scale(1) skewX(-3deg); opacity: 1; }
+    }
+    .cutin-slam { animation: cutinSlam 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    /* 全画面オーバーレイ背景（完全不透明で裏UIが絶対に透けない） */
+    .overlay-blackout {
+      background-color: #020104;
+    }
+    .overlay-6000 {
+      background: radial-gradient(circle at 50% 42%, #4a0d22 0%, #1c0518 52%, #07020a 100%);
+    }
+    .overlay-wedding {
+      background: radial-gradient(circle at 50% 35%, #ffffff 0%, #fff1f2 46%, #fef3c7 100%);
+    }
+
+    /* 独立裏ボタン（実機OKボタン風・控えめ配置） */
+    .secret-ok-btn {
+      background: radial-gradient(circle at 35% 30%, #3f3f46 0%, #18181b 65%, #09090b 100%);
+      box-shadow: inset 0 2px 3px rgba(255,255,255,0.18), 0 3px 8px rgba(0,0,0,0.85);
+      transition: transform 0.08s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .secret-ok-btn:active {
+      transform: scale(0.90) translateY(1px);
+    }
+    .secret-ok-active {
+      border-color: rgba(251, 191, 36, 0.65) !important;
+      box-shadow: inset 0 2px 4px rgba(254,240,138,0.25), 0 0 10px rgba(251,191,36,0.32);
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #140812; }
+    ::-webkit-scrollbar-thumb { background: #991b1b; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen bg-obsidian text-slate-100 pb-10">
+
+  <!-- =======================================================================
+       コンパクト2行ヘッダー（スマホ縦画面最適化・昇格テストボタン搭載）
+       ======================================================================= -->
+  <header class="bg-[#0b040c]/95 border-b border-rose-900/60 shadow-lg sticky top-0 z-40 backdrop-blur-md">
+    <div class="max-w-lg sm:max-w-4xl mx-auto px-2.5 pt-2 pb-1.5 space-y-1.5">
+      <!-- 1行目：タイトル＆試聴・昇格テスト・チューナー・速度切替 -->
+      <div class="flex items-center justify-between gap-1">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <div class="w-7 h-7 shrink-0 rounded-lg bg-gradient-to-br from-rose-600 via-red-800 to-amber-500 flex items-center justify-center shadow border border-amber-300/60">
+            <span class="font-black text-white text-[10px]">鬼2</span>
+          </div>
+          <div class="leading-tight truncate">
+            <h1 class="text-[11px] sm:text-sm font-black bg-gradient-to-r from-rose-300 via-amber-200 to-red-400 bg-clip-text text-transparent truncate">
+              リゼロ鬼がかり2
+            </h1>
+            <p class="text-[9px] text-rose-300/80 truncate">1/349.9・完全修正版</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 shrink-0">
+          <button id="btnTestPokyun" class="px-2 py-1.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 text-white shadow border border-amber-300/60 active:scale-95 transition">
+            🔊 試聴
+          </button>
+          <button id="btnTestPromo" class="px-2 py-1.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-purple-700 to-fuchsia-700 hover:from-purple-600 text-amber-200 shadow border border-fuchsia-400/60 active:scale-95 transition">
+            🎬 昇格テスト
+          </button>
+          <button id="btnToggleTuner" class="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/50 active:scale-95 transition">
+            🎛️ 音
+          </button>
+          <button id="btnSpeedToggle" class="px-1.5 py-1.5 rounded-lg text-[10px] font-black bg-indigo-950 hover:bg-indigo-900 text-cyan-300 border border-cyan-500/50 active:scale-95 transition" title="演出スピード切替">
+            ⏱ 極上
+          </button>
+        </div>
+      </div>
+
+      <!-- 2行目：タブ切替 -->
+      <div class="flex gap-1.5">
+        <button id="tabPlay" class="flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-rose-700 via-red-700 to-amber-700 text-white shadow border border-amber-400/50">
+          🔥 実戦プレイモード
+        </button>
+        <button id="tabSim100" class="flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-black transition-all bg-slate-900/90 text-slate-400 hover:text-slate-200 border border-slate-800">
+          📊 初当たり100回シミュ
+        </button>
+      </div>
+    </div>
+
+    <!-- 折りたたみ式：ポキュ↑ーン↓ 音響チューナードロワー（確定神設定デフォルト固定） -->
+    <div id="audioTunerDrawer" class="hidden border-t border-rose-900/60 bg-[#120614]/98">
+      <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-3 space-y-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-black text-amber-300">🎛️ ポキュ↑ーン↓ 音響チューナー（神設定固定）</span>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button id="btnResetTuner" class="text-[10px] font-bold text-slate-200 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-600 active:scale-95 transition">初期値に戻す</button>
+            <button id="btnMute" class="text-[10px] font-black text-emerald-300 px-2 py-1 rounded bg-slate-800 border border-slate-600 active:scale-95 transition">🔊 ON</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[11px]">
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-rose-200 font-bold">リバーブ深さ</span>
+              <span id="valReverbWet" class="font-black text-amber-300">44%</span>
+            </div>
+            <input id="sliderReverbWet" type="range" min="0" max="100" step="1" value="44" class="w-full accent-rose-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-rose-200 font-bold">高音キレ・ピッチ</span>
+              <span id="valPeakBright" class="font-black text-amber-300">0.73x</span>
+            </div>
+            <input id="sliderPeakBright" type="range" min="0.60" max="1.30" step="0.01" value="0.73" class="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-rose-200 font-bold">「ーン↓」落ち幅</span>
+              <span id="valDownBend" class="font-black text-amber-300">115%</span>
+            </div>
+            <input id="sliderDownBend" type="range" min="0" max="150" step="5" value="115" class="w-full accent-fuchsia-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-amber-200 font-black">「ポ」の強さ</span>
+              <span id="valPoEmphasis" class="font-black text-amber-300">160%</span>
+            </div>
+            <input id="sliderPoEmphasis" type="range" min="50" max="200" step="5" value="160" class="w-full accent-orange-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-rose-300 font-black">ジャリジャリ感</span>
+              <span id="valGrit" class="font-black text-amber-300">115%</span>
+            </div>
+            <input id="sliderGrit" type="range" min="0" max="160" step="5" value="115" class="w-full accent-red-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-rose-200 font-bold">マスター音量</span>
+              <span id="valVolume" class="font-black text-amber-300">80%</span>
+            </div>
+            <input id="sliderVolume" type="range" min="0" max="100" step="5" value="80" class="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- フルスクリーン固定モーダル：RUSHリザルト（見切れゼロ） -->
+  <div id="resultModal" class="hidden fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto">
+    <div class="w-full max-w-sm my-auto rounded-3xl bg-gradient-to-b from-[#2f0917] via-[#150719] to-[#08040b] border-2 border-amber-400/90 p-5 shadow-2xl text-center">
+      <div class="text-[10px] font-black tracking-[0.28em] text-rose-300 mb-1">ONIGAKARI RUSH RESULT</div>
+      <div class="text-2xl font-black gold-grad-text mb-4">鬼がかりRUSH 終了</div>
+
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <div class="rounded-xl bg-black/70 border border-rose-800/70 p-2.5">
+          <div class="text-[10px] text-rose-300">連チャン数</div>
+          <div id="resChains" class="text-xl font-black text-white">0 連</div>
+        </div>
+        <div class="rounded-xl bg-black/70 border border-amber-500/75 p-2.5">
+          <div class="text-[10px] text-amber-300">鬼がかり6000</div>
+          <div id="res6000" class="text-xl font-black text-amber-300">0 回</div>
+        </div>
+        <div class="rounded-xl bg-black/70 border border-fuchsia-500/60 p-2.5">
+          <div class="text-[10px] text-fuchsia-300">Re:Start / 残保連</div>
+          <div id="resSpecial" class="text-sm font-black text-fuchsia-300 mt-1">0回 / 0回</div>
+        </div>
+        <div class="rounded-xl bg-black/70 border border-cyan-500/60 p-2.5">
+          <div class="text-[10px] text-cyan-300">獲得純増</div>
+          <div id="resNet" class="text-lg font-black text-cyan-300">0 発</div>
+        </div>
+      </div>
+
+      <div id="resSummaryText" class="text-xs font-bold text-amber-200 mb-4 leading-relaxed whitespace-pre-line"></div>
+      <button id="btnCloseResult" class="w-full py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 text-white shadow-lg border border-amber-300/60 active:scale-95 transition">
+        通常時へ戻る
+      </button>
+    </div>
+  </div>
+
+  <main class="max-w-lg sm:max-w-4xl mx-auto px-2 sm:px-4 pt-2.5 space-y-2">
+
+    <!-- ========================================================== -->
+    <!-- タブ1：実戦プレイモード                                      -->
+    <!-- ========================================================== -->
+    <div id="playModeContainer" class="space-y-2">
+
+      <!-- 上部ミニダッシュボード -->
+      <section class="grid grid-cols-4 gap-1.5">
+        <div class="rounded-xl bg-[#130716]/95 border border-rose-900/60 px-2 py-1.5 text-center">
+          <div class="text-[9px] text-rose-300/80">現在/総回転</div>
+          <div id="dashSpins" class="text-xs sm:text-sm font-black text-white">0 / 0</div>
+        </div>
+        <div class="rounded-xl bg-[#130716]/95 border border-rose-900/60 px-2 py-1.5 text-center">
+          <div class="text-[9px] text-rose-300/80">総投資</div>
+          <div id="dashInvest" class="text-xs sm:text-sm font-black text-rose-400">0円</div>
+        </div>
+        <div class="rounded-xl bg-[#130716]/95 border border-rose-900/60 px-2 py-1.5 text-center">
+          <div class="text-[9px] text-rose-300/80">持ち玉(純増)</div>
+          <div id="dashBalls" class="text-xs sm:text-sm font-black text-cyan-300">0発</div>
+        </div>
+        <div class="rounded-xl bg-[#130716]/95 border border-rose-900/60 px-2 py-1.5 text-center">
+          <div class="text-[9px] text-rose-300/80">収支</div>
+          <div id="dashBalance" class="text-xs sm:text-sm font-black text-white">±0円</div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           完全排他レイヤー液晶筐体（固定高さ・overflow:hidden・3段完全分離）
+           =================================================================== -->
+      <div class="flex items-stretch gap-1.5">
+        <div id="ledLeft" class="led-bar shrink-0"></div>
+
+        <section id="lcdFrame" class="relative flex-1 overflow-hidden rounded-3xl border-2 border-rose-900/85 bg-gradient-to-b from-[#1e0816] via-[#120716] to-[#08040b] h-[356px] sm:h-[388px] flex flex-col justify-between p-3 sm:p-4 shadow-2xl transition-colors duration-200">
+
+          <!-- 【z-10】通常3段構造：上部HUD / 中央単一排他ステージ / 下部保留スロット -->
+
+          <!-- ① 上部HUDバー（左：モード名、中央：鬼ランプ、右：残回数＆残保4ドット） -->
+          <div class="relative z-10 flex items-center justify-between gap-1.5 shrink-0 h-11">
+            <div id="stateBadge" class="px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide bg-black/80 border border-rose-500/70 text-rose-300 shadow whitespace-nowrap">
+              通常時 1/349.9
+            </div>
+
+            <!-- 中央上部：鬼ランプ -->
+            <div class="relative flex items-center justify-center">
+              <div id="lampRippleHost" class="absolute inset-0 pointer-events-none"></div>
+              <div id="oniLamp" class="w-10 h-10 rounded-full border-2 border-rose-800/90 bg-gradient-to-br from-slate-900 via-[#250a16] to-black flex items-center justify-center shadow-inner transition-all duration-150">
+                <span id="lampEmoji" class="text-base">👹</span>
+              </div>
+            </div>
+
+            <!-- 右上：通常回転数 または RUSH残回数＋残保留4ドット -->
+            <div class="text-right shrink-0">
+              <div id="normalSpinWrap" class="text-[11px] font-bold text-rose-200 bg-black/65 px-2.5 py-1 rounded-lg border border-rose-900/80 whitespace-nowrap">
+                <strong id="currentSpinDisplay" class="text-white text-sm">0</strong> 回転
+              </div>
+              <div id="stRemainingWrap" class="hidden bg-rose-950/90 px-2 py-1 rounded-lg border border-amber-400/80 shadow">
+                <div class="text-[10px] font-black text-amber-200 leading-none whitespace-nowrap">
+                  残 <strong id="stHudRemain" class="text-amber-300 text-xs">140</strong> 回
+                </div>
+                <div class="flex items-center justify-end gap-1 mt-1" title="残保留4個">
+                  <span class="text-[8px] text-rose-200 font-bold">残保</span>
+                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
+                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
+                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
+                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ② 中央メインステージ（厳密な単一シーン排他切替：同時に1つしかdisplayされない） -->
+          <div class="relative z-10 flex-1 flex items-center justify-center overflow-hidden py-1">
+
+            <!-- シーンA：通常時（3桁デジタル図柄＋回転数表示） -->
+            <div id="scene-normal" class="scene-pane w-full flex flex-col items-center justify-center text-center">
+              <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2.5">
+                <div id="reelBox0" class="reel-box w-16 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-rose-800/80 flex items-center justify-center overflow-hidden">
+                  <span id="reelNum0" class="text-4xl sm:text-5xl font-black gold-grad-text">7</span>
+                </div>
+                <div id="reelBox1" class="reel-box w-16 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-rose-800/80 flex items-center justify-center overflow-hidden">
+                  <span id="reelNum1" class="text-4xl sm:text-5xl font-black crimson-grad-text">3</span>
+                </div>
+                <div id="reelBox2" class="reel-box w-16 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-rose-800/80 flex items-center justify-center overflow-hidden">
+                  <span id="reelNum2" class="text-4xl sm:text-5xl font-black gold-grad-text">7</span>
+                </div>
+              </div>
+              <div id="normalTitle" class="text-2xl sm:text-3xl font-black text-white tracking-tight">STANDBY</div>
+              <p id="normalSub" class="mt-1 text-[11px] sm:text-xs text-rose-100/80 max-w-sm leading-snug px-2">
+                「🔥 先バレオート」で爆音ポキュ↑ーン↓＆極上時差ドパ演出を体感！
+              </p>
+            </div>
+
+            <!-- シーンB：先バレ・リーチ・表3DドームPUSH（裏ボタンは操作パネル隅へ独立配置） -->
+            <div id="scene-reach" class="scene-pane hidden w-full flex flex-col items-center justify-center text-center">
+              <span id="reachYokokuBadge" class="mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black tracking-wide bg-black/85 border border-amber-400/80 text-amber-300 shadow-lg"></span>
+              <div id="reachTitle" class="font-mincho text-2xl sm:text-3xl font-black text-white leading-tight px-2"></div>
+              <p id="reachSub" class="mt-1 text-[11px] text-rose-100/85 max-w-sm leading-snug px-2"></p>
+
+              <!-- 表・当落ジャッジ専用 3D立体ドームPUSHボタン -->
+              <div id="pushButtonArea" class="hidden mt-2.5 flex flex-col items-center gap-1">
+                <div class="relative w-28 h-28 flex items-center justify-center">
+                  <button id="btnOniPush" class="push-dome w-24 h-24 rounded-full border-4 border-amber-300 flex flex-col items-center justify-center text-white cursor-pointer select-none">
+                    <span id="btnPushMain" class="text-2xl font-black tracking-wider drop-shadow leading-none">PUSH</span>
+                    <span id="btnPushSub" class="text-[9px] font-black text-amber-200 mt-1 tracking-widest">当落ジャッジ</span>
+                  </button>
+                </div>
+                <div id="pushHintText" class="text-[10px] font-black text-amber-300">
+                  タップで当落ジャッジ！（下部パネル右隅に「OK裏ボタン」搭載）
+                </div>
+              </div>
+            </div>
+
+            <!-- シーンC：RUSH消化待機中のみ表示（大当り・昇格中は完全にdisplay:none） -->
+            <div id="scene-rush-idle" class="scene-pane hidden w-full flex flex-col items-center justify-center text-center">
+              <div id="rushModeBanner" class="text-[11px] font-black tracking-[0.2em] text-amber-300/90 mb-1">ONIGAKARI RUSH</div>
+              <div class="flex items-baseline justify-center gap-1.5">
+                <span class="text-sm font-black text-rose-200">残り</span>
+                <span id="rushBigRemain" class="text-6xl sm:text-7xl font-black gold-grad-text leading-none tracking-tight">140</span>
+                <span class="text-sm font-black text-rose-200">回</span>
+              </div>
+              <p id="rushIdleSub" class="mt-2.5 text-[11px] sm:text-xs font-bold text-rose-100/85 max-w-sm leading-snug px-2">
+                25%の「鬼がかり6000」を引け！300やRe:Startからも昇格あり！
+              </p>
+            </div>
+
+            <!-- シーンD：大当たり＆Step 2「こじんまり『これから脳が震える…』」専用ステージ -->
+            <div id="scene-bonus" class="scene-pane hidden w-full h-full flex flex-col items-center justify-center text-center relative px-2">
+              <div id="bonusSubLabel" class="text-[11px] sm:text-xs font-black tracking-[0.18em] text-amber-300 mb-1.5"></div>
+              <div id="bonusMainTitle" class="text-3xl sm:text-4xl font-black gold-grad-text tracking-tight leading-tight"></div>
+              <p id="bonusDesc" class="mt-1.5 text-xs font-bold text-slate-200/90 max-w-sm"></p>
+
+              <!-- ★Step 2専用スロット：大当たりの下部隅にこじんまりと控えめに現れる不穏な予告★ -->
+              <div id="subtleWhisperSlot" class="hidden absolute bottom-1 right-1 sm:right-2 px-2.5 py-1 rounded-md bg-black/75 border border-purple-500/45 shadow-lg">
+                <span id="subtleWhisperText" class="font-mincho text-xs sm:text-sm font-semibold text-purple-200/95 tracking-widest">
+                  これから脳が震える…
+                </span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ③ 下部保留スロット（通常4個 / 脳が震えるRUSH 5文字） -->
+          <div class="relative z-10 pt-2 border-t border-rose-900/60 flex items-center justify-between gap-2 shrink-0 h-11">
+            <span id="reserveLabel" class="text-[10px] font-black text-rose-300/85 tracking-wider whitespace-nowrap">保留</span>
+            <div class="flex items-center justify-center gap-2 flex-1">
+              <div id="resSlot0" class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[11px] font-black text-slate-400 transition-all">○</div>
+              <div id="resSlot1" class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[11px] font-black text-slate-400 transition-all">○</div>
+              <div id="resSlot2" class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[11px] font-black text-slate-400 transition-all">○</div>
+              <div id="resSlot3" class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[11px] font-black text-slate-400 transition-all">○</div>
+              <div id="resSlot4" class="hidden w-8 h-8 rounded-full border-2 border-purple-700 bg-purple-950/90 flex items-center justify-center text-[11px] font-black text-purple-300 transition-all">る</div>
+            </div>
+            <span id="lampStatusText" class="text-[10px] font-black text-amber-200 min-w-[54px] text-right whitespace-nowrap">待機中</span>
+          </div>
+
+          <!-- =================================================================
+               【z-40】完全不透明・全画面演出オーバーレイ
+               （Step 3漆黒フリーズ / Step 4 6000・3000降臨 / ホワイトアウトWEDDING）
+               ※背後UIは一切透けず、文字重なりは構造的に0%
+               ================================================================= -->
+          <div id="fullscreenOverlay" class="hidden absolute inset-0 z-40 overlay-blackout flex flex-col items-center justify-center text-center p-5">
+            <div id="crtScanLayer" class="hidden pointer-events-none absolute inset-0 crt-scanlines"></div>
+            <div id="fsSub" class="relative z-10 text-xs sm:text-sm font-black tracking-[0.24em] text-rose-400 mb-2"></div>
+            <div id="fsMain" class="relative z-10 text-3xl sm:text-5xl font-black gold-grad-text tracking-wider leading-tight px-1"></div>
+            <div id="fsExtra" class="relative z-10 mt-3 text-xs sm:text-sm font-bold text-amber-100/95 max-w-md leading-relaxed"></div>
+          </div>
+
+          <!-- 【z-50】最前面HTML5 Canvasエフェクト（赤い亀裂・金吹雪・紅蓮炎・衝撃波・白い羽根） -->
+          <canvas id="fxCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-50"></canvas>
+
+          <!-- 【z-55】物理スラッシュ：斜め真っ二つ吹き飛びパネル＆光の斬撃ビーム -->
+          <div id="slashHost" class="pointer-events-none absolute inset-0 overflow-hidden z-[55]"></div>
+
+        </section>
+
+        <div id="ledRight" class="led-bar shrink-0"></div>
+      </div>
+
+      <!-- ★RUSH累計成績専用スリムバー（液晶の直下に独立配置＝文字被り構造的根絶）★ -->
+      <section id="rushStatusBar" class="hidden rounded-2xl bg-gradient-to-r from-[#240715] via-[#17061a] to-[#240715] border border-amber-500/60 px-3 py-2 shadow-lg">
+        <div class="grid grid-cols-4 gap-1 text-center items-center">
+          <div>
+            <div class="text-[9px] text-rose-300 font-bold">連チャン</div>
+            <div id="rushChainDisplay" class="text-sm sm:text-base font-black text-white leading-tight">1連</div>
+          </div>
+          <div class="border-l border-rose-900/80">
+            <div class="text-[9px] text-amber-300 font-bold">累計払出</div>
+            <div id="rushDispDisplay" class="text-sm sm:text-base font-black text-amber-300 leading-tight">1,500個</div>
+          </div>
+          <div class="border-l border-rose-900/80">
+            <div class="text-[9px] text-cyan-300 font-bold">累計純増</div>
+            <div id="rushNetDisplay" class="text-sm sm:text-base font-black text-cyan-300 leading-tight">1,400発</div>
+          </div>
+          <div class="border-l border-rose-900/80">
+            <div class="text-[9px] text-fuchsia-300 font-bold">鬼6000</div>
+            <div id="rush6000Display" class="text-sm sm:text-base font-black text-fuchsia-300 leading-tight">0回</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- カスタム切替バー（通常時は実機3種 / RUSH時は3モード切替） -->
+      <section class="rounded-2xl bg-[#130716]/95 border border-rose-900/60 px-2.5 py-2 shadow">
+        <div id="normalCustomPanel" class="grid grid-cols-3 gap-1.5">
+          <button id="toggleSakibare" class="py-2 px-1 rounded-xl text-[11px] font-black border transition bg-rose-700/85 border-rose-400 text-white shadow active:scale-95">
+            🔥 先バレ40%: ON
+          </button>
+          <button id="toggleOchiburu" class="py-2 px-1 rounded-xl text-[11px] font-black border transition bg-amber-600/65 border-amber-300 text-amber-100 active:scale-95">
+            💥 落ちブルUP: ON
+          </button>
+          <button id="togglePremier" class="py-2 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
+            🌈 プレミアUP: OFF
+          </button>
+        </div>
+
+        <div id="rushCustomPanel" class="hidden grid grid-cols-3 gap-1.5">
+          <button data-rmode="onigakari" class="rmode-btn py-2 px-1 rounded-xl text-[11px] font-black border transition bg-rose-700/80 border-amber-300 text-white active:scale-95">
+            🔥 鬼がかり
+          </button>
+          <button data-rmode="brain" class="rmode-btn py-2 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
+            🧠 脳が震える
+          </button>
+          <button data-rmode="rem" class="rmode-btn py-2 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
+            💙 レム告知
+          </button>
+        </div>
+      </section>
+
+      <!-- 操作コントロールパネル（右隅に控えめな「OK（裏ボタン）」を独立配置） -->
+      <section class="rounded-2xl bg-[#130716]/95 border border-rose-900/60 p-2.5 shadow-xl flex items-center gap-2">
+        <div class="flex-1 min-w-0">
+          <div id="normalControls" class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <button id="btnSpin1" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-slate-700 to-slate-900 hover:from-slate-600 text-white shadow border border-slate-600 active:scale-95 transition">
+              1回転
+            </button>
+            <button id="btnSpin10" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-indigo-700 to-slate-900 hover:from-indigo-600 text-white shadow border border-indigo-500/50 active:scale-95 transition">
+              10回転
+            </button>
+            <button id="btnAutoSakibare" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-rose-600 to-red-800 hover:from-rose-500 text-white shadow border border-rose-400/60 active:scale-95 transition">
+              🔥 先バレオート
+            </button>
+            <button id="btnAutoHit" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-amber-400 to-orange-600 hover:from-amber-300 text-slate-950 shadow border border-amber-200/70 active:scale-95 transition">
+              ⚡ 当りオート
+            </button>
+            <button id="btnStopAuto" class="py-3 px-2 rounded-xl font-black text-xs bg-slate-900 hover:bg-slate-800 text-rose-300 border border-rose-900/70 active:scale-95 transition">
+              ⏹ 停止
+            </button>
+            <button id="btnResetPlay" class="py-3 px-2 rounded-xl font-bold text-xs bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 active:scale-95 transition">
+              リセット
+            </button>
+          </div>
+
+          <div id="rushControls" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button id="btnRush1" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-rose-600 to-red-800 hover:from-rose-500 text-white shadow active:scale-95 transition">
+              ST 1回転
+            </button>
+            <button id="btnRush10" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-fuchsia-700 to-purple-900 hover:from-fuchsia-600 text-white shadow active:scale-95 transition">
+              ST 10回転
+            </button>
+            <button id="btnRushAuto" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-amber-500 to-orange-700 hover:from-amber-400 text-slate-950 shadow active:scale-95 transition">
+              ⚡ RUSHオート
+            </button>
+            <button id="btnRushSkip" class="py-3 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 text-slate-950 shadow active:scale-95 transition">
+              💥 当り/終了スキップ
+            </button>
+          </div>
+
+          <div id="busyNotice" class="hidden py-2.5 text-center text-xs font-black text-amber-300">
+            🔥 演出進行中…液晶にご注目ください！ 🔥
+          </div>
+        </div>
+
+        <!-- ★独立配置の控えめな裏ボタン（OKボタン）★ -->
+        <div class="shrink-0 pl-1.5 border-l border-rose-950/80 flex flex-col items-center justify-center">
+          <button id="btnSecretOk" title="裏ボタン（リーチ中に押すと先行一発告知を抽選）" class="secret-ok-btn w-11 h-11 rounded-full border-2 border-zinc-700 flex flex-col items-center justify-center text-zinc-300 cursor-pointer">
+            <span class="text-[11px] font-black tracking-tighter leading-none">OK</span>
+            <span class="text-[7px] text-zinc-500 font-bold mt-0.5">裏</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 補助統計＆回転率・交換率設定 -->
+      <section class="rounded-2xl bg-[#130716]/90 border border-rose-900/50 p-3 space-y-2.5 shadow">
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="rounded-xl bg-black/50 border border-rose-950 p-2">
+            <div class="text-[10px] text-rose-300/80">初当り / RUSH突入</div>
+            <div id="statHits" class="text-sm font-black text-rose-200">0 / 0</div>
+          </div>
+          <div class="rounded-xl bg-black/50 border border-rose-950 p-2">
+            <div class="text-[10px] text-rose-300/80">先バレ勝率</div>
+            <div id="statSakibare" class="text-sm font-black text-amber-300">0/0 (-%)</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center pt-1">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="rotRateSlider" class="text-[11px] font-bold text-amber-200">通常回転率 (回/1k)</label>
+              <span id="rotRateDisplay" class="text-xs font-black text-white bg-black/70 px-2 py-0.5 rounded border border-rose-700/70">16.5 回/1k</span>
+            </div>
+            <input id="rotRateSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-rose-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button data-rate="4.0" class="rate-btn py-2 rounded-lg text-[11px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
+            <button data-rate="3.6363636" class="rate-btn py-2 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
+            <button data-rate="3.5714286" class="rate-btn py-2 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 実戦履歴ログ -->
+      <section class="rounded-2xl bg-[#130716]/90 border border-rose-900/60 p-3 shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-black text-amber-300">📜 実戦履歴ログ</h2>
+          <span class="text-[10px] text-slate-400">最新が上</span>
+        </div>
+        <div class="overflow-x-auto max-h-52 overflow-y-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="text-rose-300/80 border-b border-rose-900/70 sticky top-0 bg-[#130716]">
+              <tr>
+                <th class="py-1.5 px-1.5">回転</th>
+                <th class="py-1.5 px-1.5">種別</th>
+                <th class="py-1.5 px-1.5">演出 / 内訳</th>
+                <th class="py-1.5 px-1.5 text-right">結果 / 出玉</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-rose-950/80">
+              <tr>
+                <td colspan="4" class="py-5 text-center text-slate-500">「🎬 昇格テスト」や「🔥 先バレオート」を押してみてください！</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- タブ2：初当たり100回 高速シミュレーター                       -->
+    <!-- ========================================================== -->
+    <div id="sim100Container" class="hidden space-y-3">
+      <section class="rounded-2xl bg-[#130716]/95 border border-rose-900/60 p-3.5 shadow-xl space-y-3.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h2 class="text-sm sm:text-base font-black text-amber-300">🚀 初当たり100回 高速シミュレーター</h2>
+            <p class="text-[11px] text-slate-400 mt-0.5">1/3,499白鯨直行・残保留4個厳密独立抽選（3.94%）・ウェディング12,000（約1/101）を完全再現。</p>
+          </div>
+          <button id="btnRunSim100" class="px-5 py-3 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 hover:from-rose-500 text-white shadow-lg active:scale-95 transition whitespace-nowrap">
+            🚀 100回シミュレーション実行
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center bg-black/45 p-2.5 rounded-xl border border-rose-950">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[11px] font-bold text-amber-200">回転率 (12〜24回/1k)</span>
+              <span id="simRotDisplay" class="text-xs font-black text-white">16.5 回/1k</span>
+            </div>
+            <input id="simRotSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-rose-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button data-rate="4.0" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
+            <button data-rate="3.6363636" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
+            <button data-rate="3.5714286" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">総回転 / 平均確率</div>
+            <div id="simTotalSpins" class="text-xs sm:text-sm font-black text-white mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">最大ハマり</div>
+            <div id="simMaxHamari" class="text-xs sm:text-sm font-black text-rose-400 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">白鯨3000直行 (1/3499)</div>
+            <div id="simWhaleCount" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">RUSH突入 (理論55%)</div>
+            <div id="simRushRate" class="text-xs sm:text-sm font-black text-amber-200 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">鬼6000回数 (理論25%)</div>
+            <div id="sim6000Count" class="text-xs sm:text-sm font-black text-amber-300 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">残保留連 (4回転内3.94%)</div>
+            <div id="simHoryurenCount" class="text-xs sm:text-sm font-black text-fuchsia-300 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">💒 WEDDING 12,000</div>
+            <div id="simWeddingCount" class="text-xs sm:text-sm font-black text-pink-300 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">最大一撃 (払出/純増)</div>
+            <div id="simMaxPayout" class="text-xs sm:text-sm font-black text-amber-400 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">標準偏差 (理論±9,548)</div>
+            <div id="simStdDev" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5">-</div>
+          </div>
+          <div class="rounded-xl bg-black/60 border border-rose-900/60 p-2.5">
+            <div class="text-[10px] text-slate-400">最終差玉 / 金額収支</div>
+            <div id="simFinalBalance" class="text-xs sm:text-sm font-black text-white mt-0.5">-</div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl bg-black/75 border border-rose-900/70 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+            <span class="text-[11px] font-bold text-amber-200">📈 累計差玉スランプグラフ（プラス域：ゴールド ／ マイナス域：クリムゾン）</span>
+            <span id="simPeakBottom" class="text-[10px] text-slate-400"></span>
+          </div>
+          <div class="relative w-full h-56 sm:h-72">
+            <canvas id="slumpChartCanvas" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+
+        <div id="simDiagnosis" class="rounded-xl bg-gradient-to-r from-rose-950/60 via-black/75 to-amber-950/50 border border-amber-500/40 p-3 text-xs text-amber-100 leading-relaxed">
+          ボタンを押すと初当たり100回分のスランプグラフと、鬼がかり6000・残保留ウェディング12,000の分析が表示されます。
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- 分割した3モジュールを順番に読み込み（sound → effects → game） -->
+  <script src="sound.js"></script>
+  <script src="effects.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
