@@ -1,11 +1,89 @@
 // =========================================================================
-// effects.js : 最前面HTML5 Canvasエフェクト・液晶演出・4ステップ昇格エンジン
+// effects.js : 最前面HTML5 Canvasエフェクト・液晶演出・RUSH違和感＆4ステップ昇格
 // =========================================================================
+
+// RUSH追加演出＆違和感専用CSSを自動注入（index.html無改修で動作）
+(function injectRushExtraStyles() {
+  if (document.getElementById('rush-extra-css')) return;
+  const st = document.createElement('style');
+  st.id = 'rush-extra-css';
+  st.textContent = `
+    /* 違和感系エフェクト */
+    .iwakan-mono { filter: grayscale(100%) contrast(125%) !important; }
+    .iwakan-fade-remain { transition: opacity 0.85s ease; opacity: 0.06 !important; }
+    @keyframes remPuru {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 1.5px); }
+      50% { transform: translate(2px, -1.5px); }
+      75% { transform: translate(-1.5px, -1.5px); }
+    }
+    .iwakan-rempuru { animation: remPuru 0.09s linear infinite !important; }
+
+    /* 脳が震えるRUSH：弱／中シェイク（強は既存のshake-intense＋落ちブル） */
+    @keyframes brainShakeWeak {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2.5px, 1px); }
+      75% { transform: translate(2.5px, -1px); }
+    }
+    @keyframes brainShakeMid {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(-5px, 2.5px) rotate(-0.5deg); }
+      75% { transform: translate(5px, -2.5px) rotate(0.5deg); }
+    }
+    .shake-weak { animation: brainShakeWeak 0.11s linear infinite; }
+    .shake-mid { animation: brainShakeMid 0.10s linear infinite; }
+
+    /* レム告知：4種ランプ点灯パターン */
+    @keyframes remSlowGlow {
+      0% { opacity: 0.25; box-shadow: 0 0 0 rgba(56,189,248,0); }
+      65% { opacity: 0.9; box-shadow: 0 0 24px 8px rgba(56,189,248,0.9); }
+      100% { opacity: 1; box-shadow: 0 0 38px 14px rgba(250,204,21,0.98); }
+    }
+    .lamp-rem-slow {
+      background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 45%, #c084fc 85%, #fde047 100%) !important;
+      border-color: #fef08a !important;
+      animation: remSlowGlow 1.15s ease-in forwards !important;
+    }
+    @keyframes remClassicFlash {
+      0%, 100% { background: radial-gradient(circle, #ffffff 0%, #38bdf8 48%, #0284c7 100%); box-shadow: 0 0 36px 12px rgba(224,242,254,0.98); }
+      50% { background: radial-gradient(circle, #fef9c3 0%, #0ea5e9 55%, #082f49 100%); box-shadow: 0 0 10px 2px rgba(56,189,248,0.4); }
+    }
+    .lamp-rem-classic {
+      border-color: #ffffff !important;
+      animation: remClassicFlash 0.12s steps(2) infinite !important;
+    }
+
+    /* 保留点滅（通常点滅・特殊高速赤点滅） */
+    @keyframes slotBlink {
+      0%, 100% { opacity: 1; transform: scale(1.06); }
+      50% { opacity: 0.35; transform: scale(0.95); }
+    }
+    .res-blink { animation: slotBlink 0.45s ease-in-out infinite; }
+    .res-blink-fast { animation: slotBlink 0.15s linear infinite; }
+
+    /* ゼロかRUSH背景 */
+    .mode-zero-bg {
+      background: radial-gradient(circle at 50% 45%, #18181b 0%, #09090b 65%, #020203 100%) !important;
+    }
+
+    /* 隠レム・告知バナー */
+    @keyframes hiddenRemPulse {
+      0% { opacity: 0; transform: scale(0.75); }
+      50% { opacity: 0.42; transform: scale(1.02); }
+      100% { opacity: 0.28; transform: scale(1); }
+    }
+    .hidden-rem-mark {
+      animation: hiddenRemPulse 0.9s ease-out forwards;
+    }
+  `;
+  document.head.appendChild(st);
+})();
+
 const FxCanvas = (() => {
   const canvas = document.getElementById('fxCanvas');
   const ctx = canvas.getContext('2d');
   let w = 360, h = 360;
-  let ambientMode = 'ember'; // 'ember' | 'rush' | 'rem' | 'wedding' | 'none'
+  let ambientMode = 'ember'; // 'ember' | 'rush' | 'rem' | 'zero' | 'wedding' | 'none'
 
   const particles = [], rings = [], bolts = [], cracks = [];
 
@@ -39,6 +117,24 @@ const FxCanvas = (() => {
         pts.push({ x, y });
       }
       bolts.push({ pts, color, alpha: 1 });
+    }
+  }
+
+  // 見えざる手オーラ（脳が震えるRUSH特殊演出用）
+  function spawnPurpleHands(count = 28) {
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? 0 : w;
+      particles.push({
+        type: 'spark',
+        x: side + (side === 0 ? -5 : 5),
+        y: Math.random() * h,
+        vx: (side === 0 ? 1 : -1) * (2.4 + Math.random() * 3.8),
+        vy: (Math.random() - 0.5) * 1.4,
+        size: 3.0 + Math.random() * 4.5,
+        color: i % 3 === 0 ? '#e879f9' : '#7e22ce',
+        alpha: 0.92,
+        decay: 0.018
+      });
     }
   }
 
@@ -119,12 +215,19 @@ const FxCanvas = (() => {
         size: 1.8 + Math.random() * 2.8,
         color: Math.random() < 0.55 ? '#facc15' : '#ef4444', alpha: 0.75, decay: 0.009
       });
-    } else if (ambientMode === 'rem' && particles.length < 22 && Math.random() < 0.25) {
+    } else if (ambientMode === 'rem' && particles.length < 18 && Math.random() < 0.18) {
       particles.push({
         type: 'spark', x: Math.random() * w, y: h + 8,
-        vx: (Math.random() - 0.5) * 0.4, vy: -(0.5 + Math.random() * 0.9),
-        size: 2 + Math.random() * 2.2,
-        color: Math.random() < 0.7 ? '#38bdf8' : '#e0f2fe', alpha: 0.7, decay: 0.006
+        vx: (Math.random() - 0.5) * 0.3, vy: -(0.4 + Math.random() * 0.7),
+        size: 1.8 + Math.random() * 2.0,
+        color: Math.random() < 0.7 ? '#38bdf8' : '#e0f2fe', alpha: 0.6, decay: 0.006
+      });
+    } else if (ambientMode === 'zero' && particles.length < 10 && Math.random() < 0.10) {
+      particles.push({
+        type: 'spark', x: Math.random() * w, y: h + 8,
+        vx: 0, vy: -(0.8 + Math.random() * 1.4),
+        size: 1.4 + Math.random() * 1.6,
+        color: '#e4e4e7', alpha: 0.45, decay: 0.008
       });
     } else if (ambientMode === 'wedding' && particles.length < 48 && Math.random() < 0.35) {
       spawnFeathers(1);
@@ -200,7 +303,7 @@ const FxCanvas = (() => {
   return {
     resize, clearAll,
     setAmbient: m => { ambientMode = m; },
-    spawnRing, spawnLightning, spawnRedCracks, clearCracks, burstGold, burstFlames, spawnFeathers
+    spawnRing, spawnLightning, spawnPurpleHands, spawnRedCracks, clearCracks, burstGold, burstFlames, spawnFeathers
   };
 })();
 
@@ -211,7 +314,7 @@ let fastMode = false;
 let seqToken = 0;
 
 function wait(ms, token = seqToken) {
-  const dur = Math.max(60, Math.round(ms * (fastMode ? 0.40 : 1.0)));
+  const dur = Math.max(55, Math.round(ms * (fastMode ? 0.42 : 1.0)));
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (token !== seqToken) reject('CANCELLED');
@@ -258,9 +361,29 @@ const lampEmoji = document.getElementById('lampEmoji');
 const reserveLabel = document.getElementById('reserveLabel');
 const resSlots = [0,1,2,3,4].map(i => document.getElementById(`resSlot${i}`));
 
+// ★scene-rush-idle内にRUSH演出用サブ要素（信頼度バッジ・煽り／カウントダウン・隠レム）を排他配置★
+const rushIdlePane = scenePanes['rush-idle'];
+rushIdlePane.classList.add('relative', 'h-full');
+
+const rushTopBadge = document.createElement('div');
+rushTopBadge.id = 'rushTopBadge';
+rushTopBadge.className = 'hidden mb-1 px-3 py-0.5 rounded-full text-[11px] font-black tracking-wide bg-black/85 border border-amber-400 text-amber-300 shadow-lg';
+rushIdlePane.insertBefore(rushTopBadge, rushIdlePane.firstChild);
+
+const hiddenRemBadge = document.createElement('div');
+hiddenRemBadge.id = 'hiddenRemBadge';
+hiddenRemBadge.className = 'hidden pointer-events-none absolute bottom-1 left-2 text-lg select-none hidden-rem-mark';
+hiddenRemBadge.textContent = '💙';
+rushIdlePane.appendChild(hiddenRemBadge);
+
+const rushNoiseVeil = document.createElement('div');
+rushNoiseVeil.id = 'rushNoiseVeil';
+rushNoiseVeil.className = 'hidden pointer-events-none absolute inset-0 z-20 crt-scanlines bg-black/20';
+lcdFrame.appendChild(rushNoiseVeil);
+
 // ★単一シーン排他切替関数（文字重なりを構造的にゼロ化）★
 function setActiveScene(sceneName) {
-  state.activeScene = sceneName;
+  if (typeof state !== 'undefined') state.activeScene = sceneName;
   Object.entries(scenePanes).forEach(([key, el]) => {
     el.classList.toggle('hidden', key !== sceneName);
   });
@@ -271,7 +394,11 @@ function setActiveScene(sceneName) {
   if (sceneName !== 'reach') {
     pushButtonArea.classList.add('hidden');
   }
-  btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach');
+  if (sceneName !== 'rush-idle') {
+    rushTopBadge.classList.add('hidden');
+    hiddenRemBadge.classList.add('hidden');
+  }
+  btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach' || sceneName === 'rush-idle');
 }
 
 // 完全不透明 全画面オーバーレイ制御
@@ -313,12 +440,17 @@ function hideFullscreenOverlay() {
 }
 
 // =========================================================================
-// 演出UIヘルパー（LED・リール・保留・ランプ・物理スラッシュ）
+// 演出UIヘルパー（LED・リール・保留・ランプ・物理スラッシュ・違和感）
 // =========================================================================
 function setLed(style) {
   [ledLeft, ledRight].forEach(el => {
     el.className = 'led-bar shrink-0' + (style ? ` led-${style}` : '');
   });
+}
+
+function setLedSide(leftStyle, rightStyle) {
+  ledLeft.className = 'led-bar shrink-0' + (leftStyle ? ` led-${leftStyle}` : '');
+  ledRight.className = 'led-bar shrink-0' + (rightStyle ? ` led-${rightStyle}` : '');
 }
 
 function setReels(a, b, c, { spinning = [false, false, false], tenpai = false } = {}) {
@@ -343,12 +475,17 @@ function updateReserveSlots(mode = 'NORMAL', special = null) {
     ['脳', 'が', '震', 'え', 'る'].forEach((ch, i) => {
       const el = resSlots[i];
       el.classList.remove('hidden');
-      el.textContent = ch;
-      if (special === 'HIT') {
+      if (special === 'HANDS' && i === 0) {
+        el.textContent = '🖐️';
+        el.className = 'w-8 h-8 rounded-full border-2 border-fuchsia-300 bg-gradient-to-br from-purple-700 to-fuchsia-950 flex items-center justify-center text-sm shadow-lg shadow-fuchsia-500/80 animate-pulse';
+      } else if (special === 'HIT') {
+        el.textContent = ch;
         el.className = 'w-8 h-8 rounded-full border-2 border-amber-300 bg-gradient-to-br from-rose-600 to-purple-800 flex items-center justify-center text-xs font-black text-amber-200 shadow-lg animate-pulse';
-      } else if (special === 'GAZE' && i < 2) {
-        el.className = 'w-8 h-8 rounded-full border-2 border-rose-400 bg-rose-950 flex items-center justify-center text-xs font-black text-rose-200';
+      } else if ((special === 'GAZE' || special === 'NOGA') && i < 2) {
+        el.textContent = ch;
+        el.className = 'w-8 h-8 rounded-full border-2 border-rose-400 bg-rose-950 flex items-center justify-center text-xs font-black text-rose-200 shadow shadow-rose-500/70 animate-pulse';
       } else {
+        el.textContent = ch;
         el.className = 'w-8 h-8 rounded-full border-2 border-purple-700/80 bg-purple-950/80 flex items-center justify-center text-xs font-black text-purple-300';
       }
     });
@@ -365,6 +502,12 @@ function updateReserveSlots(mode = 'NORMAL', special = null) {
     } else if (i === 0 && special === 'RAINBOW') {
       el.textContent = '鬼';
       el.className = 'w-8 h-8 rounded-full border-2 border-white lamp-rainbow flex items-center justify-center text-xs font-black text-slate-950 shadow-lg animate-bounce';
+    } else if (i === 0 && special === 'BLINK') {
+      el.textContent = '●';
+      el.className = 'w-8 h-8 rounded-full border-2 border-sky-200 bg-sky-500/80 flex items-center justify-center text-xs font-black text-white shadow-lg shadow-sky-400/80 res-blink';
+    } else if (i === 0 && special === 'BLINK_RED') {
+      el.textContent = '鬼';
+      el.className = 'w-8 h-8 rounded-full border-2 border-amber-200 bg-gradient-to-br from-rose-500 to-red-900 flex items-center justify-center text-xs font-black text-amber-100 shadow-lg shadow-rose-500/90 res-blink-fast';
     } else {
       el.textContent = '○';
       el.className = 'w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[10px] font-black text-slate-400';
@@ -380,19 +523,32 @@ function updateRes4Dots(activeCount) {
   });
 }
 
+function clearIwakanEffects() {
+  lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid');
+  oniLamp.classList.remove('iwakan-rempuru', 'lamp-rem-slow', 'lamp-rem-classic');
+  const bigRem = document.getElementById('rushBigRemain');
+  if (bigRem) bigRem.classList.remove('iwakan-fade-remain');
+  hiddenRemBadge.classList.add('hidden');
+  rushNoiseVeil.classList.add('hidden');
+  rushTopBadge.classList.add('hidden');
+}
+
 function clearVisualEffects() {
-  lcdFrame.classList.remove('fx-redbare', 'fx-rainbow', 'fx-gold', 'fx-restart', 'fx-glitch', 'shake-intense', 'shake-burst', 'mode-brain-bg', 'mode-rem-bg', 'mode-despair-bg');
+  clearIwakanEffects();
+  lcdFrame.classList.remove('fx-redbare', 'fx-rainbow', 'fx-gold', 'fx-restart', 'fx-glitch', 'shake-intense', 'shake-burst', 'mode-brain-bg', 'mode-rem-bg', 'mode-despair-bg', 'mode-zero-bg');
   btnOniPush.classList.remove('ochiburu-dome', 'push-dome-gold');
   oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow');
   FxCanvas.clearCracks();
   setLed('');
-  lampStatusText.textContent = state.phase === 'RUSH' ? 'RUSH中' : '待機中';
+  const ph = (typeof state !== 'undefined') ? state.phase : 'NORMAL';
+  const rm = (typeof state !== 'undefined') ? state.rushMode : 'onigakari';
+  lampStatusText.textContent = ph === 'RUSH' ? 'RUSH中' : '待機中';
   lampStatusText.className = 'text-[10px] font-black text-amber-200 min-w-[54px] text-right whitespace-nowrap';
-  lampEmoji.textContent = (state.phase === 'RUSH' && state.rushMode === 'rem') ? '💙' : '👹';
+  lampEmoji.textContent = (ph === 'RUSH' && rm === 'rem') ? '💙' : (ph === 'RUSH' && rm === 'brain') ? '🧠' : (ph === 'RUSH' && rm === 'zero') ? '⚡' : '👹';
 }
 
 function triggerLamp(type, label) {
-  oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow');
+  oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow', 'lamp-rem-slow', 'lamp-rem-classic');
   void oniLamp.offsetWidth;
   if (type === 'red') { oniLamp.classList.add('lamp-red'); setLed('red'); }
   else if (type === 'rem') { oniLamp.classList.add('lamp-rem'); setLed('rem'); }
@@ -428,6 +584,287 @@ function firePhysicalSplitSlash() {
   FxCanvas.burstGold(68);
   FxCanvas.burstFlames(45);
   setTimeout(() => { beam.remove(); pL.remove(); pR.remove(); }, 800);
+}
+
+// =========================================================================
+// ★RUSH専用：全10種の違和感演出エンジン（大当り直前に発動）★
+// =========================================================================
+async function playIwakanEffect({ is6000, rushMode, token }) {
+  const bigRem = document.getElementById('rushBigRemain');
+  const commonPool = [
+    'LED_ONE_OFF', 'LED_ALL_OFF', 'MONO_SCREEN', 'FADE_REMAIN',
+    'REM_PURU', 'GLITCH_BLINK', 'HIDDEN_REM', 'SILENT_STILL'
+  ];
+  // 6,000当選時は6,000濃厚プレミア違和感も候補に加える
+  const pool = is6000 ? [...commonPool, 'COUNT_6000', 'RAINBOW_GLINT'] : commonPool;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+
+  const baseLed = rushMode === 'brain' ? 'brain' : rushMode === 'rem' ? 'rem' : rushMode === 'zero' ? '' : 'red';
+  let label = '';
+
+  switch (pick) {
+    case 'LED_ONE_OFF':
+      label = '違和感：サイドLED片側消灯';
+      if (Math.random() < 0.5) setLedSide('off', baseLed);
+      else setLedSide(baseLed, 'off');
+      await wait(950, token);
+      break;
+
+    case 'LED_ALL_OFF':
+      label = '違和感：サイドLED全消灯';
+      setLed('off');
+      await wait(950, token);
+      break;
+
+    case 'MONO_SCREEN':
+      label = '違和感：液晶モノクロ化';
+      lcdFrame.classList.add('iwakan-mono');
+      await wait(900, token);
+      lcdFrame.classList.remove('iwakan-mono');
+      break;
+
+    case 'FADE_REMAIN':
+      label = '違和感：残り回数じわじわ消失';
+      if (bigRem) bigRem.classList.add('iwakan-fade-remain');
+      await wait(980, token);
+      if (bigRem) bigRem.classList.remove('iwakan-fade-remain');
+      break;
+
+    case 'REM_PURU':
+      label = '違和感：レムぷる（筐体微振動）';
+      oniLamp.classList.add('iwakan-rempuru');
+      lcdFrame.classList.add('iwakan-rempuru');
+      try { if (navigator && navigator.vibrate) navigator.vibrate([30, 40, 30, 40, 30]); } catch (e) {}
+      await wait(920, token);
+      oniLamp.classList.remove('iwakan-rempuru');
+      lcdFrame.classList.remove('iwakan-rempuru');
+      break;
+
+    case 'GLITCH_BLINK':
+      label = '違和感：一瞬の映像ノイズ停止';
+      rushNoiseVeil.classList.remove('hidden');
+      lcdFrame.classList.add('fx-glitch');
+      await wait(240, token);
+      lcdFrame.classList.remove('fx-glitch');
+      rushNoiseVeil.classList.add('hidden');
+      await wait(650, token);
+      break;
+
+    case 'HIDDEN_REM':
+      label = '違和感：画面隅に隠レム💙出現';
+      hiddenRemBadge.classList.remove('hidden');
+      await wait(1000, token);
+      hiddenRemBadge.classList.add('hidden');
+      break;
+
+    case 'SILENT_STILL':
+      label = '違和感：背景オーラ完全静止＆無音の間';
+      FxCanvas.setAmbient('none');
+      FxCanvas.clearAll();
+      await wait(950, token);
+      break;
+
+    case 'COUNT_6000':
+      label = '超違和感：残り回数「6000」化け（6000濃厚）';
+      if (bigRem) {
+        const orig = bigRem.textContent;
+        bigRem.textContent = '6000';
+        bigRem.className = 'text-6xl sm:text-7xl font-black rainbow-grad-text leading-none tracking-tight';
+        await wait(1050, token);
+        bigRem.textContent = orig;
+      }
+      break;
+
+    case 'RAINBOW_GLINT':
+      label = '超違和感：鬼ランプ一瞬虹チラ光り（6000濃厚）';
+      oniLamp.classList.add('lamp-rainbow');
+      await wait(190, token);
+      oniLamp.classList.remove('lamp-rainbow');
+      await wait(780, token);
+      break;
+  }
+
+  return label;
+}
+
+// =========================================================================
+// ★レム告知モード：4種ランプ点灯パターン演出★
+// =========================================================================
+async function playRemNoticePattern({ is6000, token }) {
+  // 6,000当選時はプレミア点灯3種（徐々に点灯／一瞬消えて再点灯／旧レム風フラッシュ）を高確率で選択
+  let pat = 'NORMAL';
+  if (is6000 && Math.random() < 0.72) {
+    const p6 = ['SLOW_GLOW', 'DOUBLE_BLINK', 'CLASSIC_FLASH'];
+    pat = p6[Math.floor(Math.random() * p6.length)];
+  }
+
+  let note = 'レム通常点灯';
+  if (pat === 'SLOW_GLOW') {
+    note = '💙 レム徐々に点灯（6000濃厚!!）';
+    oniLamp.classList.remove('lamp-rem', 'lamp-rainbow', 'lamp-red');
+    oniLamp.classList.add('lamp-rem-slow');
+    lampStatusText.textContent = 'じわ〜っ…';
+    setLed('rem');
+    await wait(1150, token);
+    StudioAudio.playKyuin();
+    triggerLamp('rainbow', '6000濃厚!!');
+    await wait(350, token);
+  } else if (pat === 'DOUBLE_BLINK') {
+    note = '💙 一瞬光って消えて再点灯（6000濃厚!!）';
+    oniLamp.classList.add('lamp-rem');
+    lampStatusText.textContent = 'ピッ…';
+    await wait(160, token);
+    oniLamp.classList.remove('lamp-rem');
+    lampStatusText.textContent = '……';
+    setLed('off');
+    await wait(550, token);
+    StudioAudio.playKyuin();
+    triggerLamp('rainbow', '再点灯6000!!');
+    FxCanvas.spawnLightning('#38bdf8', 4);
+    await wait(420, token);
+  } else if (pat === 'CLASSIC_FLASH') {
+    note = '💙 旧レム風ストロボフラッシュ（6000濃厚!!）';
+    StudioAudio.playKyuin();
+    oniLamp.classList.add('lamp-rem-classic');
+    lampStatusText.textContent = '旧レム閃光!!';
+    setLed('rainbow');
+    FxCanvas.spawnRing('#38bdf8', 300, 9);
+    FxCanvas.spawnLightning('#e0f2fe', 5);
+    await wait(850, token);
+    oniLamp.classList.remove('lamp-rem-classic');
+  } else {
+    StudioAudio.playKyuin();
+    triggerLamp('rem', 'キュイン!!');
+    FxCanvas.spawnRing('#38bdf8', 250, 7);
+    await wait(420, token);
+  }
+  return note;
+}
+
+// =========================================================================
+// ★脳が震えるRUSH：文字保留・脳が煽りLv1〜5・震える告知（弱/中/強）★
+// =========================================================================
+async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false, custOchiburu = true, token }) {
+  const idleSub = document.getElementById('rushIdleSub');
+  const maxLv = isHit ? (is6000 ? 5 : 4) : (Math.random() < 0.5 ? 2 : 3);
+
+  updateReserveSlots('BRAIN', isHands ? 'HANDS' : 'NOGA');
+  if (isHands) FxCanvas.spawnPurpleHands(26);
+
+  rushTopBadge.classList.remove('hidden');
+  for (let lv = 1; lv <= maxLv; lv++) {
+    const isButtonGa = (isHit && is6000 && lv === maxLv && Math.random() < 0.55);
+    if (isButtonGa) {
+      rushTopBadge.textContent = '💥 脳が…いや「ボタンが」震える!!（6000濃厚）';
+      rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow-lg pop-in';
+    } else {
+      rushTopBadge.textContent = isHands
+        ? `🖐️ 見えざる手煽り Lv.${lv}`
+        : `🧠 脳が煽り Lv.${lv}`;
+      rushTopBadge.className = lv >= 4
+        ? 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-rose-950/95 border border-amber-300 text-amber-200 shadow-lg'
+        : 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-purple-950/95 border border-fuchsia-400 text-fuchsia-200 shadow-lg';
+    }
+
+    if (idleSub) {
+      idleSub.textContent = isHands
+        ? '🖐️ 見えざる手が迫る… 当たれば鬼がかり6000濃厚!!'
+        : `🧠 脳が…脳が…（Lv.${lv}）`;
+    }
+    if (lv >= 2) {
+      lcdFrame.classList.add('shake-weak');
+      StudioAudio.playSoftHeartbeat();
+    }
+    await wait(lv === maxLv ? 360 : 240, token);
+  }
+
+  lcdFrame.classList.remove('shake-weak');
+
+  if (!isHit) {
+    rushTopBadge.classList.add('hidden');
+    updateReserveSlots('BRAIN', null);
+    return null;
+  }
+
+  // 当選時：震える告知（弱／中／強＝落ちブル）※落ちブルは6,000濃厚時のみ！
+  updateReserveSlots('BRAIN', 'HIT');
+  let vibNote = '';
+  if (is6000 && Math.random() < (custOchiburu ? 0.85 : 0.35)) {
+    // 強震え（落ちブル発動＝6,000濃厚）
+    vibNote = '🧠 強震え＋落ちブル（6000濃厚!!）';
+    rushTopBadge.textContent = '💥【脳が震える・強＋落ちブル!!】6000濃厚!!';
+    rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in';
+    StudioAudio.playOchiburu();
+    lcdFrame.classList.add('shake-intense', 'fx-rainbow');
+    triggerLamp('rainbow', '6000濃厚!!');
+    FxCanvas.spawnLightning('#fde047', 5);
+    await wait(780, token);
+    lcdFrame.classList.remove('shake-intense');
+  } else if (bonusType === 'BONUS_1500' || is6000) {
+    // 中震え（1,500以上濃厚・落ちブル音は鳴らさない）
+    vibNote = '🧠 震える告知・中（1500以上濃厚）';
+    rushTopBadge.textContent = '🧠【脳が震える・中!!】大当り濃厚!!';
+    rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-fuchsia-950/95 border border-amber-300 text-amber-200 shadow-lg pop-in';
+    lcdFrame.classList.add('shake-mid', 'fx-gold');
+    try { if (navigator && navigator.vibrate) navigator.vibrate([70, 30, 70, 30, 120]); } catch (e) {}
+    StudioAudio.playSoftHeartbeat();
+    FxCanvas.spawnRing('#e879f9', 260, 7);
+    await wait(520, token);
+    lcdFrame.classList.remove('shake-mid');
+  } else {
+    // 弱震え（大当り濃厚・300/Re:Start含む）
+    vibNote = '🧠 震える告知・弱（大当り濃厚）';
+    rushTopBadge.textContent = '🧠【脳が震える・弱!!】大当り!!';
+    rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-purple-950/95 border border-fuchsia-300 text-fuchsia-100 shadow-lg pop-in';
+    lcdFrame.classList.add('shake-weak');
+    try { if (navigator && navigator.vibrate) navigator.vibrate([45, 35, 65]); } catch (e) {}
+    await wait(440, token);
+    lcdFrame.classList.remove('shake-weak');
+  }
+
+  rushTopBadge.classList.add('hidden');
+  return vibNote;
+}
+
+// =========================================================================
+// ★鬼がかりRUSH：カウントダウン＆法則崩れ演出★
+// =========================================================================
+async function playOnigakariCountdown({ isHit, is6000, token }) {
+  let seq = ['3', '2', '1', '0'];
+  let note = 'カウントダウン';
+  let isPrem = false;
+
+  if (isHit && is6000 && Math.random() < 0.55) {
+    if (Math.random() < 0.5) {
+      seq = ['3', '4', '5', '6'];
+      note = '🔥 カウントダウン法則崩れ(3→4→5→6：6000濃厚!!)';
+    } else {
+      seq = ['6', '0', '0', '0'];
+      note = '🔥 カウントダウン(6→0→0→0：6000濃厚!!)';
+    }
+    isPrem = true;
+  } else if (isHit && Math.random() < 0.35) {
+    seq = ['E', 'M', 'I', '!!'];
+    note = '🌈 特殊カウント(E→M→I：大当り濃厚!!)';
+    isPrem = true;
+  } else if (Math.random() < 0.35) {
+    seq = ['1', '2', '3', '0'];
+    note = '🔥 昇順カウントダウン';
+  }
+
+  rushTopBadge.classList.remove('hidden');
+  for (let i = 0; i < seq.length; i++) {
+    rushTopBadge.textContent = `⏱ COUNTDOWN [ ${seq[i]} ]`;
+    rushTopBadge.className = (isPrem && i >= 1)
+      ? 'mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in'
+      : 'mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg';
+    FxCanvas.spawnRing(isPrem ? '#fde047' : '#ef4444', 180 + i * 35, 5);
+    await wait(240, token);
+    if (!isHit && i === 2) break; // ガセは途中で途切れる
+  }
+
+  rushTopBadge.classList.add('hidden');
+  return isHit ? note : null;
 }
 
 // =========================================================================
@@ -483,7 +920,7 @@ async function runGoldenPromotionSequence({
   FxCanvas.setAmbient('none');
   FxCanvas.clearAll();
   setLed('off');
-  lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg');
+  lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg', 'mode-zero-bg');
 
   showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
   await wait(600, token);
