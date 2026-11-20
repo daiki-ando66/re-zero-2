@@ -1,8 +1,8 @@
 // =========================================================================
-// sound.js : Web Audio API 爆音サウンドエンジン
-// ・先バレ音（ポキュ↑ーン↓）：確定神設定デフォルト固定＆合成ロジック完全維持
-// ・大当たり音＆落ちブル音：サウンドラボの5ボイスSuperSaw＋物理落下バウンド・
-//   筐体ビビリエンジンを場面別に明確に使い分け
+// sound.js (v3.0) : Web Audio API 爆音サウンドエンジン
+// ・先バレ音（ポキュ↑ーン↓）＆場面別大当たり音：確定神設定を完全維持
+// ・新・落ちブル警報ロングトーン：490Hz→980Hz高重心チューニング焼き込み
+// ・暗転用プチュン：さりげない電源断＋2.2秒ホールリバーブ残響仕様
 // =========================================================================
 const AUDIO_DEFAULTS = {
   reverbWet: 0.44,
@@ -13,7 +13,6 @@ const AUDIO_DEFAULTS = {
   volume: 0.80
 };
 
-// サウンドラボ標準ドパ＆実機リアル落ちブル基準値
 const LAB_JP_BASE = {
   grit: 95,
   kyuin: 105,
@@ -22,6 +21,7 @@ const LAB_JP_BASE = {
   pitch: 1.00,
   tempo: 1.05
 };
+
 const LAB_OB_BASE = {
   drop: 120,
   speed: 28,
@@ -30,12 +30,21 @@ const LAB_OB_BASE = {
   dur: 1.3
 };
 
+// 新・落ちブル警報ロングトーン確定神設定（高重心チューニング）
+const ALARM_OB_SETTINGS = {
+  baseHz: 490,
+  hold1: 0.60,
+  glide: 0.38,
+  hold2: 2.00,
+  grit: 140,
+  physScale: 0.80
+};
+
 const StudioAudio = (() => {
   let ctx = null, masterGain = null, dryBus = null;
   let gritShaper = null, gritBus = null;
   let wetSend = null, wetGain = null, delaySend = null, noiseBuffer = null;
 
-  // サウンドラボ移植：大当たり専用WaveShaper＋コンプバス＆落ちブル専用バス
   let jpDryBus = null, jpWetSend = null, jpSaturation = null, jpLowShelf = null, jpHighShelf = null;
   let obOutBus = null;
 
@@ -50,7 +59,6 @@ const StudioAudio = (() => {
     return curve;
   }
 
-  // 非対称オーバードライブ＋微細ハードクリップ（ジャリジャリ専用・先バレ用）
   function createGritCurve(gritLevel = 1.15) {
     const n = 44100, curve = new Float32Array(n);
     const drive = 1.2 + gritLevel * 7.5;
@@ -66,7 +74,6 @@ const StudioAudio = (() => {
     return curve;
   }
 
-  // サウンドラボ移植：大当たり＆落ちブル用オーバードライブ曲線
   function makeLabGritCurve(gritPct) {
     const g = Math.max(0, gritPct / 100);
     const n = 44100, curve = new Float32Array(n);
@@ -87,7 +94,6 @@ const StudioAudio = (() => {
     return curve;
   }
 
-  // 2.2秒ステレオホールリバーブ Impulse Response
   function createHallImpulseResponse(audioCtx, duration = 2.2) {
     const sr = audioCtx.sampleRate, length = Math.floor(sr * duration);
     const impulse = audioCtx.createBuffer(2, length, sr);
@@ -167,7 +173,6 @@ const StudioAudio = (() => {
         dL.connect(fbL); fbL.connect(dR); dR.connect(fbR); fbR.connect(dL);
         dL.connect(merger, 0, 0); dR.connect(merger, 0, 1); merger.connect(wetGain);
 
-        // --- サウンドラボ移植：大当たり用バスチェーン ---
         jpDryBus = ctx.createGain(); jpDryBus.gain.value = 0.92;
         jpWetSend = ctx.createGain(); jpWetSend.gain.value = 1.0;
 
@@ -198,7 +203,6 @@ const StudioAudio = (() => {
         jpHighShelf.connect(jpCompressor);
         jpCompressor.connect(masterGain);
 
-        // --- サウンドラボ移植：落ちブル専用バスチェーン ---
         obOutBus = ctx.createGain(); obOutBus.gain.value = 1.0;
         const obShaper = ctx.createWaveShaper();
         obShaper.curve = makeLabGritCurve(85); obShaper.oversample = '2x';
@@ -231,7 +235,7 @@ const StudioAudio = (() => {
     try { if (navigator && navigator.vibrate) navigator.vibrate(pat); } catch (e) {}
   }
 
-  // ★ ポッ・キュ↑・ーン↓（68ms分離・ジャリジャリ低重心・2.2秒リバーブ）※一切変更なし
+  // ★ ポッ・キュ↑・ーン↓（確定神設定・一切変更なし）
   function playPokyun(isRainbow = false) {
     const c = init(); if (!c) return;
     const now = c.currentTime;
@@ -239,7 +243,6 @@ const StudioAudio = (() => {
 
     vibrate(isRainbow ? [95, 30, 120, 30, 220] : [85, 25, 130]);
 
-    // Phase 1: 「ポッ」(丸く芯のあるアタック)
     const poFilter = c.createBiquadFilter();
     poFilter.type = 'lowpass'; poFilter.Q.setValueAtTime(4.5, now);
     poFilter.frequency.setValueAtTime(900, now);
@@ -284,7 +287,6 @@ const StudioAudio = (() => {
     clickG.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
     clickSrc.connect(clickBP).connect(clickG).connect(gritBus); clickSrc.start(now); clickSrc.stop(now + 0.012);
 
-    // Phase 2 & 3: 68ms分離後の「キュ↑・ーン↓」
     const t2 = now + 0.068, tApex = now + 0.165, tFallMid = tApex + 0.34, tEnd = now + 1.35;
     const fStart = 620 * pitch, fApex = 2850 * pitch;
     const fMid = Math.max(580 * pitch, fApex * (1 - Math.min(0.58, 0.32 * fall)));
@@ -341,7 +343,6 @@ const StudioAudio = (() => {
     sawLead.start(t2); sqLead.start(t2); fmMod.start(t2);
     sawLead.stop(tEnd + 0.04); sqLead.stop(tEnd + 0.04); fmMod.stop(tEnd + 0.04);
 
-    // -1オクターブ低重心レイヤー
     const subOct = c.createOscillator(), subLP = c.createBiquadFilter(), subEnv = c.createGain();
     subOct.type = 'sawtooth';
     subOct.frequency.setValueAtTime(fStart * 0.5, t2);
@@ -357,7 +358,6 @@ const StudioAudio = (() => {
     subOct.connect(subLP).connect(subEnv); subEnv.connect(gritBus); subEnv.connect(dryBus);
     subOct.start(t2); subOct.stop(tEnd + 0.04);
 
-    // ジャリジャリバズノイズ
     if (grit > 0.02) {
       const bSrc = c.createBufferSource(); bSrc.buffer = noiseBuffer; bSrc.loop = true;
       const bBP = c.createBiquadFilter(); bBP.type = 'bandpass'; bBP.Q.value = 1.1;
@@ -392,7 +392,7 @@ const StudioAudio = (() => {
   }
 
   // =======================================================================
-  // サウンドラボ移植：大当たり音合成レイヤー群（場面別プロファイル対応）
+  // 大当たり音合成レイヤー群（変更なし）
   // =======================================================================
   function applyJackpotProfile(prof) {
     if (!ctx) return;
@@ -565,8 +565,6 @@ const StudioAudio = (() => {
     osc1.stop(t + dur + 0.06); osc2.stop(t + dur + 0.06); lfo.stop(t + dur + 0.06);
   }
 
-  // ★場面別 大当たり音①：通常1,500（標準：上位への余白を残す標準インパクト）
-  // ★場面別 大当たり音③：RUSH1,500（爽快：テンポ1.22x＆抜けの良い高音キュイン＋歯切れブラス）
   function play1500Jackpot(isRush = false) {
     const c = init(); if (!c) return;
     const prof = isRush
@@ -605,7 +603,6 @@ const StudioAudio = (() => {
     layerKyuinSweep(bus, arpStart + 0.04, isRush ? 2000 : 1700, isRush ? 4600 : 4100, 0.30, prof, isRush ? 1.10 : 0.92);
   }
 
-  // ★場面別 大当たり音②：通常3,000（重厚：ダブルインパクト＋D4->F4->G4->A4->D5重厚ブラス＆重低音）
   function play3000Jackpot() {
     const c = init(); if (!c) return;
     const prof = { grit: 112, kyuin: 110, brass: 128, sub: 132, pitch: 0.96, tempo: 1.02 };
@@ -639,20 +636,14 @@ const StudioAudio = (() => {
     });
 
     const climaxT = t0 + b * 5.2;
-    for (let k = 1; k <= 4; k++) {
-      layerSubKick(bus, climaxT + k * (0.24 / spd), prof, 1.10);
-    }
+    for (let k = 1; k <= 4; k++) layerSubKick(bus, climaxT + k * (0.24 / spd), prof, 1.10);
 
     const arpSeq = [1175, 1480, 1760, 2349, 2960, 3520, 2960, 3520, 4186, 4698, 3520, 4698];
-    arpSeq.forEach((f, i) => {
-      layerArcadeArp(bus, climaxT + i * (0.055 / spd), f, 0.12 / spd, prof, 1.05);
-    });
+    arpSeq.forEach((f, i) => layerArcadeArp(bus, climaxT + i * (0.055 / spd), f, 0.12 / spd, prof, 1.05));
     layerKyuinSweep(bus, climaxT, 1700, 4500, 0.30, prof, 1.15);
     layerKyuinSweep(bus, climaxT + 0.24 / spd, 2000, 4800, 0.34, prof, 1.10);
   }
 
-  // ★場面別 大当たり音④：RUSH6,000（最上位MAX：狂気サイレン＋E4->G4->A4->B4->E5爆裂ブラス＆キュイン嵐）
-  // ★場面別 大当たり音⑤：WEDDING12,000（祝福MAX：6000ベース＋煌びやかな祝福ベル＆シマー倍音）
   function play6000Fanfare(isWedding = false) {
     const c = init(); if (!c) return;
     const prof = isWedding
@@ -667,18 +658,13 @@ const StudioAudio = (() => {
 
     vibrate(isWedding ? [120, 30, 120, 30, 120, 30, 400] : [120, 25, 120, 25, 90, 25, 90, 25, 160, 30, 320]);
 
-    // 1. 開幕スラッシュ爆発
     layerImpactExplosion(bus, now, prof, 1.38);
     layerKyuinSweep(bus, now + 0.01, 2800, 5200, 0.22, prof, 1.25);
 
-    // 2. 狂気の上昇サイレン＋8連打サブキックロール
     const sirenDur = 0.56 / spd;
     layerRisingSiren(bus, now + 0.10 / spd, sirenDur, prof);
-    for (let r = 0; r < 8; r++) {
-      layerSubKick(bus, now + (0.10 + r * 0.068) / spd, prof, 0.90 + r * 0.05);
-    }
+    for (let r = 0; r < 8; r++) layerSubKick(bus, now + (0.10 + r * 0.068) / spd, prof, 0.90 + r * 0.05);
 
-    // 3. 大爆発インパクト → E4 -> G4 -> A4 -> B4 -> E5 超ドパ・ブラス進行
     const dropT = now + (0.10 + 0.56) / spd;
     layerImpactExplosion(bus, dropT, prof, 1.48);
 
@@ -697,24 +683,17 @@ const StudioAudio = (() => {
       layerSubKick(bus, at, prof, idx >= 4 ? 1.45 : 1.18);
     });
 
-    // 4. クライマックス追い打ち爆発＋執拗なサブベース連打
     const cliT = dropT + b * 6.1;
     layerImpactExplosion(bus, cliT, prof, 1.40);
-    for (let k = 1; k <= 8; k++) {
-      layerSubKick(bus, cliT + k * (0.19 / spd), prof, k % 2 === 0 ? 1.35 : 1.10);
-    }
+    for (let k = 1; k <= 8; k++) layerSubKick(bus, cliT + k * (0.19 / spd), prof, k % 2 === 0 ? 1.35 : 1.10);
 
-    // 5. 高音ベル＆キュインの嵐（WEDDING時は祝福高域チャイム＆シマー倍音を厚く重ねる）
     const chaosArp = [1975, 2489, 2637, 3322, 3951, 4186, 4698, 3951, 3322, 4186, 4698, 5274, 3951, 4698, 5274, 4186];
-    chaosArp.forEach((f, i) => {
-      layerArcadeArp(bus, cliT + i * (0.052 / spd), Math.min(4800, f), 0.13 / spd, prof, 1.20);
-    });
+    chaosArp.forEach((f, i) => layerArcadeArp(bus, cliT + i * (0.052 / spd), Math.min(4800, f), 0.13 / spd, prof, 1.20));
     [0, 0.22, 0.44, 0.72, 1.02].forEach((off, idx) => {
       layerKyuinSweep(bus, cliT + off / spd, 1650 + idx * 200, 4200 + idx * 180, 0.30 / spd, prof, 1.25);
     });
 
     if (isWedding) {
-      // 祝福MAX特別仕様：教会の鐘＋高域シマーハーモニー
       [1046.5, 1318.51, 1567.98, 2093.0, 2637.02, 3135.96, 4186.0].forEach((f, i) => {
         const bt = dropT + i * 0.085;
         const bell1 = c.createOscillator(), bell2 = c.createOscillator(), bG = c.createGain();
@@ -731,81 +710,64 @@ const StudioAudio = (() => {
   }
 
   // =======================================================================
-  // サウンドラボ移植：物理落ちブル（落下衝撃「ガコンッ！」＋36msバウンド＋同位相LFO筐体ビビリ）
+  // ★v3.0 新・落ちブル警報ロングトーン（490Hz→980Hz 高重心＋物理落下バイブ）★
+  // withAlarm=true: 物理落ちブル＋高重心警報ロングトーン「とぅーーる↑ーーーー!!」
+  // withAlarm=false: 物理落ちブルのみ（昇格フィニッシュ重ね用）
   // =======================================================================
-  function playOchiburu() {
+  function playOchiburu(withAlarm = true) {
     const c = init(); if (!c) return;
     const now = c.currentTime + 0.01;
-    const bus = obOutBus;
+    const p = ALARM_OB_SETTINGS;
+    const physGain = c.createGain();
+    physGain.gain.value = withAlarm ? p.physScale : 1.0;
+    physGain.connect(obOutBus);
 
     const dropScale = LAB_OB_BASE.drop / 100;
     const motorHz = LAB_OB_BASE.speed;
     const rattleScale = LAB_OB_BASE.rattle / 100;
     const growlScale = LAB_OB_BASE.growl / 100;
-    const dur = LAB_OB_BASE.dur;
+    const dur = withAlarm ? 1.65 : LAB_OB_BASE.dur;
 
-    // 物理振動パターン生成
-    const vibPattern = [95, 20];
-    const pulseStepMs = Math.max(30, Math.round(1000 / Math.min(28, motorHz)));
-    let accMs = 115;
-    const targetMs = Math.round(dur * 1000);
-    while (accMs < targetMs) {
-      const onTime = Math.max(22, Math.round(pulseStepMs * 0.72));
-      const offTime = Math.max(12, Math.round(pulseStepMs * 0.28));
-      vibPattern.push(onTime, offTime);
-      accMs += onTime + offTime;
-    }
-    vibrate(vibPattern);
+    vibrate(withAlarm ? [95, 25, 80, 25, 80, 25, 180, 30, 140] : [95, 20, 75, 20, 75, 20, 120]);
 
-    // --- Part 1: 物理落下衝撃「ガコンッ！ドゴォッ！」 ---
+    // --- Part 1: 物理落下衝撃「ガコンッ！」 ---
     if (dropScale > 0.01) {
       const bodyOsc = c.createOscillator(), bodyTri = c.createOscillator(), bodyG = c.createGain();
       bodyOsc.type = 'sine'; bodyTri.type = 'triangle';
       bodyOsc.frequency.setValueAtTime(145, now); bodyOsc.frequency.exponentialRampToValueAtTime(42, now + 0.11);
       bodyTri.frequency.setValueAtTime(160, now); bodyTri.frequency.exponentialRampToValueAtTime(46, now + 0.09);
       bodyG.gain.setValueAtTime(0.001, now);
-      bodyG.gain.linearRampToValueAtTime(1.25 * dropScale, now + 0.003);
+      bodyG.gain.linearRampToValueAtTime(1.15 * dropScale, now + 0.003);
       bodyG.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-      bodyOsc.connect(bodyG); bodyTri.connect(bodyG); bodyG.connect(bus);
+      bodyOsc.connect(bodyG); bodyTri.connect(bodyG); bodyG.connect(physGain);
       bodyOsc.start(now); bodyTri.start(now); bodyOsc.stop(now + 0.15); bodyTri.stop(now + 0.15);
 
       const clackNoise = c.createBufferSource(); clackNoise.buffer = noiseBuffer;
       const clackBP = c.createBiquadFilter(); clackBP.type = 'bandpass'; clackBP.frequency.setValueAtTime(640, now); clackBP.Q.value = 1.6;
       const clackNG = c.createGain();
       clackNG.gain.setValueAtTime(0.001, now);
-      clackNG.gain.linearRampToValueAtTime(1.15 * dropScale, now + 0.002);
+      clackNG.gain.linearRampToValueAtTime(1.05 * dropScale, now + 0.002);
       clackNG.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-      clackNoise.connect(clackBP).connect(clackNG).connect(bus);
+      clackNoise.connect(clackBP).connect(clackNG).connect(physGain);
       clackNoise.start(now); clackNoise.stop(now + 0.055);
 
-      const clackTone = c.createOscillator(), clackTG = c.createGain();
-      clackTone.type = 'triangle';
-      clackTone.frequency.setValueAtTime(540, now); clackTone.frequency.exponentialRampToValueAtTime(165, now + 0.035);
-      clackTG.gain.setValueAtTime(0.001, now);
-      clackTG.gain.linearRampToValueAtTime(0.75 * dropScale, now + 0.002);
-      clackTG.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
-      clackTone.connect(clackTG).connect(bus);
-      clackTone.start(now); clackTone.stop(now + 0.05);
-
-      // 36ms後の物理バウンド・ロック音「…ンッ！」
       const bT = now + 0.036;
       const bNoise = c.createBufferSource(); bNoise.buffer = noiseBuffer;
       const bBP = c.createBiquadFilter(); bBP.type = 'bandpass'; bBP.frequency.value = 880; bBP.Q.value = 2.0;
       const bG = c.createGain();
       bG.gain.setValueAtTime(0.001, bT);
-      bG.gain.linearRampToValueAtTime(0.62 * dropScale, bT + 0.002);
+      bG.gain.linearRampToValueAtTime(0.58 * dropScale, bT + 0.002);
       bG.gain.exponentialRampToValueAtTime(0.001, bT + 0.028);
-      bNoise.connect(bBP).connect(bG).connect(bus);
+      bNoise.connect(bBP).connect(bG).connect(physGain);
       bNoise.start(bT); bNoise.stop(bT + 0.035);
     }
 
-    // --- Part 2: モーター振動＋筐体プラビビリ「ドゥルルルルルルッ！！ガタガタッ！」 ---
+    // --- Part 2: 筐体バイブ「ドゥルルルル…」 ---
     const vStart = now + 0.052;
     const vEnd = vStart + dur;
-
     const lfo = c.createOscillator();
     lfo.type = 'square';
-    lfo.frequency.setValueAtTime(motorHz * 1.12, vStart);
+    lfo.frequency.setValueAtTime(motorHz * 1.10, vStart);
     lfo.frequency.exponentialRampToValueAtTime(motorHz, vStart + 0.09);
     lfo.frequency.setValueAtTime(motorHz, Math.max(vStart + 0.10, vEnd - 0.14));
     lfo.frequency.exponentialRampToValueAtTime(Math.max(12, motorHz * 0.78), vEnd);
@@ -815,73 +777,109 @@ const StudioAudio = (() => {
     lfo.connect(lfoSmooth);
 
     if (growlScale > 0.01) {
-      const mSaw = c.createOscillator(), mTri = c.createOscillator();
-      mSaw.type = 'sawtooth'; mTri.type = 'triangle';
-      mSaw.frequency.setValueAtTime(76, vStart);
-      mSaw.frequency.exponentialRampToValueAtTime(60, vStart + 0.12);
-      mSaw.frequency.setValueAtTime(60, Math.max(vStart + 0.13, vEnd - 0.14));
-      mSaw.frequency.exponentialRampToValueAtTime(48, vEnd);
-
-      mTri.frequency.setValueAtTime(56, vStart);
-      mTri.frequency.setValueAtTime(52, Math.max(vStart + 0.10, vEnd - 0.14));
-      mTri.frequency.exponentialRampToValueAtTime(42, vEnd);
-
-      const mLP = c.createBiquadFilter(); mLP.type = 'lowpass'; mLP.frequency.value = 230; mLP.Q.value = 2.0;
-      const mAM = c.createGain(); mAM.gain.setValueAtTime(0.55, vStart);
-      const mLfoDepth = c.createGain(); mLfoDepth.gain.value = 0.48;
+      const mSaw = c.createOscillator(), mLP = c.createBiquadFilter(), mAM = c.createGain(), mEnv = c.createGain();
+      mSaw.type = 'sawtooth';
+      mSaw.frequency.setValueAtTime(76, vStart); mSaw.frequency.exponentialRampToValueAtTime(52, vEnd);
+      mLP.type = 'lowpass'; mLP.frequency.value = 210; mLP.Q.value = 1.8;
+      mAM.gain.setValueAtTime(0.55, vStart);
+      const mLfoDepth = c.createGain(); mLfoDepth.gain.value = 0.46;
       lfoSmooth.connect(mLfoDepth).connect(mAM.gain);
-
-      const mEnv = c.createGain();
       mEnv.gain.setValueAtTime(0.001, vStart);
-      mEnv.gain.linearRampToValueAtTime(1.15 * growlScale, vStart + 0.025);
-      mEnv.gain.setValueAtTime(1.10 * growlScale, Math.max(vStart + 0.05, vEnd - 0.10));
+      mEnv.gain.linearRampToValueAtTime(0.95 * growlScale, vStart + 0.025);
+      mEnv.gain.setValueAtTime(0.90 * growlScale, Math.max(vStart + 0.05, vEnd - 0.10));
       mEnv.gain.exponentialRampToValueAtTime(0.001, vEnd);
-
-      mSaw.connect(mLP); mTri.connect(mLP);
-      mLP.connect(mAM).connect(mEnv).connect(bus);
-      mSaw.start(vStart); mTri.start(vStart);
-      mSaw.stop(vEnd + 0.03); mTri.stop(vEnd + 0.03);
+      mSaw.connect(mLP).connect(mAM).connect(mEnv).connect(physGain);
+      mSaw.start(vStart); mSaw.stop(vEnd + 0.03);
     }
 
     if (rattleScale > 0.01) {
       const rNoise = c.createBufferSource(); rNoise.buffer = noiseBuffer; rNoise.loop = true;
       const rBP = c.createBiquadFilter(); rBP.type = 'bandpass'; rBP.frequency.value = 1150; rBP.Q.value = 1.1;
-
-      const rSq1 = c.createOscillator(), rSq2 = c.createOscillator();
-      rSq1.type = 'square'; rSq2.type = 'sawtooth';
-      rSq1.frequency.setValueAtTime(162, vStart);
-      rSq1.frequency.setValueAtTime(158, Math.max(vStart + 0.1, vEnd - 0.14));
-      rSq1.frequency.exponentialRampToValueAtTime(125, vEnd);
-      rSq2.frequency.setValueAtTime(328, vStart);
-      rSq2.frequency.exponentialRampToValueAtTime(255, vEnd);
-
-      const rSqBP = c.createBiquadFilter(); rSqBP.type = 'bandpass'; rSqBP.frequency.value = 820; rSqBP.Q.value = 1.4;
-      const rSqGain = c.createGain(); rSqGain.gain.value = 0.42;
-
       const rAM = c.createGain(); rAM.gain.setValueAtTime(0.50, vStart);
       const rLfoDepth = c.createGain(); rLfoDepth.gain.value = 0.50;
       lfoSmooth.connect(rLfoDepth).connect(rAM.gain);
-
       const rEnv = c.createGain();
       rEnv.gain.setValueAtTime(0.001, vStart);
-      rEnv.gain.linearRampToValueAtTime(0.75 * rattleScale, vStart + 0.02);
-      rEnv.gain.setValueAtTime(0.72 * rattleScale, Math.max(vStart + 0.04, vEnd - 0.10));
+      rEnv.gain.linearRampToValueAtTime(0.68 * rattleScale, vStart + 0.02);
+      rEnv.gain.setValueAtTime(0.65 * rattleScale, Math.max(vStart + 0.04, vEnd - 0.10));
       rEnv.gain.exponentialRampToValueAtTime(0.001, vEnd);
-
-      rNoise.connect(rBP).connect(rAM);
-      rSq1.connect(rSqBP); rSq2.connect(rSqBP);
-      rSqBP.connect(rSqGain).connect(rAM);
-      rAM.connect(rEnv).connect(bus);
-
-      rNoise.start(vStart); rSq1.start(vStart); rSq2.start(vStart);
-      rNoise.stop(vEnd + 0.03); rSq1.stop(vEnd + 0.03); rSq2.stop(vEnd + 0.03);
+      rNoise.connect(rBP).connect(rAM).connect(rEnv).connect(physGain);
+      rNoise.start(vStart); rNoise.stop(vEnd + 0.03);
     }
 
     lfo.start(vStart);
     lfo.stop(vEnd + 0.03);
+
+    // --- Part 3: 高重心警報ロングトーン「とぅーー（490Hz）→ る↑（980Hz）→ ーーーー!!」 ---
+    if (!withAlarm) return;
+
+    const tStart = now + 0.01;
+    const tGlideStart = tStart + p.hold1;
+    const tGlideEnd = tGlideStart + p.glide;
+    const tEnd = tGlideEnd + p.hold2;
+    const f1 = p.baseHz;
+    const f2 = p.baseHz * 2.0;
+
+    // 低域モコモコをカットし、中高域の抜けと太さを引き上げるEQチェーン
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 340; hp.Q.value = 0.7;
+
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 2.4;
+    lp.frequency.setValueAtTime(f1 * 4.5, tStart);
+    lp.frequency.exponentialRampToValueAtTime(Math.min(12500, f2 * 6.5), tGlideEnd);
+    lp.frequency.exponentialRampToValueAtTime(Math.min(9500, f2 * 4.2), tEnd);
+
+    const hiPresence = c.createBiquadFilter();
+    hiPresence.type = 'peaking'; hiPresence.frequency.value = 3100; hiPresence.Q.value = 1.0; hiPresence.gain.value = 4.8;
+
+    const shaper = c.createWaveShaper();
+    shaper.curve = makeLabGritCurve(p.grit); shaper.oversample = '4x';
+
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.001, tStart);
+    env.gain.linearRampToValueAtTime(0.42, tStart + 0.025);
+    env.gain.setValueAtTime(0.40, tGlideStart);
+    env.gain.linearRampToValueAtTime(0.52, tGlideEnd);
+    env.gain.setValueAtTime(0.46, Math.max(tGlideEnd + 0.05, tEnd - 0.35));
+    env.gain.exponentialRampToValueAtTime(0.001, tEnd);
+
+    const vib = c.createOscillator(), vibG = c.createGain();
+    vib.type = 'sine'; vib.frequency.value = 6.2;
+    vibG.gain.setValueAtTime(0.001, tStart);
+    vibG.gain.setValueAtTime(0.001, tGlideEnd);
+    vibG.gain.linearRampToValueAtTime(f2 * 0.014, tGlideEnd + 0.18);
+    vibG.gain.exponentialRampToValueAtTime(2.0, tEnd);
+    vib.connect(vibG); vib.start(tStart); vib.stop(tEnd + 0.05);
+
+    // -1octを廃し、5ボイスSuperSaw＋うっすら+1oct倍音で高重心かつ太い音像に
+    const voices = [
+      { type: 'sawtooth', detune: -16, mul: 1.0, g: 0.28 },
+      { type: 'square',   detune: -6,  mul: 1.0, g: 0.24 },
+      { type: 'sawtooth', detune: 0,   mul: 1.0, g: 0.32 },
+      { type: 'square',   detune: 6,   mul: 1.0, g: 0.24 },
+      { type: 'sawtooth', detune: 16,  mul: 1.0, g: 0.28 },
+      { type: 'triangle', detune: 3,   mul: 2.0, g: 0.14 }
+    ];
+
+    voices.forEach(v => {
+      const osc = c.createOscillator(), vg = c.createGain();
+      osc.type = v.type; osc.detune.value = v.detune; vg.gain.value = v.g;
+      osc.frequency.setValueAtTime(f1 * v.mul, tStart);
+      osc.frequency.setValueAtTime(f1 * v.mul, tGlideStart);
+      osc.frequency.exponentialRampToValueAtTime(f2 * v.mul, tGlideEnd);
+      osc.frequency.setValueAtTime(f2 * v.mul, tEnd);
+      vibG.connect(osc.frequency);
+      osc.connect(vg).connect(hp);
+      osc.start(tStart); osc.stop(tEnd + 0.05);
+    });
+
+    hp.connect(lp).connect(shaper).connect(hiPresence).connect(env);
+    env.connect(dryBus);
+    const alarmWet = c.createGain(); alarmWet.gain.value = 1.05;
+    env.connect(alarmWet).connect(wetSend);
   }
 
-  // 微かな低音鼓動（Step 2「これから脳が震える…」用の静かなドクン）
   function playSoftHeartbeat() {
     const c = init(); if (!c) return;
     const now = c.currentTime;
@@ -900,20 +898,24 @@ const StudioAudio = (() => {
     });
   }
 
-  // プチュン（Step 3 電源断ブラックアウト）
+  // ★v3.0 さりげない電源断プチュン（控えめ音量＋2.2秒ホールリバーブ残響）★
   function playPuchun() {
     const c = init(); if (!c) return;
     const now = c.currentTime;
-    vibrate([100]);
+    vibrate([65]);
     const o = c.createOscillator(), g = c.createGain();
     o.type = 'sine';
-    o.frequency.setValueAtTime(2500, now);
-    o.frequency.exponentialRampToValueAtTime(34, now + 0.14);
-    g.gain.setValueAtTime(0.95, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-    o.connect(g).connect(dryBus); o.start(now); o.stop(now + 0.20);
+    o.frequency.setValueAtTime(1950, now);
+    o.frequency.exponentialRampToValueAtTime(42, now + 0.13);
+    g.gain.setValueAtTime(0.42, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    o.connect(g);
+    g.connect(dryBus);
+    const pWet = c.createGain(); pWet.gain.value = 1.25;
+    g.connect(pWet).connect(wetSend);
+    o.start(now); o.stop(now + 0.18);
   }
 
-  // 微かな不穏ノイズ＆赤い亀裂ピキッ音（Step 3 0.6秒後）
   function playCrackNoise() {
     const c = init(); if (!c) return;
     const now = c.currentTime;
@@ -939,7 +941,6 @@ const StudioAudio = (() => {
     });
   }
 
-  // 爆音引き裂き「ズバァァン！！」（Step 4）
   function playSlash() {
     const c = init(); if (!c) return;
     const now = c.currentTime;
