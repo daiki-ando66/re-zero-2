@@ -14,6 +14,7 @@ const SPEC = {
   ST_RESERVE: 4,            // 残保留4個（各1/99.9 厳密独立抽選）
   ST_DENSA: 140,            // 電サポ140回（各1/99.9）
   ST_PROB: 1 / 99.9,
+  HORYUREN_NOTICE_RATE: 0.50, // WEDDING以外の残保留当選を即「保留連」告知する確率（独立乱数）
 
   R_6000: 0.25,             // 25%: 鬼がかり6000
   R_1500: 0.55,             // 55%: 鬼がかり1500
@@ -35,6 +36,21 @@ function drawRushBonusType() {
 }
 
 // 厳密な残保留4個独立抽選（各1/99.9、4個以内当選率 ≒ 3.94%）
+// 当選しなかった回転も含め、1回転ずつ自力消化できるよう配列で返す
+function drawReserve4Slots() {
+  const slots = [];
+  for (let i = 1; i <= SPEC.ST_RESERVE; i++) {
+    if (Math.random() < SPEC.ST_PROB) {
+      slots.push({ hit: true, hitIndex: i, bonusType: drawRushBonusType() });
+      break;
+    } else {
+      slots.push({ hit: false, hitIndex: i, bonusType: null });
+    }
+  }
+  return slots;
+}
+
+// 100回シミュレーター用の残保留4個独立抽選
 function drawReserve4() {
   for (let i = 1; i <= SPEC.ST_RESERVE; i++) {
     if (Math.random() < SPEC.ST_PROB) {
@@ -69,6 +85,7 @@ const state = {
   unspentFrac: 0,
 
   pendingReach: null,
+  reserveQueue: [],         // 残保留4個分の未消化キュー（1回転ずつ自力消化）
   stRemaining: 0,
   rushChains: 0,
   rushDisp: 0,
@@ -456,9 +473,11 @@ async function resolveNormalReach() {
     if (sc.hesoType === '3000_RUSH') {
       await runGoldenPromotionSequence({
         fakeSub: '🎉 図柄揃い大当り!! 🎉',
-        fakeTitle: '鬼がかり 1,500 BONUS',
-        fakeDesc: '払出 1,500個 獲得…',
+        fakeTitle: '鬼がかり 1,500 BONUS!!',
+        fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
         fakeStyle: 'gold',
+        fakeIsRush: false,
+        fakeBurstGold: true,
         finalSub: '🐋 白鯨討伐・1/3,499降臨!! 🐋',
         finalTitle: '鬼がかり 3,000 BONUS!!',
         finalExtra: '払出 3,000個（純増 2,800発）＋ 鬼がかりRUSH直行!!',
@@ -469,11 +488,14 @@ async function resolveNormalReach() {
     } else if (sc.hesoType === '1500_RUSH') {
       const isRevival = Math.random() < 0.35;
       if (isRevival) {
+        // 本物の通常1,500非突入と見た目・文言・音を完全一致させる
         await runGoldenPromotionSequence({
-          fakeSub: '鬼がかりジャッジ',
+          fakeSub: '鬼がかりジャッジ失敗…',
           fakeTitle: '通常 1,500 BONUS',
-          fakeDesc: 'RUSH非突入…通常時へ戻ります…',
+          fakeDesc: 'RUSH非突入（実質純増 +1,400発の持ち玉獲得）',
           fakeStyle: 'despair',
+          fakeIsRush: false,
+          fakeBurstGold: false,
           finalSub: '🔥 逆転死に戻り復活!! 🔥',
           finalTitle: '鬼がかりRUSH 突入!!',
           finalExtra: '払出 1,500個（純増 1,400発）＋ ST144回獲得!!',
@@ -523,7 +545,7 @@ async function resolveNormalReach() {
 }
 
 // =========================================================================
-// 鬼がかりRUSH（ST144回：残保留4個厳密独立抽選 ＋ 黄金4ステップ昇格 ＋ WEDDING 12,000）
+// 鬼がかりRUSH（ST144回：残保留4個厳密独立抽選・保留連告知乱数＋自力144回消化）
 // =========================================================================
 function enterOnigakariRush(hitSpin, is3000) {
   state.rushHits++;
@@ -547,19 +569,20 @@ function enterOnigakariRush(hitSpin, is3000) {
 
 async function afterBonusReserveCheck(prevType) {
   const tok = ++seqToken;
-  const res4 = drawReserve4();
-  updateRes4Dots(4);
+  const slots = drawReserve4Slots();
+  const hitSlot = slots.find(s => s.hit) || null;
+  updateRes4Dots(SPEC.ST_RESERVE);
 
   try {
-    if (res4.hit) {
-      state.rushHoryurenCount++;
-
-      // 真のプレミアム：6000＋残保留6000（約1/101）→ ホワイトアウト WEDDING BONUS 12,000!!
-      if (prevType === 'BONUS_6000' && res4.bonusType === 'BONUS_6000') {
+    if (hitSlot) {
+      // ① 真のプレミアム：6000＋残保留6000（約1/101）→ 100%保留連として WEDDING BONUS 12,000!!
+      if (prevType === 'BONUS_6000' && hitSlot.bonusType === 'BONUS_6000') {
+        state.rushHoryurenCount++;
         state.phase = 'ANIMATING';
         setControlMode('BUSY');
 
-        state.stRemaining = SPEC.ST_DENSA;
+        state.reserveQueue = [];
+        state.stRemaining = SPEC.ST_TOTAL;
         setActiveScene('rush-idle');
         rushIdleSub.textContent = '残保留消化中……';
         updateStatsUI();
@@ -571,7 +594,7 @@ async function afterBonusReserveCheck(prevType) {
         triggerLamp('rainbow', '💒 12,000!!');
         showFullscreenOverlay({
           mode: 'wedding',
-          sub: `💒 奇跡の残保留${res4.hitIndex}個目当選（約1/101） 💒`,
+          sub: `💒 奇跡の残保留${hitSlot.hitIndex}個目当選（約1/101） 💒`,
           main: '「スバルくん…愛しています」',
           extra: '純白の奇跡・残保留6000連荘降臨!!'
         });
@@ -594,56 +617,61 @@ async function afterBonusReserveCheck(prevType) {
         return;
       }
 
-      // 通常の残保留連（4回転以内3.94%）
-      state.phase = 'ANIMATING';
-      setControlMode('BUSY');
-      await wait(650, tok);
-      StudioAudio.playPokyun(res4.bonusType === 'BONUS_6000');
-      triggerLamp('rainbow', `残保${res4.hitIndex}連!!`);
-      FxCanvas.burstGold(48);
+      // ② WEDDING以外の残保留当選：独立乱数で「保留連即告知」するか「ST1〜4回転目に自力消化」するか決定
+      if (Math.random() < SPEC.HORYUREN_NOTICE_RATE) {
+        state.rushHoryurenCount++;
+        state.reserveQueue = [];
+        state.phase = 'ANIMATING';
+        setControlMode('BUSY');
+        await wait(650, tok);
+        StudioAudio.playPokyun(hitSlot.bonusType === 'BONUS_6000');
+        triggerLamp('rainbow', `残保${hitSlot.hitIndex}連!!`);
+        FxCanvas.burstGold(48);
 
-      const label = res4.bonusType === 'BONUS_6000' ? '鬼がかり 6,000 BONUS!!'
-        : res4.bonusType === 'BONUS_1500' ? '鬼がかり 1,500 BONUS!!'
-        : res4.bonusType === 'BONUS_300' ? '鬼がかり 300 BONUS!!'
-        : 'Re:Start（STリセット）!!';
+        const label = hitSlot.bonusType === 'BONUS_6000' ? '鬼がかり 6,000 BONUS!!'
+          : hitSlot.bonusType === 'BONUS_1500' ? '鬼がかり 1,500 BONUS!!'
+          : hitSlot.bonusType === 'BONUS_300' ? '鬼がかり 300 BONUS!!'
+          : 'Re:Start（STリセット）!!';
 
-      if (res4.bonusType === 'BONUS_6000') {
-        StudioAudio.play6000Fanfare(false);
-      } else if (res4.bonusType === 'RESTART') {
-        StudioAudio.playReStart();
-      } else {
-        StudioAudio.play1500Jackpot(true);
+        if (hitSlot.bonusType === 'BONUS_6000') {
+          StudioAudio.play6000Fanfare(false);
+        } else if (hitSlot.bonusType === 'RESTART') {
+          StudioAudio.playReStart();
+        } else {
+          StudioAudio.play1500Jackpot(true);
+        }
+
+        showFullscreenOverlay({
+          mode: hitSlot.bonusType === 'BONUS_6000' ? '6000' : 'gold',
+          sub: `⚡ 残保留${hitSlot.hitIndex}個目で即引き戻し!! ⚡`,
+          main: `保留連!! ${label}`,
+          extra: '大当り終了直後の残保留で奇跡の連荘!!'
+        });
+        await wait(1900, tok);
+        hideFullscreenOverlay();
+
+        if (hitSlot.bonusType === 'BONUS_6000') {
+          state.rushChains++; state.rush6000Count++;
+          state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000;
+        } else if (hitSlot.bonusType === 'BONUS_1500') {
+          state.rushChains++;
+          state.rushDisp += SPEC.DISP_1500; state.rushNet += SPEC.NET_1500; state.balls += SPEC.NET_1500;
+        } else if (hitSlot.bonusType === 'BONUS_300') {
+          state.rushChains++;
+          state.rushDisp += SPEC.DISP_300; state.rushNet += SPEC.NET_300; state.balls += SPEC.NET_300;
+        } else {
+          state.rushRestartCount++;
+        }
+        updateStatsUI();
+        afterBonusReserveCheck(hitSlot.bonusType);
+        return;
       }
-
-      showFullscreenOverlay({
-        mode: res4.bonusType === 'BONUS_6000' ? '6000' : 'gold',
-        sub: `⚡ 残保留${res4.hitIndex}個目で即引き戻し（3.94%）!! ⚡`,
-        main: `保留連!! ${label}`,
-        extra: '大当り終了直後の残保留で奇跡の連荘!!'
-      });
-      await wait(1900, tok);
-      hideFullscreenOverlay();
-
-      if (res4.bonusType === 'BONUS_6000') {
-        state.rushChains++; state.rush6000Count++;
-        state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000;
-      } else if (res4.bonusType === 'BONUS_1500') {
-        state.rushChains++;
-        state.rushDisp += SPEC.DISP_1500; state.rushNet += SPEC.NET_1500; state.balls += SPEC.NET_1500;
-      } else if (res4.bonusType === 'BONUS_300') {
-        state.rushChains++;
-        state.rushDisp += SPEC.DISP_300; state.rushNet += SPEC.NET_300; state.balls += SPEC.NET_300;
-      } else {
-        state.rushRestartCount++;
-      }
-      updateStatsUI();
-      afterBonusReserveCheck(res4.bonusType);
-      return;
     }
 
-    // 残保留4個ハズレ → 電サポ140回転待機（scene-rush-idle）へ
-    updateRes4Dots(0);
-    state.stRemaining = SPEC.ST_DENSA;
+    // ③ 残保留ハズレ or 保留連非告知 → 勝手に4回消化せず残り144回転スタート（最初の4回転で残保留キューを1個ずつ消化）
+    state.reserveQueue = slots;
+    updateRes4Dots(SPEC.ST_RESERVE);
+    state.stRemaining = SPEC.ST_TOTAL;
     state.phase = 'RUSH';
     clearVisualEffects();
     setActiveScene('rush-idle');
@@ -693,6 +721,19 @@ function applyRushModeVisuals() {
 function spinRushOnce() {
   if (state.phase !== 'RUSH' || state.stRemaining <= 0) return null;
   state.stRemaining--;
+
+  // 最初の4回転は内部抽選済みの残保留キューを1回転ずつ消化（二重抽選なし）
+  if (state.reserveQueue.length > 0) {
+    const slot = state.reserveQueue.shift();
+    updateRes4Dots(state.reserveQueue.length);
+    if (slot.hit) {
+      state.reserveQueue = [];
+      return { type: slot.bonusType };
+    }
+    return { type: 'MISS', brainGaze: (state.rushMode === 'brain' && Math.random() < 0.015) };
+  }
+
+  // 残り140回転（電サポ本番）は1回転ごとに独立抽選
   if (Math.random() < SPEC.ST_PROB) return { type: drawRushBonusType() };
   if (state.stRemaining <= 0) return { type: 'ST_END' };
   return { type: 'MISS', brainGaze: (state.rushMode === 'brain' && Math.random() < 0.015) };
@@ -744,6 +785,7 @@ function handleRushEvent(ev) {
   }
 }
 
+// 右打ち鬼がかり6000当選（25%）→ 見た目は本物の300/Re:Start/1500と完全一致させたうえで黄金4ステップ昇格
 async function runRush6000Sequence() {
   const tok = ++seqToken;
   state.phase = 'ANIMATING';
@@ -753,11 +795,13 @@ async function runRush6000Sequence() {
   let opts;
   if (r < 0.36) {
     opts = {
-      fakeSub: '右打ち 6%…',
+      fakeSub: '右打ち 6%',
       fakeTitle: '鬼がかり 300 BONUS',
-      fakeDesc: '払出 300個（純増 280発）で終了か……',
+      fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
       fakeStyle: 'despair',
       fakeRestart: false,
+      fakeIsRush: true,
+      fakeBurstGold: false,
       finalSub: '💥【鬼300 切り裂き昇格!!】💥',
       finalTitle: '鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
@@ -767,9 +811,11 @@ async function runRush6000Sequence() {
     opts = {
       fakeSub: '⏪ 右打ち 14%・死に戻り ⏪',
       fakeTitle: 'Re:Start',
-      fakeDesc: '出玉なし・ST144回へ巻き戻し……',
+      fakeDesc: '出玉0個・ST144回へ完全巻き戻し！',
       fakeStyle: 'despair',
       fakeRestart: true,
+      fakeIsRush: true,
+      fakeBurstGold: false,
       finalSub: '💥【Re:Start 逆転切り裂き!!】💥',
       finalTitle: '超・鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
@@ -778,10 +824,12 @@ async function runRush6000Sequence() {
   } else {
     opts = {
       fakeSub: '🔥 右打ち 55% 🔥',
-      fakeTitle: '鬼がかり 1,500 BONUS',
-      fakeDesc: '払出 1,500個（純増 1,400発）獲得…',
+      fakeTitle: '鬼がかり 1,500 BONUS!!',
+      fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
       fakeStyle: 'gold',
       fakeRestart: false,
+      fakeIsRush: true,
+      fakeBurstGold: true,
       finalSub: '🔥【1500 切り裂き昇格!!】🔥',
       finalTitle: '鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）獲得!! 残保留4個抽選へ…',
@@ -809,7 +857,12 @@ async function runNormalRushBonusSequence(type) {
 
   try {
     if (type === 'BONUS_1500') {
-      if (state.rushMode === 'onigakari') StudioAudio.play1500Jackpot(true);
+      // 全RUSHモード（鬼がかり／脳が震える／レム告知）でRUSH1500サウンドを確実に鳴らす
+      if (state.rushMode === 'rem') {
+        setTimeout(() => StudioAudio.play1500Jackpot(true), 220);
+      } else {
+        StudioAudio.play1500Jackpot(true);
+      }
       lcdFrame.classList.add('fx-gold');
       FxCanvas.burstGold(34);
       bonusSubLabel.textContent = '🔥 右打ち 55% 🔥';
@@ -822,7 +875,11 @@ async function runNormalRushBonusSequence(type) {
       updateStatsUI();
       afterBonusReserveCheck('BONUS_1500');
     } else if (type === 'BONUS_300') {
-      StudioAudio.play1500Jackpot(true);
+      if (state.rushMode === 'rem') {
+        setTimeout(() => StudioAudio.play1500Jackpot(true), 220);
+      } else {
+        StudioAudio.play1500Jackpot(true);
+      }
       lcdFrame.classList.add('mode-despair-bg');
       bonusSubLabel.textContent = '右打ち 6%';
       bonusSubLabel.className = 'text-[11px] font-black tracking-[0.18em] text-slate-400 mb-1.5';
@@ -899,30 +956,30 @@ document.getElementById('btnTestPromo').addEventListener('click', async () => {
 
   const variants = [
     {
-      fakeSub: '右打ち 6%…（昇格テスト①）',
+      fakeSub: '右打ち 6%',
       fakeTitle: '鬼がかり 300 BONUS',
-      fakeDesc: '払出 300個（純増 280発）で終了か……',
-      fakeStyle: 'despair', fakeRestart: false,
+      fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
+      fakeStyle: 'despair', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false,
       finalSub: '💥【鬼300 切り裂き昇格!!】💥',
       finalTitle: '鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）降臨!!',
       finalSound: '6000'
     },
     {
-      fakeSub: '⏪ 右打ち 14%（昇格テスト②） ⏪',
+      fakeSub: '⏪ 右打ち 14%・死に戻り ⏪',
       fakeTitle: 'Re:Start',
-      fakeDesc: '出玉なし・ST144回へ巻き戻し……',
-      fakeStyle: 'despair', fakeRestart: true,
+      fakeDesc: '出玉0個・ST144回へ完全巻き戻し！',
+      fakeStyle: 'despair', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false,
       finalSub: '💥【Re:Start 逆転切り裂き!!】💥',
       finalTitle: '超・鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）降臨!!',
       finalSound: '6000'
     },
     {
-      fakeSub: '🔥 右打ち 55%（昇格テスト③） 🔥',
-      fakeTitle: '鬼がかり 1,500 BONUS',
-      fakeDesc: '払出 1,500個（純増 1,400発）獲得…',
-      fakeStyle: 'gold', fakeRestart: false,
+      fakeSub: '🔥 右打ち 55% 🔥',
+      fakeTitle: '鬼がかり 1,500 BONUS!!',
+      fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
+      fakeStyle: 'gold', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true,
       finalSub: '🔥【1500 切り裂き昇格!!】🔥',
       finalTitle: '鬼がかり 6,000 BONUS!!',
       finalExtra: '払出 6,000個（実質純増 5,600発）降臨!!',
@@ -953,6 +1010,7 @@ document.getElementById('btnTestPromo').addEventListener('click', async () => {
 document.getElementById('btnCloseResult').addEventListener('click', () => {
   resultModal.classList.add('hidden');
   state.phase = 'NORMAL';
+  state.reserveQueue = [];
   clearVisualEffects();
   FxCanvas.setAmbient('ember');
   updateReserveSlots('NORMAL');
@@ -1059,7 +1117,7 @@ document.getElementById('btnResetPlay').addEventListener('click', () => {
   Object.assign(state, {
     phase: 'NORMAL', currentSpin: 0, totalNormalSpins: 0, firstHits: 0, rushHits: 0,
     sakibareTotal: 0, sakibareWins: 0, totalInvestYen: 0, balls: 0, unspentFrac: 0,
-    pendingReach: null, stRemaining: 0, rushChains: 0, rushDisp: 0, rushNet: 0,
+    pendingReach: null, reserveQueue: [], stRemaining: 0, rushChains: 0, rushDisp: 0, rushNet: 0,
     rush6000Count: 0, rushWeddingCount: 0, rushHoryurenCount: 0, rushRestartCount: 0, history: []
   });
 
@@ -1186,9 +1244,14 @@ function runSim100() {
         const r4 = drawReserve4();
         let hitBonus = null;
         if (r4.hit) {
-          horyurenCount++;
           hitBonus = r4.bonusType;
-          if (prevType === 'BONUS_6000' && hitBonus === 'BONUS_6000') weddingCount++;
+          const isWed = (prevType === 'BONUS_6000' && hitBonus === 'BONUS_6000');
+          if (isWed) {
+            weddingCount++;
+            horyurenCount++;
+          } else if (Math.random() < SPEC.HORYUREN_NOTICE_RATE) {
+            horyurenCount++;
+          }
         } else if (Math.random() < densa140Prob) {
           hitBonus = drawRushBonusType();
         } else {
@@ -1238,7 +1301,7 @@ function runSim100() {
     <p>
       右打ち総当選 <strong>${totalRushWins}回</strong> 中、鬼がかり6000は <strong>${count6000}回（${pct6000}%）</strong>
       （理論 ${exp6000.toFixed(1)}回 ／ 差 <strong class="${diff6000 >= 0 ? 'text-emerald-300' : 'text-rose-400'}">${diff6000 >= 0 ? '+' : ''}${diff6000.toFixed(1)}回</strong>）。
-      残保留4個以内での保留連は <strong>${horyurenCount}回</strong>、真のプレミアム「WEDDING 12,000」は <strong>${weddingCount}回</strong>（理論期待：約${(count6000 * 0.00985).toFixed(2)}回）でした。
+      保留連告知は <strong>${horyurenCount}回</strong>、真のプレミアム「WEDDING 12,000」は <strong>${weddingCount}回</strong>（理論期待：約${(count6000 * 0.00985).toFixed(2)}回）でした。
     </p>
   `;
   drawSlumpChart(points);
