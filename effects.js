@@ -1,14 +1,12 @@
 // =========================================================================
-// effects.js : Canvasエフェクト・RUSH違和感・ぶっ飛び演出・全画面画像カットイン
+// effects.js (v3.0) : Canvas・縁外連動・3秒画像カットイン・答え合わせ枠・ぶっ飛び演出
 // =========================================================================
 
-// RUSH追加演出・違和感・ぶっ飛び物理崩壊・全画面画像カットイン用CSSを自動注入
 (function injectRushExtraStyles() {
   if (document.getElementById('rush-extra-css')) return;
   const st = document.createElement('style');
   st.id = 'rush-extra-css';
   st.textContent = `
-    /* 違和感系エフェクト */
     .iwakan-mono { filter: grayscale(100%) contrast(125%) !important; }
     .iwakan-fade-remain { transition: opacity 0.85s ease; opacity: 0.06 !important; }
     @keyframes remPuru {
@@ -19,7 +17,6 @@
     }
     .iwakan-rempuru { animation: remPuru 0.09s linear infinite !important; }
 
-    /* 脳が震えるRUSH：弱／中シェイク */
     @keyframes brainShakeWeak {
       0%, 100% { transform: translate(0, 0); }
       25% { transform: translate(-2.5px, 1px); }
@@ -33,7 +30,6 @@
     .shake-weak { animation: brainShakeWeak 0.11s linear infinite; }
     .shake-mid { animation: brainShakeMid 0.10s linear infinite; }
 
-    /* ★ページ全体・超激震（脳破壊シェイク）★ */
     @keyframes pageMegaShake {
       0%, 100% { transform: translate(0, 0) rotate(0deg); }
       12% { transform: translate(-11px, -7px) rotate(-1.4deg); }
@@ -46,7 +42,6 @@
     }
     .page-mega-shake { animation: pageMegaShake 0.11s linear infinite !important; }
 
-    /* ★RGB色ズレ（色収差グリッチ）★ */
     @keyframes rgbGlitchAnim {
       0% { filter: drop-shadow(-5px 0 0 rgba(255,0,80,0.95)) drop-shadow(5px 0 0 rgba(0,240,255,0.95)) contrast(135%); transform: skewX(-4deg); }
       33% { filter: drop-shadow(6px -2px 0 rgba(255,0,80,0.95)) drop-shadow(-6px 2px 0 rgba(0,240,255,0.95)) saturate(200%); transform: skewX(5deg); }
@@ -55,7 +50,6 @@
     }
     .fx-rgb-glitch { animation: rgbGlitchAnim 0.10s steps(2) infinite !important; }
 
-    /* ★ぶっ飛び演出：液晶パネルごと重力で物理落下（ドロップクラッシュ）★ */
     @keyframes dropCrashAnim {
       0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
       16%  { transform: translateY(-6px) rotate(-3.5deg); opacity: 1; }
@@ -71,7 +65,6 @@
       animation: dropCrashAnim 0.82s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
     }
 
-    /* ★ぶっ飛び演出：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★ */
     @keyframes shardFly {
       0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; }
       18%  { transform: translate3d(calc(var(--tx) * 0.12), calc(var(--ty) * 0.12), 20px) rotate(calc(var(--rot) * 0.15)) scale(1.05); opacity: 1; }
@@ -85,26 +78,21 @@
       animation: shardFly 0.84s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    /* ★全画面「鬼がかってますね」画像カットイン＆虹色オーラ★ */
     @keyframes cutinZoomIn {
-      0%   { opacity: 0; transform: scale(1.45); filter: brightness(2.4); }
-      24%  { opacity: 1; transform: scale(0.98); filter: brightness(1.2); }
-      100% { opacity: 1; transform: scale(1.04); filter: brightness(1.02); }
+      0%   { opacity: 0; transform: scale(1.42); filter: brightness(2.3); }
+      18%  { opacity: 1; transform: scale(0.98); filter: brightness(1.18); }
+      100% { opacity: 1; transform: scale(1.06); filter: brightness(1.02); }
     }
-    .cutin-img-zoom {
-      animation: cutinZoomIn 1.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+    .cutin-img-zoom { animation: cutinZoomIn 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
     @keyframes rainbowFrameSpin {
       0%   { box-shadow: 0 0 38px 10px rgba(250,204,21,0.9), 0 0 70px 18px rgba(236,72,153,0.65); border-color: #fde047; }
       33%  { box-shadow: 0 0 42px 12px rgba(56,189,248,0.95), 0 0 74px 20px rgba(192,132,252,0.7); border-color: #38bdf8; }
       66%  { box-shadow: 0 0 42px 12px rgba(244,63,94,0.95), 0 0 74px 20px rgba(250,204,21,0.7); border-color: #f472b6; }
       100% { box-shadow: 0 0 38px 10px rgba(250,204,21,0.9), 0 0 70px 18px rgba(236,72,153,0.65); border-color: #fde047; }
     }
-    .cutin-rainbow-border {
-      animation: rainbowFrameSpin 0.75s linear infinite;
-    }
+    .cutin-rainbow-border { animation: rainbowFrameSpin 0.75s linear infinite; }
 
-    /* ★初当たり＆6000解放：虹色フラッシュ＆虹オーラ背景★ */
     @keyframes rainbowBgFlow {
       0%   { background-position: 0% 50%; }
       50%  { background-position: 100% 50%; }
@@ -125,7 +113,6 @@
       animation: globalRainbowBurstAnim 0.72s ease-out forwards;
     }
 
-    /* レム告知：4種ランプ点灯パターン */
     @keyframes remSlowGlow {
       0% { opacity: 0.25; box-shadow: 0 0 0 rgba(56,189,248,0); }
       65% { opacity: 0.9; box-shadow: 0 0 24px 8px rgba(56,189,248,0.9); }
@@ -145,7 +132,6 @@
       animation: remClassicFlash 0.12s steps(2) infinite !important;
     }
 
-    /* 保留点滅 */
     @keyframes slotBlink {
       0%, 100% { opacity: 1; transform: scale(1.06); }
       50% { opacity: 0.35; transform: scale(0.95); }
@@ -153,12 +139,10 @@
     .res-blink { animation: slotBlink 0.45s ease-in-out infinite; }
     .res-blink-fast { animation: slotBlink 0.15s linear infinite; }
 
-    /* ゼロかRUSH背景 */
     .mode-zero-bg {
       background: radial-gradient(circle at 50% 45%, #18181b 0%, #09090b 65%, #020203 100%) !important;
     }
 
-    /* 隠レム */
     @keyframes hiddenRemPulse {
       0% { opacity: 0; transform: scale(0.75); }
       50% { opacity: 0.42; transform: scale(1.02); }
@@ -169,9 +153,7 @@
   document.head.appendChild(st);
 })();
 
-// =========================================================================
-// ★カットイン画像（onigakari.jpg）事前プリロード＆自動フォールバック★
-// =========================================================================
+// カットイン画像（onigakari.jpg）プリロード＆自動フォールバック
 let onigakariImageSrc = null;
 (function preloadCutinImage() {
   const candidates = ['onigakari.jpg', 'onigakari.png', 'image_3da6a7.jpg'];
@@ -323,12 +305,12 @@ const FxCanvas = (() => {
   function tick() {
     ctx.clearRect(0, 0, w, h);
 
-    if (ambientMode === 'ember' && particles.length < 18 && Math.random() < 0.22) {
+    if (ambientMode === 'ember' && particles.length < 20 && Math.random() < 0.25) {
       particles.push({
         type: 'spark', x: Math.random() * w, y: h + 8,
         vx: (Math.random() - 0.5) * 0.5, vy: -(0.6 + Math.random() * 1.2),
         size: 1.5 + Math.random() * 2.2,
-        color: Math.random() < 0.7 ? '#e11d48' : '#fb923c', alpha: 0.55, decay: 0.006
+        color: Math.random() < 0.55 ? '#facc15' : '#fb923c', alpha: 0.60, decay: 0.006
       });
     } else if (ambientMode === 'rush' && particles.length < 32 && Math.random() < 0.35) {
       particles.push({
@@ -431,7 +413,7 @@ const FxCanvas = (() => {
 })();
 
 // =========================================================================
-// 演出タイミング制御＆演出系DOM参照
+// 演出タイミング制御＆DOM参照
 // =========================================================================
 let fastMode = false;
 let seqToken = 0;
@@ -446,9 +428,9 @@ function wait(ms, token = seqToken) {
   });
 }
 
-// 3秒フリーズ専用ウェイト（高速モードでも静寂の余韻を最低1.8秒確保）
+// 3秒フリーズ＆3秒画像表示用（高速モードでも余韻をしっかり確保）
 function waitFreeze(ms, token = seqToken) {
-  const dur = fastMode ? Math.round(ms * 0.60) : ms;
+  const dur = fastMode ? Math.round(ms * 0.65) : ms;
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (token !== seqToken) reject('CANCELLED');
@@ -456,6 +438,46 @@ function waitFreeze(ms, token = seqToken) {
     }, dur);
   });
 }
+
+// 仮表示中の「OK裏ボタン割り込み昇格」制御
+let promoInterruptResolver = null;
+function canInterruptPromotion() {
+  return typeof promoInterruptResolver === 'function';
+}
+function interruptPromotionByOk() {
+  if (typeof promoInterruptResolver === 'function') {
+    const fn = promoInterruptResolver;
+    promoInterruptResolver = null;
+    fn('OK_INTERRUPT');
+    return true;
+  }
+  return false;
+}
+function waitInterruptible(ms, token = seqToken) {
+  const dur = Math.max(80, Math.round(ms * (fastMode ? 0.55 : 1.0)));
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      promoInterruptResolver = null;
+      if (token !== seqToken) reject('CANCELLED');
+      else resolve('TIMEOUT');
+    }, dur);
+
+    promoInterruptResolver = (reason) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      promoInterruptResolver = null;
+      if (token !== seqToken) reject('CANCELLED');
+      else resolve(reason);
+    };
+  });
+}
+
+const ambientBgLayer = document.getElementById('ambientBgLayer');
+const sunburstLayer = document.getElementById('sunburstLayer');
 
 const lcdFrame = document.getElementById('lcdFrame');
 const ledLeft = document.getElementById('ledLeft');
@@ -468,7 +490,6 @@ const fsMain = document.getElementById('fsMain');
 const fsExtra = document.getElementById('fsExtra');
 const res4Dots = document.querySelectorAll('.res4-dot');
 
-// 画面全体演出用（電源断ブラックアウト幕・虹色閃光幕・全画面画像カットイン幕）
 const globalBlackoutCurtain = document.createElement('div');
 globalBlackoutCurtain.id = 'globalBlackoutCurtain';
 globalBlackoutCurtain.className = 'hidden fixed inset-0 z-[999] bg-black pointer-events-none';
@@ -486,7 +507,6 @@ document.body.appendChild(globalCutinOverlay);
 
 const pageShakeTargets = [document.querySelector('header'), document.querySelector('main')].filter(Boolean);
 
-// 排他シーン要素（同時に1つしか表示されない）
 const scenePanes = {
   normal: document.getElementById('scene-normal'),
   reach: document.getElementById('scene-reach'),
@@ -532,20 +552,25 @@ rushNoiseVeil.id = 'rushNoiseVeil';
 rushNoiseVeil.className = 'hidden pointer-events-none absolute inset-0 z-20 crt-scanlines bg-black/20';
 lcdFrame.appendChild(rushNoiseVeil);
 
-// ★画面全体の暗転・超激震・RGB色ズレ・画像カットイン制御★
+// ★縁外ライティング＆虹色サンバースト制御★
+function setAmbientBg(mode = '') {
+  if (!ambientBgLayer) return;
+  ambientBgLayer.className = 'fixed inset-0 pointer-events-none z-0' + (mode ? ` bg-mode-${mode}` : '');
+}
+function setSunburst(on) {
+  if (sunburstLayer) sunburstLayer.classList.toggle('hidden', !on);
+}
+
 function setGlobalBlackout(on) {
   globalBlackoutCurtain.classList.toggle('hidden', !on);
 }
-
 function hideGlobalCutin() {
   globalCutinOverlay.classList.add('hidden');
   globalCutinOverlay.innerHTML = '';
 }
-
 function setPageMegaShake(on) {
   pageShakeTargets.forEach(el => el.classList.toggle('page-mega-shake', on));
 }
-
 function fireGlobalRainbowFlash() {
   globalRainbowFlash.className = 'fixed inset-0 z-[998] pointer-events-none global-rainbow-burst';
   void globalRainbowFlash.offsetWidth;
@@ -553,88 +578,107 @@ function fireGlobalRainbowFlash() {
     globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none';
   }, 750);
 }
-
 function clearGlobalChaosEffects() {
+  promoInterruptResolver = null;
   setGlobalBlackout(false);
   hideGlobalCutin();
   setPageMegaShake(false);
+  setSunburst(false);
   lcdFrame.classList.remove('fx-rgb-glitch');
   slashHost.innerHTML = '';
 }
 
-// ★全画面「鬼がかってますね」ドパドパカットイン（onigakari.jpg自動表示＋未配置時は虹文字自動切替）★
+// ★本家仕様：右下「違和感の答え合わせ」兼 レア「これから脳が震える…」表示★
+function showIwakanAnswer(text, isBrainWhisper = false) {
+  if (!text) {
+    hideIwakanAnswer();
+    return;
+  }
+  subtleWhisperText.textContent = text;
+  if (isBrainWhisper) {
+    subtleWhisperSlot.className = 'absolute bottom-1 right-1 sm:right-2 px-2.5 py-1 rounded-md bg-black/85 border border-purple-400/60 shadow-lg max-w-[88%]';
+    subtleWhisperText.className = 'font-mincho text-xs sm:text-sm font-semibold text-purple-200 tracking-widest';
+    void subtleWhisperSlot.offsetWidth;
+    subtleWhisperSlot.classList.add('fx-whisper-in');
+  } else {
+    subtleWhisperSlot.className = 'absolute bottom-1 right-1 sm:right-2 px-2.5 py-1 rounded-md bg-black/80 border border-amber-500/45 shadow-lg max-w-[88%]';
+    subtleWhisperText.className = 'font-mincho text-[11px] sm:text-xs font-semibold text-amber-100/90 tracking-wider';
+  }
+  subtleWhisperSlot.classList.remove('hidden');
+}
+
+function hideIwakanAnswer() {
+  subtleWhisperSlot.classList.add('hidden');
+  subtleWhisperSlot.classList.remove('fx-whisper-in');
+}
+
+// ★全画面「鬼がかってますね」画像カットイン（約3.0秒じっくり表示・メタ説明なし）★
 async function playOnigakariImageCutin({
-  caption = '🌈 鬼がかってますね!! 🌈',
-  subCaption = 'ONIGAKARI PREMIUM FREEZE',
-  dur = 1750,
+  caption = '鬼がかってますね',
+  dur = 3000,
   withPokyun = true,
   token
 }) {
   if (withPokyun) StudioAudio.playPokyun(true);
   fireGlobalRainbowFlash();
+  setAmbientBg('rainbow');
+  setSunburst(true);
   setLed('rainbow');
 
   if (onigakariImageSrc) {
     globalCutinOverlay.innerHTML = `
       <div class="w-full max-w-lg flex flex-col items-center gap-3">
-        <div class="text-xs sm:text-sm font-black tracking-[0.26em] rainbow-grad-text drop-shadow pop-in">${subCaption}</div>
         <div class="relative w-full aspect-video rounded-2xl overflow-hidden border-4 cutin-rainbow-border bg-black">
           <img src="${onigakariImageSrc}" alt="鬼がかってますね" class="w-full h-full object-cover cutin-img-zoom">
-          <div class="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"></div>
+          <div class="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
         </div>
-        <div class="font-mincho text-2xl sm:text-3xl font-black rainbow-grad-text tracking-wider drop-shadow pop-in">${caption}</div>
+        <div class="font-mincho text-2xl sm:text-3xl font-black rainbow-grad-text tracking-widest drop-shadow pop-in">${caption}</div>
       </div>
     `;
   } else {
     globalCutinOverlay.innerHTML = `
       <div class="w-full max-w-lg rounded-3xl overlay-rainbow border-4 cutin-rainbow-border p-8 text-center shadow-2xl pop-in">
-        <div class="text-xs font-black tracking-[0.28em] text-yellow-200 mb-3">${subCaption}</div>
         <div class="font-mincho text-4xl sm:text-5xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)] tracking-wider leading-tight">
-          鬼がかってますね!!
+          ${caption}
         </div>
-        <div class="mt-3 text-sm font-black text-yellow-100">${caption}</div>
       </div>
     `;
   }
 
   globalCutinOverlay.classList.remove('hidden');
   try {
-    await wait(dur, token);
+    await waitFreeze(dur, token);
   } finally {
     hideGlobalCutin();
   }
 }
 
-// ★初当たり用：虹色バースト演出★
+// ★初当たり・大当たり用 虹色バースト（縁外サンバースト連動）★
 function fireRainbowBurst(lampLabel = '🌈 大当り!!') {
   fireGlobalRainbowFlash();
+  setAmbientBg('rainbow');
+  setSunburst(true);
   triggerLamp('rainbow', lampLabel);
   lcdFrame.classList.add('fx-rainbow', 'shake-burst');
   setLed('rainbow');
   FxCanvas.spawnRing('#fde047', 320, 9);
   FxCanvas.spawnRing('#38bdf8', 250, 7);
-  FxCanvas.burstRainbow(72);
+  FxCanvas.burstRainbow(78);
   setTimeout(() => lcdFrame.classList.remove('shake-burst'), 720);
 }
 
-// ★単一シーン排他切替関数★
 function setActiveScene(sceneName) {
   if (typeof state !== 'undefined') state.activeScene = sceneName;
   Object.entries(scenePanes).forEach(([key, el]) => {
     el.classList.toggle('hidden', key !== sceneName);
   });
-  if (sceneName !== 'bonus') {
-    subtleWhisperSlot.classList.add('hidden');
-    subtleWhisperSlot.classList.remove('fx-whisper-in');
-  }
-  if (sceneName !== 'reach') {
-    pushButtonArea.classList.add('hidden');
-  }
+  if (sceneName !== 'bonus') hideIwakanAnswer();
+  if (sceneName !== 'reach') pushButtonArea.classList.add('hidden');
   if (sceneName !== 'rush-idle') {
     rushTopBadge.classList.add('hidden');
     hiddenRemBadge.classList.add('hidden');
   }
-  btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach' || sceneName === 'rush-idle');
+  btnSecretOk.classList.toggle('secret-ok-active', sceneName === 'reach' || sceneName === 'rush-idle' || sceneName === 'bonus');
 }
 
 function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra = '', scanlines = false }) {
@@ -681,7 +725,7 @@ function hideFullscreenOverlay() {
 }
 
 // =========================================================================
-// 演出UIヘルパー（LED・リール・保留・ランプ・各種ぶっ飛び破壊演出）
+// 演出UIヘルパー（LED・リール・保留・ランプ・物理破壊演出）
 // =========================================================================
 function setLed(style) {
   [ledLeft, ledRight].forEach(el => {
@@ -751,7 +795,7 @@ function updateReserveSlots(mode = 'NORMAL', special = null) {
       el.className = 'w-8 h-8 rounded-full border-2 border-amber-200 bg-gradient-to-br from-rose-500 to-red-900 flex items-center justify-center text-xs font-black text-amber-100 shadow-lg shadow-rose-500/90 res-blink-fast';
     } else {
       el.textContent = '○';
-      el.className = 'w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-900/90 flex items-center justify-center text-[10px] font-black text-slate-400';
+      el.className = 'w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/70 flex items-center justify-center text-[10px] font-black text-amber-200/60';
     }
   }
 }
@@ -777,6 +821,7 @@ function clearIwakanEffects() {
 function clearVisualEffects() {
   clearIwakanEffects();
   clearGlobalChaosEffects();
+  setAmbientBg('');
   lcdFrame.classList.remove('fx-redbare', 'fx-rainbow', 'fx-gold', 'fx-restart', 'fx-glitch', 'shake-intense', 'shake-burst', 'mode-brain-bg', 'mode-rem-bg', 'mode-despair-bg', 'mode-zero-bg');
   btnOniPush.classList.remove('ochiburu-dome', 'push-dome-gold');
   oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow');
@@ -813,39 +858,40 @@ function triggerLamp(type, label) {
   }
 }
 
-// ★ぶっ飛び演出①：物理真っ二つ引き裂き★
+// 物理真っ二つ引き裂き
 function firePhysicalSplitSlash() {
   const beam = document.createElement('div'); beam.className = 'slash-beam';
   const pL = document.createElement('div'); pL.className = 'split-panel-left';
   const pR = document.createElement('div'); pR.className = 'split-panel-right';
   slashHost.appendChild(pL); slashHost.appendChild(pR); slashHost.appendChild(beam);
 
+  fireGlobalRainbowFlash();
   FxCanvas.spawnRing('#fde047', 340, 10);
   FxCanvas.spawnRing('#ef4444', 270, 8);
   FxCanvas.spawnLightning('#fde047', 5);
-  FxCanvas.burstGold(68);
-  FxCanvas.burstFlames(45);
+  FxCanvas.burstRainbow(72);
+  FxCanvas.burstFlames(40);
   setTimeout(() => { beam.remove(); pL.remove(); pR.remove(); }, 820);
 }
 
-// ★ぶっ飛び演出②：液晶ごと重力で物理落下（ドロップクラッシュ）★
+// 液晶ごと物理落下（メタ説明テキストなし）
 function fireDropCrash(fakeTitle = '') {
   const panel = document.createElement('div');
   panel.className = 'drop-crash-panel';
-  panel.innerHTML = `<div class="text-xs font-black text-rose-400 tracking-widest mb-1">SYSTEM COLLAPSE</div><div class="text-2xl sm:text-3xl font-black text-slate-200">${fakeTitle || 'CRUSH!!'}</div>`;
+  panel.innerHTML = `<div class="text-2xl sm:text-3xl font-black text-slate-200">${fakeTitle}</div>`;
   slashHost.appendChild(panel);
 
   setPageMegaShake(true);
   fireGlobalRainbowFlash();
   FxCanvas.spawnRing('#fde047', 360, 11);
-  FxCanvas.burstRainbow(72);
+  FxCanvas.burstRainbow(78);
   setTimeout(() => {
     panel.remove();
     setPageMegaShake(false);
   }, 860);
 }
 
-// ★ぶっ飛び演出③：画面6分割・3D粉砕吹き飛び（シャッタークラッシュ）★
+// 画面6分割・3D粉砕吹き飛び
 function fireShatterFly() {
   const configs = [
     { l: '0%',    t: '0%',  w: '34%', h: '51%', tx: '-140%', ty: '-120%', rot: '-52deg' },
@@ -879,7 +925,7 @@ function fireShatterFly() {
   }, 880);
 }
 
-// ★ぶっ飛び演出④：ページ全体・超激震＋RGB色ズレ（脳破壊モード）★
+// ページ全体・超激震＋RGB色ズレ
 function fireMegaQuakeBrainBreak() {
   setPageMegaShake(true);
   lcdFrame.classList.add('fx-rgb-glitch');
@@ -887,7 +933,7 @@ function fireMegaQuakeBrainBreak() {
   FxCanvas.spawnRing('#ef4444', 360, 12);
   FxCanvas.spawnRing('#fde047', 290, 9);
   FxCanvas.spawnLightning('#fde047', 7);
-  FxCanvas.burstRainbow(80);
+  FxCanvas.burstRainbow(82);
   FxCanvas.burstFlames(55);
   setTimeout(() => {
     lcdFrame.classList.remove('fx-rgb-glitch');
@@ -896,7 +942,7 @@ function fireMegaQuakeBrainBreak() {
 }
 
 // =========================================================================
-// ★RUSH専用：全10種の違和感演出エンジン★
+// ★RUSH専用：全10種の違和感演出（答え合わせ枠用の簡潔なラベルを返す）★
 // =========================================================================
 async function playIwakanEffect({ is6000, rushMode, token }) {
   const bigRem = document.getElementById('rushBigRemain');
@@ -912,34 +958,34 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
 
   switch (pick) {
     case 'LED_ONE_OFF':
-      label = '違和感：サイドLED片側消灯';
+      label = '👁️ サイドLED片側消灯';
       if (Math.random() < 0.5) setLedSide('off', baseLed);
       else setLedSide(baseLed, 'off');
       await wait(950, token);
       break;
 
     case 'LED_ALL_OFF':
-      label = '違和感：サイドLED全消灯';
+      label = '👁️ サイドLED全消灯';
       setLed('off');
       await wait(950, token);
       break;
 
     case 'MONO_SCREEN':
-      label = '違和感：液晶モノクロ化';
+      label = '👁️ 液晶モノクロ化';
       lcdFrame.classList.add('iwakan-mono');
       await wait(900, token);
       lcdFrame.classList.remove('iwakan-mono');
       break;
 
     case 'FADE_REMAIN':
-      label = '違和感：残り回数じわじわ消失';
+      label = '👁️ 残り回数消失';
       if (bigRem) bigRem.classList.add('iwakan-fade-remain');
       await wait(980, token);
       if (bigRem) bigRem.classList.remove('iwakan-fade-remain');
       break;
 
     case 'REM_PURU':
-      label = '違和感：レムぷる（筐体微振動）';
+      label = '👁️ レムぷる';
       oniLamp.classList.add('iwakan-rempuru');
       lcdFrame.classList.add('iwakan-rempuru');
       try { if (navigator && navigator.vibrate) navigator.vibrate([30, 40, 30, 40, 30]); } catch (e) {}
@@ -949,7 +995,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
       break;
 
     case 'GLITCH_BLINK':
-      label = '違和感：一瞬の映像ノイズ停止';
+      label = '👁️ 映像ノイズ停止';
       rushNoiseVeil.classList.remove('hidden');
       lcdFrame.classList.add('fx-glitch');
       await wait(240, token);
@@ -959,21 +1005,21 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
       break;
 
     case 'HIDDEN_REM':
-      label = '違和感：画面隅に隠レム💙出現';
+      label = '👁️ 隠レム💙出現';
       hiddenRemBadge.classList.remove('hidden');
       await wait(1000, token);
       hiddenRemBadge.classList.add('hidden');
       break;
 
     case 'SILENT_STILL':
-      label = '違和感：背景オーラ完全静止＆無音の間';
+      label = '👁️ 背景オーラ静止';
       FxCanvas.setAmbient('none');
       FxCanvas.clearAll();
       await wait(950, token);
       break;
 
     case 'COUNT_6000':
-      label = '超違和感：残り回数「6000」化け（6000濃厚）';
+      label = '👁️ 残り回数「6000」変化';
       if (bigRem) {
         const orig = bigRem.textContent;
         bigRem.textContent = '6000';
@@ -984,7 +1030,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
       break;
 
     case 'RAINBOW_GLINT':
-      label = '超違和感：鬼ランプ一瞬虹チラ光り（6000濃厚）';
+      label = '👁️ 鬼ランプ一瞬虹点灯';
       oniLamp.classList.add('lamp-rainbow');
       await wait(190, token);
       oniLamp.classList.remove('lamp-rainbow');
@@ -995,9 +1041,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
   return label;
 }
 
-// =========================================================================
-// ★レム告知モード：4種ランプ点灯パターン演出★
-// =========================================================================
+// レム告知モード：4種ランプ点灯パターン
 async function playRemNoticePattern({ is6000, token }) {
   let pat = 'NORMAL';
   if (is6000 && Math.random() < 0.72) {
@@ -1005,9 +1049,9 @@ async function playRemNoticePattern({ is6000, token }) {
     pat = p6[Math.floor(Math.random() * p6.length)];
   }
 
-  let note = 'レム通常点灯';
+  let note = '';
   if (pat === 'SLOW_GLOW') {
-    note = '💙 レム徐々に点灯（6000濃厚!!）';
+    note = '💙 レム徐々に点灯';
     oniLamp.classList.remove('lamp-rem', 'lamp-rainbow', 'lamp-red');
     oniLamp.classList.add('lamp-rem-slow');
     lampStatusText.textContent = 'じわ〜っ…';
@@ -1017,7 +1061,7 @@ async function playRemNoticePattern({ is6000, token }) {
     triggerLamp('rainbow', '6000濃厚!!');
     await wait(350, token);
   } else if (pat === 'DOUBLE_BLINK') {
-    note = '💙 一瞬光って消えて再点灯（6000濃厚!!）';
+    note = '💙 レム再点灯';
     oniLamp.classList.add('lamp-rem');
     lampStatusText.textContent = 'ピッ…';
     await wait(160, token);
@@ -1026,11 +1070,11 @@ async function playRemNoticePattern({ is6000, token }) {
     setLed('off');
     await wait(550, token);
     StudioAudio.playKyuin();
-    triggerLamp('rainbow', '再点灯6000!!');
+    triggerLamp('rainbow', '再点灯!!');
     FxCanvas.spawnLightning('#38bdf8', 4);
     await wait(420, token);
   } else if (pat === 'CLASSIC_FLASH') {
-    note = '💙 旧レム風ストロボフラッシュ（6000濃厚!!）';
+    note = '💙 旧レム閃光';
     StudioAudio.playKyuin();
     oniLamp.classList.add('lamp-rem-classic');
     lampStatusText.textContent = '旧レム閃光!!';
@@ -1048,9 +1092,7 @@ async function playRemNoticePattern({ is6000, token }) {
   return note;
 }
 
-// =========================================================================
-// ★脳が震えるRUSH：文字保留・脳が煽りLv1〜5・震える告知（弱/中/強）★
-// =========================================================================
+// 脳が震えるRUSH：文字保留・脳が煽りLv1〜5・震える告知（弱/中/強）
 async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false, custOchiburu = true, token }) {
   const idleSub = document.getElementById('rushIdleSub');
   const maxLv = isHit ? (is6000 ? 5 : 4) : (Math.random() < 0.5 ? 2 : 3);
@@ -1062,21 +1104,17 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
   for (let lv = 1; lv <= maxLv; lv++) {
     const isButtonGa = (isHit && is6000 && lv === maxLv && Math.random() < 0.55);
     if (isButtonGa) {
-      rushTopBadge.textContent = '💥 脳が…いや「ボタンが」震える!!（6000濃厚）';
+      rushTopBadge.textContent = '💥「ボタンが」震える!!';
       rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow-lg pop-in';
     } else {
-      rushTopBadge.textContent = isHands
-        ? `🖐️ 見えざる手煽り Lv.${lv}`
-        : `🧠 脳が煽り Lv.${lv}`;
+      rushTopBadge.textContent = isHands ? `🖐️ 見えざる手 Lv.${lv}` : `🧠 脳が… Lv.${lv}`;
       rushTopBadge.className = lv >= 4
         ? 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-rose-950/95 border border-amber-300 text-amber-200 shadow-lg'
         : 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-purple-950/95 border border-fuchsia-400 text-fuchsia-200 shadow-lg';
     }
 
     if (idleSub) {
-      idleSub.textContent = isHands
-        ? '🖐️ 見えざる手が迫る… 当たれば鬼がかり6000濃厚!!'
-        : `🧠 脳が…脳が…（Lv.${lv}）`;
+      idleSub.textContent = isHands ? '🖐️ 見えざる手が迫る…' : `🧠 脳が…脳が…`;
     }
     if (lv >= 2) {
       lcdFrame.classList.add('shake-weak');
@@ -1090,24 +1128,28 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
   if (!isHit) {
     rushTopBadge.classList.add('hidden');
     updateReserveSlots('BRAIN', null);
-    return null;
+    return { triggeredOchiburu: false, note: '' };
   }
 
   updateReserveSlots('BRAIN', 'HIT');
-  let vibNote = '';
-  if (is6000 && Math.random() < (custOchiburu ? 0.85 : 0.35)) {
-    vibNote = '🧠 強震え＋落ちブル（6000濃厚!!）';
-    rushTopBadge.textContent = '💥【脳が震える・強＋落ちブル!!】6000濃厚!!';
+  let triggeredOchiburu = false;
+  let note = '';
+  if (is6000 && Math.random() < (custOchiburu ? 0.55 : 0.25)) {
+    triggeredOchiburu = true;
+    note = '🧠 脳が震える・強';
+    rushTopBadge.textContent = '💥 脳が震える!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in';
-    StudioAudio.playOchiburu();
+    StudioAudio.playOchiburu(true);
     lcdFrame.classList.add('shake-intense', 'fx-rainbow');
+    setAmbientBg('rainbow');
+    setSunburst(true);
     triggerLamp('rainbow', '6000濃厚!!');
     FxCanvas.spawnLightning('#fde047', 5);
-    await wait(780, token);
+    await wait(1400, token);
     lcdFrame.classList.remove('shake-intense');
   } else if (bonusType === 'BONUS_1500' || is6000) {
-    vibNote = '🧠 震える告知・中（1500以上濃厚）';
-    rushTopBadge.textContent = '🧠【脳が震える・中!!】大当り濃厚!!';
+    note = '🧠 脳が震える・中';
+    rushTopBadge.textContent = '🧠 脳が震える!!';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-fuchsia-950/95 border border-amber-300 text-amber-200 shadow-lg pop-in';
     lcdFrame.classList.add('shake-mid', 'fx-gold');
     try { if (navigator && navigator.vibrate) navigator.vibrate([70, 30, 70, 30, 120]); } catch (e) {}
@@ -1116,8 +1158,8 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
     await wait(520, token);
     lcdFrame.classList.remove('shake-mid');
   } else {
-    vibNote = '🧠 震える告知・弱（大当り濃厚）';
-    rushTopBadge.textContent = '🧠【脳が震える・弱!!】大当り!!';
+    note = '🧠 脳が震える・弱';
+    rushTopBadge.textContent = '🧠 脳が震える…';
     rushTopBadge.className = 'mb-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-purple-950/95 border border-fuchsia-300 text-fuchsia-100 shadow-lg pop-in';
     lcdFrame.classList.add('shake-weak');
     try { if (navigator && navigator.vibrate) navigator.vibrate([45, 35, 65]); } catch (e) {}
@@ -1126,38 +1168,35 @@ async function playBrainModeSequence({ isHit, is6000, bonusType, isHands = false
   }
 
   rushTopBadge.classList.add('hidden');
-  return vibNote;
+  return { triggeredOchiburu, note };
 }
 
-// =========================================================================
-// ★鬼がかりRUSH：カウントダウン＆法則崩れ演出★
-// =========================================================================
+// 鬼がかりRUSH：カウントダウン＆法則崩れ
 async function playOnigakariCountdown({ isHit, is6000, token }) {
   let seq = ['3', '2', '1', '0'];
-  let note = 'カウントダウン';
+  let note = '';
   let isPrem = false;
 
   if (isHit && is6000 && Math.random() < 0.55) {
     if (Math.random() < 0.5) {
       seq = ['3', '4', '5', '6'];
-      note = '🔥 カウントダウン法則崩れ(3→4→5→6：6000濃厚!!)';
+      note = '🔥 法則崩れ(3→4→5→6)';
     } else {
       seq = ['6', '0', '0', '0'];
-      note = '🔥 カウントダウン(6→0→0→0：6000濃厚!!)';
+      note = '🔥 特殊カウント(6→0→0→0)';
     }
     isPrem = true;
   } else if (isHit && Math.random() < 0.35) {
     seq = ['E', 'M', 'I', '!!'];
-    note = '🌈 特殊カウント(E→M→I：大当り濃厚!!)';
+    note = '🌈 特殊カウント(E→M→I)';
     isPrem = true;
   } else if (Math.random() < 0.35) {
     seq = ['1', '2', '3', '0'];
-    note = '🔥 昇順カウントダウン';
   }
 
   rushTopBadge.classList.remove('hidden');
   for (let i = 0; i < seq.length; i++) {
-    rushTopBadge.textContent = `⏱ COUNTDOWN [ ${seq[i]} ]`;
+    rushTopBadge.textContent = `⏱ [ ${seq[i]} ]`;
     rushTopBadge.className = (isPrem && i >= 1)
       ? 'mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in'
       : 'mb-1 px-3.5 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg';
@@ -1167,11 +1206,82 @@ async function playOnigakariCountdown({ isHit, is6000, token }) {
   }
 
   rushTopBadge.classList.add('hidden');
-  return isHit ? note : null;
+  return isHit ? note : '';
 }
 
 // =========================================================================
-// ★RUSH中6,000限定：突発「3秒間ガチフリーズ」→ 全画面「鬼がかってますね」画像降臨★
+// ★白鯨3,000 ダイレクト直撃（1,500仮表示なし・爆虹色直行）★
+// =========================================================================
+async function runWhale3000Direct(token) {
+  try {
+    setAmbientBg('rainbow');
+    setSunburst(true);
+    fireGlobalRainbowFlash();
+    StudioAudio.playSlash();
+    fireShatterFly();
+
+    showFullscreenOverlay({
+      mode: 'rainbow',
+      sub: '🐋 白鯨討伐 🐋',
+      main: '鬼がかり 3,000 BONUS!!',
+      extra: '払出 3,000個（純増 2,800発）＋ 鬼がかりRUSH直行!!',
+      scanlines: false
+    });
+    StudioAudio.play3000Jackpot();
+    triggerLamp('rainbow', '3,000!!');
+    lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+    setLed('rainbow');
+
+    await wait(2300, token);
+    lcdFrame.classList.remove('shake-burst');
+  } finally {
+    clearGlobalChaosEffects();
+    hideFullscreenOverlay();
+  }
+}
+
+// =========================================================================
+// ★RUSH中6,000限定：突発「落ちブル警報ロングトーン」直撃（前兆ゼロ・即6,000）★
+// =========================================================================
+async function runSuddenOchiburu6000({ sub = '鬼がかりRUSH', extra = '払出 6,000個（実質純増 5,600発）獲得!!', skipAlarm = false, token }) {
+  try {
+    if (!skipAlarm) {
+      StudioAudio.playOchiburu(true);
+    }
+    setAmbientBg('rainbow');
+    setSunburst(true);
+    setPageMegaShake(true);
+    fireGlobalRainbowFlash();
+    triggerLamp('rainbow', '6,000!!');
+    lcdFrame.classList.add('fx-rainbow', 'shake-intense');
+    setLed('rainbow');
+    FxCanvas.spawnLightning('#fde047', 6);
+    FxCanvas.burstRainbow(85);
+
+    showFullscreenOverlay({
+      mode: 'rainbow',
+      sub: sub,
+      main: '超・鬼がかり 6,000 BONUS!!',
+      extra: extra,
+      scanlines: false
+    });
+
+    // 警報ロングトーンのオクターブ突き上げを聴かせてから6,000ファンファーレへ繋ぐ
+    await wait(skipAlarm ? 300 : 1250, token);
+    setPageMegaShake(false);
+    lcdFrame.classList.remove('shake-intense');
+    StudioAudio.play6000Fanfare(false);
+    FxCanvas.burstRainbow(70);
+
+    await wait(2150, token);
+  } finally {
+    clearGlobalChaosEffects();
+    hideFullscreenOverlay();
+  }
+}
+
+// =========================================================================
+// ★RUSH中6,000限定：突発「3秒間ガチフリーズ」→「鬼がかってますね」3.0秒 → 6,000★
 // =========================================================================
 async function runSudden3sFreeze6000(token) {
   try {
@@ -1179,35 +1289,36 @@ async function runSudden3sFreeze6000(token) {
     FxCanvas.setAmbient('none');
     FxCanvas.clearAll();
     setLed('off');
+    setAmbientBg('');
+    setSunburst(false);
 
-    // スマホ画面全体を完全ブラックアウト＆完全無音で3秒フリーズ！
     setGlobalBlackout(true);
     await waitFreeze(3000, token);
     setGlobalBlackout(false);
 
-    // 3秒後：全画面「鬼がかってますね」画像カットイン＋虹ポキュ↑ーン↓!!
+    // 3秒フリーズ明け：全画面「鬼がかってますね」約3.0秒じっくり表示
     await playOnigakariImageCutin({
-      caption: '鬼がかってますね!!',
-      subCaption: '💀 3秒間ブラックアウトフリーズ解放!! 💀',
-      dur: 1850,
+      caption: '鬼がかってますね',
+      dur: 3000,
       withPokyun: true,
       token
     });
 
-    // 画像カットイン直後：爆音＋3D粉砕吹き飛び＋ページ全体超激震で6,000降臨!!
     StudioAudio.playSlash();
-    StudioAudio.playOchiburu();
+    StudioAudio.playOchiburu(false);
     fireShatterFly();
+    setAmbientBg('rainbow');
+    setSunburst(true);
 
     showFullscreenOverlay({
       mode: 'rainbow',
-      sub: '🌈【鬼がかってますね・6000降臨!!】🌈',
-      main: '鬼がかり 6,000 BONUS!!',
+      sub: '鬼がかってますね',
+      main: '超・鬼がかり 6,000 BONUS!!',
       extra: '払出 6,000個（実質純増 5,600発）獲得!!',
       scanlines: false
     });
     StudioAudio.play6000Fanfare(false);
-    triggerLamp('rainbow', '鬼がかり6000!!');
+    triggerLamp('rainbow', '6,000!!');
     lcdFrame.classList.add('fx-rainbow');
     setLed('rainbow');
 
@@ -1219,36 +1330,45 @@ async function runSudden3sFreeze6000(token) {
 }
 
 // =========================================================================
-// ★★★ 黄金4ステップ時差ドパ昇格シーケンス（全6種のぶっ飛び＆虹ポキュ↑ーン↓昇格）★★★
-// crashType: 'auto' | 'pokyun' | 'freeze3s' | 'drop' | 'shatter' | 'quake' | 'slash'
+// ★★★ 6,000 / 復活昇格シーケンス（ネタバレ解消・本家答え合わせ枠・OK割り込み対応）★★★
+// crashType: 'auto' | 'pokyun' | 'freeze3s' | 'whisper' | 'drop' | 'shatter' | 'quake' | 'slash'
 // =========================================================================
 async function runGoldenPromotionSequence({
   fakeSub, fakeTitle, fakeDesc, fakeStyle = 'despair', fakeRestart = false,
   fakeIsRush = false, fakeBurstGold = false,
+  iwakanAnswer = '',
   finalSub, finalTitle, finalExtra, finalSound = '6000',
   crashType = 'auto', token
 }) {
   let mode = crashType;
-  if (mode === 'auto') {
+  let useRareWhisper = false;
+
+  if (mode === 'whisper') {
+    useRareWhisper = true;
+    const pool = ['slash', 'drop', 'shatter', 'quake'];
+    mode = pool[Math.floor(Math.random() * pool.length)];
+  } else if (mode === 'auto') {
     if (finalSound === '6000') {
       const r = Math.random();
-      if (r < 0.24) mode = 'pokyun';        // 油断撃ち抜き・虹ポキュ↑ーン↓昇格！
-      else if (r < 0.44) mode = 'freeze3s'; // 3秒フリーズ → 全画面「鬼がかってますね」画像！
+      if (r < 0.24) mode = 'pokyun';
+      else if (r < 0.42) mode = 'freeze3s';
       else {
         const pool = ['slash', 'drop', 'shatter', 'quake'];
         mode = pool[Math.floor(Math.random() * pool.length)];
+        // ★「これから脳が震える…」はレア枠（約22%のみ出現）★
+        if (Math.random() < 0.22) useRareWhisper = true;
       }
     } else {
       const pool = ['slash', 'drop', 'shatter', 'quake'];
       mode = pool[Math.floor(Math.random() * pool.length)];
+      if (Math.random() < 0.30) useRareWhisper = true;
     }
   }
 
   try {
-    // --- Step 1：大当たり（or Re:Start）表示（1.3秒）※本物と完全一致 ---
+    // --- Step 1：仮表示（本物と完全一致・事前落ちブルなし・OKボタン割り込み受付） ---
     setActiveScene('bonus');
-    subtleWhisperSlot.classList.add('hidden');
-    subtleWhisperSlot.classList.remove('fx-whisper-in');
+    hideIwakanAnswer();
 
     if (fakeRestart) {
       StudioAudio.playReStart();
@@ -1273,41 +1393,71 @@ async function runGoldenPromotionSequence({
       : 'text-3xl sm:text-4xl font-black gold-grad-text tracking-tight leading-tight pop-in';
     bonusDesc.textContent = fakeDesc;
 
-    await wait(1300, token);
+    // 違和感があった場合は通常通り右下に答え合わせを表示（レア枠でないとき）
+    if (iwakanAnswer && !useRareWhisper) {
+      showIwakanAnswer(iwakanAnswer, false);
+    }
+
+    const waitRes = await waitInterruptible(1300, token);
     lcdFrame.classList.remove('fx-restart');
 
-    // ★分岐A：油断撃ち抜き「突発・虹ポキュ↑ーン↓!!」昇格ルート★
+    // ★OK裏ボタン割り込み昇格：押した瞬間に割り込み落ちブル警報＆切り裂き爆虹6,000!!★
+    if (waitRes === 'OK_INTERRUPT') {
+      StudioAudio.playSlash();
+      StudioAudio.playOchiburu(true);
+      firePhysicalSplitSlash();
+      setAmbientBg('rainbow');
+      setSunburst(true);
+      showFullscreenOverlay({
+        mode: 'rainbow',
+        sub: finalSub,
+        main: finalTitle,
+        extra: finalExtra,
+        scanlines: false
+      });
+      triggerLamp('rainbow', '6,000!!');
+      lcdFrame.classList.add('fx-rainbow', 'shake-burst');
+      setLed('rainbow');
+      await wait(1100, token);
+      StudioAudio.play6000Fanfare(false);
+      await wait(2000, token);
+      lcdFrame.classList.remove('shake-burst');
+      return;
+    }
+
+    // ★分岐A：油断撃ち抜き「虹ポキュ↑ーン↓＆落ちブル警報」昇格ルート★
     if (mode === 'pokyun') {
-      // 「リスタートかー…」と思った瞬間に、前触れゼロで爆音ポキュ↑ーン↓!!
       StudioAudio.playPokyun(true);
+      StudioAudio.playOchiburu(true);
       fireGlobalRainbowFlash();
+      setAmbientBg('rainbow');
+      setSunburst(true);
       triggerLamp('rainbow', '🌈 ポキュ↑ーン↓!!');
       lcdFrame.classList.remove('mode-despair-bg');
       lcdFrame.classList.add('fx-rainbow', 'shake-burst');
-      FxCanvas.burstRainbow(65);
+      FxCanvas.burstRainbow(72);
+
       showFullscreenOverlay({
         mode: 'rainbow',
-        sub: fakeRestart ? '🔥 Re:Start からの油断撃ち抜き!! 🔥' : '🔥 突発・虹先バレ炸裂!! 🔥',
+        sub: fakeRestart ? 'Re:Start' : finalSub,
         main: 'ポキュ↑ーン↓!!',
-        extra: 'まだ終わらせない!! 超昇格突入!!',
+        extra: '',
         scanlines: false
       });
       await wait(1250, token);
       lcdFrame.classList.remove('shake-burst');
 
-      // そのまま爆音落ちブル＋画面切り裂きで6,000降臨!!
       StudioAudio.playSlash();
-      StudioAudio.playOchiburu();
       firePhysicalSplitSlash();
       showFullscreenOverlay({
-        mode: '6000',
-        sub: '🌈【虹ポキュ↑ーン↓逆転昇格!!】🌈',
+        mode: 'rainbow',
+        sub: finalSub,
         main: finalTitle,
         extra: finalExtra,
         scanlines: false
       });
       StudioAudio.play6000Fanfare(false);
-      triggerLamp('rainbow', '鬼がかり6000!!');
+      triggerLamp('rainbow', '6,000!!');
       lcdFrame.classList.add('fx-rainbow', 'shake-burst');
       setLed('rainbow');
       await wait(2200, token);
@@ -1315,20 +1465,20 @@ async function runGoldenPromotionSequence({
       return;
     }
 
-    // --- Step 2：こじんまりと「これから脳が震える…」（1.1秒・微かな鼓動SE） ---
-    StudioAudio.playSoftHeartbeat();
-    subtleWhisperText.textContent = 'これから脳が震える…';
-    subtleWhisperSlot.classList.remove('hidden');
-    void subtleWhisperSlot.offsetWidth;
-    subtleWhisperSlot.classList.add('fx-whisper-in');
+    // ★レア枠（約22%のみ）：本来「違和感の答え合わせ」が出る右下枠に『これから脳が震える…』が出現！★
+    if (useRareWhisper) {
+      StudioAudio.playSoftHeartbeat();
+      showIwakanAnswer('これから脳が震える…', true);
+      await wait(1250, token);
+    }
 
-    await wait(1100, token);
-
-    // --- Step 3：フリーズ暗転（3秒ガチフリーズ＋画像カットイン or 通常1.1秒フリーズ） ---
+    // --- 一瞬の無音フリーズ（さりげない残響プチュン） ---
     StudioAudio.playPuchun();
     FxCanvas.setAmbient('none');
     FxCanvas.clearAll();
     setLed('off');
+    setAmbientBg('');
+    setSunburst(false);
     lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'mode-brain-bg', 'mode-rem-bg', 'mode-zero-bg');
 
     if (mode === 'freeze3s') {
@@ -1336,67 +1486,56 @@ async function runGoldenPromotionSequence({
       await waitFreeze(3000, token);
       setGlobalBlackout(false);
 
-      // ★3秒フリーズ明けに全画面「鬼がかってますね」画像ドパドパ降臨＋虹ポキュ↑ーン↓!!★
       await playOnigakariImageCutin({
-        caption: '鬼がかってますね!!',
-        subCaption: '💀 3秒間ガチフリーズ解放!! 💀',
-        dur: 1850,
+        caption: '鬼がかってますね',
+        dur: 3000,
         withPokyun: true,
         token
       });
     } else {
       showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
-      await wait(600, token);
+      await wait(650, token);
 
       StudioAudio.playCrackNoise();
       crtScanLayer.classList.remove('hidden');
       lcdFrame.classList.add('fx-glitch');
       FxCanvas.spawnRedCracks();
-      await wait(500, token);
+      await wait(450, token);
       lcdFrame.classList.remove('fx-glitch');
     }
 
-    // --- Step 4：ぶっ飛び破壊演出で 6,000 / 3,000 降臨！！ ---
+    // --- 解放：虹ポキュ↑ーン↓＆落ちブル＆爆虹色破壊演出 → 超・鬼がかり6,000（虹） ---
     FxCanvas.clearCracks();
+    if (mode !== 'freeze3s') StudioAudio.playPokyun(true);
     StudioAudio.playSlash();
-    StudioAudio.playOchiburu();
+    StudioAudio.playOchiburu(mode !== 'freeze3s');
 
-    let subText = finalSub;
-    if (mode === 'drop') {
-      fireDropCrash(fakeTitle);
-      subText = `⬇️【画面物理落下クラッシュ!!】⬇️`;
-    } else if (mode === 'shatter') {
-      fireShatterFly();
-      subText = `💥【画面3D粉砕吹き飛び!!】💥`;
-    } else if (mode === 'quake') {
-      fireMegaQuakeBrainBreak();
-      subText = `⚡【画面全体・超激震＆RGB破壊!!】⚡`;
-    } else if (mode === 'freeze3s') {
-      fireShatterFly();
-      subText = `🌈【鬼がかってますね・6000降臨!!】🌈`;
-    } else {
-      firePhysicalSplitSlash();
-    }
+    if (mode === 'drop') fireDropCrash(fakeTitle);
+    else if (mode === 'shatter') fireShatterFly();
+    else if (mode === 'quake') fireMegaQuakeBrainBreak();
+    else if (mode === 'freeze3s') fireShatterFly();
+    else firePhysicalSplitSlash();
+
+    setAmbientBg('rainbow');
+    setSunburst(true);
 
     showFullscreenOverlay({
-      mode: finalSound === '3000' ? 'rainbow' : '6000',
-      sub: subText,
+      mode: 'rainbow',
+      sub: finalSub,
       main: finalTitle,
       extra: finalExtra,
       scanlines: false
     });
 
-    if (finalSound === '3000') {
-      StudioAudio.play3000Jackpot();
-    } else {
-      StudioAudio.play6000Fanfare(false);
-    }
-
-    triggerLamp('rainbow', '脳震え!!');
+    triggerLamp('rainbow', finalSound === '3000' ? '3,000!!' : '6,000!!');
     lcdFrame.classList.add('fx-rainbow', 'shake-burst');
     setLed('rainbow');
 
-    await wait(2200, token);
+    await wait(mode === 'freeze3s' ? 150 : 950, token);
+    if (finalSound === '3000') StudioAudio.play3000Jackpot();
+    else StudioAudio.play6000Fanfare(false);
+
+    await wait(2150, token);
     lcdFrame.classList.remove('shake-burst');
   } finally {
     clearGlobalChaosEffects();
