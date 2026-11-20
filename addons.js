@@ -1,19 +1,19 @@
 // =========================================================================
-// addons.js (v2) :
-//  1. モード別ビートエンジン（プチュン・フリーズ・無音違和感で完全切断）
-//  2. 液晶内の動的ステージ背景（通常4ステージ＋RUSH4モード＋ビート脈動）
-//  3. 鬼化レムランプ修正（他画面への残留バグ解消＆文字被りゼロ配置）
-//  4. 暗転のまま「鬼がかってますね」じわっとフェードイン
+// addons.js (v3) :
+//  1. 鬼化レム残留＆文字被りバグ完全修正（display制御強化）
+//  2. レム点灯と同時「ポキュ↑ーン↓」化
+//  3. 開発用「🚀 即RUSH突入」「♾️ 無限ST（残回数減らない）」ボタン追加
+//  4. モード別ビートエンジン（プチュン・無音違和感で完全切断）＆動的ステージ背景
+//  5. 暗転のまま「鬼がかってますね」じわっとフェードイン
 // =========================================================================
-(function initAddonsV2() {
+(function initAddonsV3() {
   // -----------------------------------------------------------------------
   // 1. 追加CSS注入
   // -----------------------------------------------------------------------
-  if (!document.getElementById('addons-v2-css')) {
+  if (!document.getElementById('addons-v3-css')) {
     const st = document.createElement('style');
-    st.id = 'addons-v2-css';
+    st.id = 'addons-v3-css';
     st.textContent = `
-      /* 最背面：動的ステージ背景Canvas */
       #stageBgCanvas {
         position: absolute;
         inset: 0;
@@ -25,7 +25,6 @@
         transition: opacity 0.25s ease;
       }
 
-      /* 通常時ステージ名バッジ（右上回転数の横に表示） */
       #stageNamePill {
         position: absolute;
         top: 52px;
@@ -43,7 +42,7 @@
         backdrop-filter: blur(4px);
       }
 
-      /* 鬼化レムランプ役物レイヤー */
+      /* 鬼化レムランプ役物レイヤー（hidden時は必ず完全非表示！） */
       #remLampStage {
         position: absolute;
         inset: 0;
@@ -55,15 +54,18 @@
         overflow: hidden;
         padding: 18px 8px 26px 8px;
       }
+      #remLampStage.hidden {
+        display: none !important;
+      }
       #remLampImg {
         max-height: 98%;
         max-width: 96%;
         object-fit: contain;
-        transition: filter 0.22s ease, opacity 0.25s ease, transform 0.28s ease;
+        transition: filter 0.18s ease, opacity 0.22s ease, transform 0.24s ease;
         will-change: filter, opacity, transform;
       }
 
-      /* レム告知モード専用：文字を左下へ退避して中央のレムを完全にクリアに見せる */
+      /* レム告知モード専用：文字を左下へ退避して中央のレムをクリアに表示 */
       #scene-rush-idle.rem-layout-clear {
         justify-content: flex-end !important;
         align-items: flex-start !important;
@@ -99,13 +101,13 @@
       }
       .rem-img-lit {
         opacity: 1 !important;
-        filter: brightness(1.24) saturate(1.35) drop-shadow(0 0 18px rgba(56,189,248,0.98)) drop-shadow(0 0 44px rgba(14,165,233,0.9)) !important;
+        filter: brightness(1.26) saturate(1.38) drop-shadow(0 0 18px rgba(56,189,248,0.98)) drop-shadow(0 0 46px rgba(14,165,233,0.92)) !important;
         transform: scale(1.04) !important;
       }
       @keyframes remImgSlowWake {
         0%   { opacity: 0.30; filter: brightness(0.26) saturate(0.3); transform: scale(0.97); }
         55%  { opacity: 0.88; filter: brightness(0.98) saturate(1.2) drop-shadow(0 0 18px rgba(56,189,248,0.88)); transform: scale(1.02); }
-        100% { opacity: 1; filter: brightness(1.36) saturate(1.45) drop-shadow(0 0 24px rgba(250,204,21,0.98)) drop-shadow(0 0 54px rgba(56,189,248,0.95)); transform: scale(1.07); }
+        100% { opacity: 1; filter: brightness(1.38) saturate(1.45) drop-shadow(0 0 24px rgba(250,204,21,0.98)) drop-shadow(0 0 54px rgba(56,189,248,0.95)); transform: scale(1.07); }
       }
       .rem-img-slow { animation: remImgSlowWake 1.2s ease-in forwards !important; }
 
@@ -127,7 +129,6 @@
       }
       .rem-img-strobe { animation: remImgStrobe 0.13s steps(2) infinite !important; }
 
-      /* 暗転のまま「鬼がかってますね」じわっとフェードイン */
       @keyframes darkFadeInCutin {
         0%   { opacity: 0; transform: scale(0.96); filter: brightness(0.35); }
         42%  { opacity: 1; transform: scale(1.00); filter: brightness(1.06); }
@@ -139,7 +140,7 @@
   }
 
   // -----------------------------------------------------------------------
-  // 2. モード別ビートエンジン（プチュン・無音違和感でスパッと切れる！）
+  // 2. モード別ビートエンジン（プチュン・無音違和感で完全切断）
   // -----------------------------------------------------------------------
   const BeatEngine = (() => {
     let ctx = null, bus = null, noiseBuf = null;
@@ -148,7 +149,7 @@
     let cutFlag = false;
     let timer = null;
     let step = 0;
-    let currentStyle = 'normal'; // 'normal' | 'onigakari' | 'brain' | 'rem' | 'zero'
+    let currentStyle = 'normal';
     let pulseLevel = 0;
 
     function ensureCtx() {
@@ -230,7 +231,7 @@
         : style === 'rem' ? 130
         : style === 'zero' ? 162
         : 122;
-      return (60000 / bpm) / 4; // 16分音符1ステップ
+      return (60000 / bpm) / 4;
     }
 
     function tickStep() {
@@ -240,35 +241,30 @@
       const s = step % 16;
 
       if (currentStyle === 'onigakari') {
-        // 疾走ハードビート（4つ打ちキック＋裏打ちベース＋エッジィなリード）
         if (s % 4 === 0) playKick(t, 0.70, 145, 42, 0.12);
         if (s === 4 || s === 12) playSnare(t, 0.22);
         if (s % 2 === 1) playHat(t, s % 4 === 2 ? 0.16 : 0.10, s % 4 === 2);
-        const bassNotes = [73.42, 73.42, 87.31, 82.41]; // D2 - D2 - F2 - E2
+        const bassNotes = [73.42, 73.42, 87.31, 82.41];
         if (s % 2 === 1) playBass(t, bassNotes[Math.floor(s / 4)], 0.09, 0.28, 'sawtooth', 620);
         const arp = [293.66, 0, 349.23, 0, 440, 0, 392, 349.23, 293.66, 0, 523.25, 0, 440, 0, 392, 0];
         if (arp[s]) playPluck(t, arp[s], 0.09, 0.12, 'sawtooth');
       } else if (currentStyle === 'brain') {
-        // 不穏で重いグルーヴ（心拍風ダブルキック＋ダークベース）
         if (s === 0 || s === 3 || s === 8 || s === 11) playKick(t, 0.68, 118, 36, 0.15);
         if (s === 4 || s === 12) playSnare(t, 0.18);
         if (s % 2 === 0) playHat(t, 0.08, false);
-        const b = [65.41, 69.30, 65.41, 61.74]; // C2 - C#2 - C2 - B1
+        const b = [65.41, 69.30, 65.41, 61.74];
         if (s % 4 === 0 || s % 4 === 2) playBass(t, b[Math.floor(s / 4)], 0.14, 0.30, 'sawtooth', 360);
         if (s === 6 || s === 14) playPluck(t, s === 6 ? 622.25 : 587.33, 0.12, 0.10, 'square');
       } else if (currentStyle === 'rem') {
-        // 透き通る蒼いパルス（キュイン＆ランプ点灯が映える控えめ空間系）
         if (s === 0 || s === 8) playKick(t, 0.42, 110, 44, 0.14);
         if (s % 4 === 2) playHat(t, 0.07, false);
         const bell = [523.25, 0, 0, 659.25, 0, 0, 783.99, 0, 659.25, 0, 0, 587.33, 0, 0, 493.88, 0];
         if (bell[s]) playPluck(t, bell[s], 0.22, 0.10, 'sine');
       } else if (currentStyle === 'zero') {
-        // 極限ミニマル高速パルス（緊張感MAX）
         if (s % 4 === 0) playKick(t, 0.56, 150, 48, 0.08);
         if (s % 2 === 1) playHat(t, 0.09, false);
         if (s === 0 || s === 6 || s === 10) playBass(t, 82.41, 0.07, 0.20, 'square', 320);
       } else {
-        // 通常時：心地よく回せる控えめグルーヴ
         if (s % 4 === 0) playKick(t, 0.36, 115, 44, 0.13);
         if (s % 4 === 2) playHat(t, 0.07, false);
         const nBass = [65.41, 73.42, 82.41, 73.42];
@@ -287,11 +283,8 @@
 
     function syncStyle() {
       if (typeof state === 'undefined') return;
-      if (state.phase === 'RUSH') {
-        currentStyle = state.rushMode || 'onigakari';
-      } else if (state.phase === 'NORMAL') {
-        currentStyle = 'normal';
-      }
+      if (state.phase === 'RUSH') currentStyle = state.rushMode || 'onigakari';
+      else if (state.phase === 'NORMAL') currentStyle = 'normal';
       if (bus && ctx) {
         const vol = (state.phase === 'RUSH') ? 0.32 : 0.22;
         bus.gain.setTargetAtTime(cutFlag || !enabled || globalMuted ? 0.0001 : vol, ctx.currentTime, 0.02);
@@ -300,11 +293,7 @@
     }
 
     return {
-      unlock() {
-        ensureCtx();
-        syncStyle();
-      },
-      // ★プチュン・無音違和感・大当たり突入時にスパッと無音切断！★
+      unlock() { ensureCtx(); syncStyle(); },
       cut() {
         cutFlag = true;
         if (timer) { clearInterval(timer); timer = null; }
@@ -320,21 +309,13 @@
         syncStyle();
       },
       setStyle(style) {
-        if (currentStyle !== style) {
-          currentStyle = style;
-          step = 0;
-        }
+        if (currentStyle !== style) { currentStyle = style; step = 0; }
         if (!cutFlag) syncStyle();
       },
       toggle() {
         enabled = !enabled;
-        if (enabled) {
-          cutFlag = false;
-          ensureCtx();
-          syncStyle();
-        } else {
-          this.cut();
-        }
+        if (enabled) { cutFlag = false; ensureCtx(); syncStyle(); }
+        else this.cut();
         return enabled;
       },
       setGlobalMute(m) {
@@ -354,12 +335,10 @@
     };
   })();
 
-  // 初回ユーザー操作でビートを自動起動
   ['pointerdown', 'keydown'].forEach(evName => {
     window.addEventListener(evName, () => BeatEngine.unlock(), { once: true });
   });
 
-  // ヘッダーに「🎵 BGM」ボタンを自動追加
   const speedBtn = document.getElementById('btnSpeedToggle');
   if (speedBtn && !document.getElementById('btnToggleBgm')) {
     const bgmBtn = document.createElement('button');
@@ -377,18 +356,15 @@
     });
   }
 
-  // 既存ミュートボタンとも同期
   const muteBtn = document.getElementById('btnMute');
   if (muteBtn) {
     muteBtn.addEventListener('click', () => {
-      setTimeout(() => {
-        BeatEngine.setGlobalMute(muteBtn.textContent.includes('OFF'));
-      }, 10);
+      setTimeout(() => BeatEngine.setGlobalMute(muteBtn.textContent.includes('OFF')), 10);
     });
   }
 
   // -----------------------------------------------------------------------
-  // 3. 黒背景を脱却！動的ステージ背景Canvas（通常4ステージ＋RUSH4モード）
+  // 3. 動的ステージ背景Canvas（通常4ステージ＋RUSH4モード＋ビート脈動）
   // -----------------------------------------------------------------------
   const stageBgCanvas = document.createElement('canvas');
   stageBgCanvas.id = 'stageBgCanvas';
@@ -406,18 +382,16 @@
     { name: '🌫️ 霧の街道', c1: '#12383a', c2: '#07171a', accent: '#2dd4bf', glow: 'rgba(45,212,191,0.32)' }
   ];
 
-  const StageRenderer = (() => {
+  (function startStageRenderer() {
     const ctx = stageBgCanvas.getContext('2d');
     let w = 360, h = 360, angle = 0;
 
-    // 放射スピードライン用
     const rays = Array.from({ length: 34 }, () => ({
       a: Math.random() * Math.PI * 2,
       r: Math.random(),
       spd: 0.015 + Math.random() * 0.025,
       len: 0.12 + Math.random() * 0.18
     }));
-    // 雪・結晶用
     const flakes = Array.from({ length: 32 }, () => ({
       x: Math.random(), y: Math.random(),
       vy: 0.0015 + Math.random() * 0.0025,
@@ -444,7 +418,6 @@
       ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2); ctx.stroke();
-      // 六芒星
       for (let k = 0; k < 2; k++) {
         ctx.beginPath();
         for (let i = 0; i < 3; i++) {
@@ -467,7 +440,6 @@
       const rm = typeof state !== 'undefined' ? state.rushMode : 'onigakari';
       const sc = typeof state !== 'undefined' ? state.activeScene : 'normal';
 
-      // 通常時ステージ名バッジ表示制御
       stageNamePill.classList.toggle('hidden', !(ph === 'NORMAL' && sc === 'normal'));
 
       const cx = w * 0.5, cy = h * 0.48;
@@ -481,15 +453,13 @@
           bg.addColorStop(1, 'rgba(20, 5, 8, 0.95)');
           ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
 
-          // 爆速ワープスピードライン
           rays.forEach((r, idx) => {
             if (!frozen) {
               r.r += r.spd * (1 + pulse * 0.9);
               if (r.r > 1.25) { r.r = 0.05; r.a = Math.random() * Math.PI * 2; }
             }
             const maxD = Math.max(w, h) * 0.75;
-            const r1 = r.r * maxD;
-            const r2 = (r.r + r.len) * maxD;
+            const r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
             ctx.strokeStyle = idx % 3 === 0 ? '#fde047' : '#fb7185';
             ctx.globalAlpha = Math.min(0.85, r.r * 0.85);
             ctx.lineWidth = idx % 3 === 0 ? 2.2 : 1.3;
@@ -516,7 +486,6 @@
           bg.addColorStop(1, 'rgba(4, 14, 28, 0.96)');
           ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
 
-          // 舞い落ちる蒼い氷結晶
           flakes.forEach(f => {
             if (!frozen) {
               f.y += f.vy; f.x += f.vx;
@@ -530,17 +499,13 @@
           });
           ctx.globalAlpha = 1;
         } else {
-          // ゼロかRUSH：高コントラスト閃光ライン
           ctx.fillStyle = 'rgba(12, 12, 16, 0.94)';
           ctx.fillRect(0, 0, w, h);
           ctx.strokeStyle = `rgba(255, 255, 255, ${0.08 + pulse * 0.22})`;
           ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(0, cy); ctx.lineTo(w, cy);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
         }
       } else {
-        // 通常時：30回転ごとに4ステージ自動ローテーション
         const spins = typeof state !== 'undefined' ? state.currentSpin : 0;
         const stg = NORMAL_STAGES[Math.floor(spins / 30) % NORMAL_STAGES.length];
         if (stageNamePill.textContent !== stg.name) stageNamePill.textContent = stg.name;
@@ -551,7 +516,6 @@
         bg.addColorStop(1, '#0d0407');
         ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
 
-        // ビート同期の光オーラ＋回転魔法陣
         const aura = ctx.createRadialGradient(cx, cy, 10, cx, cy, 145 + pulse * 35);
         aura.addColorStop(0, stg.glow);
         aura.addColorStop(1, 'transparent');
@@ -566,7 +530,6 @@
     window.addEventListener('resize', resize);
     setTimeout(resize, 60);
     requestAnimationFrame(loop);
-    return { resize };
   })();
 
   // -----------------------------------------------------------------------
@@ -638,6 +601,7 @@
     remLampStage = document.createElement('div');
     remLampStage.id = 'remLampStage';
     remLampStage.className = 'hidden';
+    remLampStage.style.display = 'none';
     const imgEl = document.createElement('img');
     imgEl.id = 'remLampImg';
     imgEl.alt = 'レムランプ';
@@ -647,12 +611,15 @@
   }
   const remLampImg = document.getElementById('remLampImg');
 
+  // ★display直接制御＋hiddenクラス付与の二重ガードで絶対に消える！★
   function setRemLampVisual(mode) {
     if (!remLampTransparentUrl || !mode || mode === 'hidden') {
       remLampStage.classList.add('hidden');
+      remLampStage.style.display = 'none';
       return;
     }
     remLampStage.classList.remove('hidden');
+    remLampStage.style.display = 'flex';
     remLampImg.className = '';
     void remLampImg.offsetWidth;
     if (mode === 'idle') remLampImg.className = 'rem-img-idle';
@@ -662,7 +629,6 @@
     else if (mode === 'strobe') remLampImg.className = 'rem-img-strobe';
   }
 
-  // ★残留バグ防止の一元チェック関数★
   function syncRemLampVisibility() {
     const rushIdleEl = document.getElementById('scene-rush-idle');
     const shouldShow = remTestOverride || (
@@ -675,7 +641,9 @@
       rushIdleEl.classList.toggle('rem-layout-clear', shouldShow);
     }
     if (shouldShow) {
-      if (remLampStage.classList.contains('hidden')) setRemLampVisual('idle');
+      if (remLampStage.style.display === 'none' || remLampStage.classList.contains('hidden')) {
+        setRemLampVisual('idle');
+      }
     } else {
       setRemLampVisual('hidden');
     }
@@ -700,12 +668,34 @@
   })();
 
   // -----------------------------------------------------------------------
-  // 5. 既存関数フック（ビート自動切替・切断＆レム残留完全防止）
+  // 5. 開発用「♾️ 無限ST」フック（ON時は残り回数が減らずST終了しない）
+  // -----------------------------------------------------------------------
+  let infiniteRushMode = false;
+
+  if (typeof window.spinRushOnce === 'function') {
+    const _origSpinRushOnce = window.spinRushOnce;
+    window.spinRushOnce = function () {
+      const ev = _origSpinRushOnce();
+      if (infiniteRushMode) {
+        if (state.stRemaining < SPEC.ST_TOTAL) state.stRemaining = SPEC.ST_TOTAL;
+        if (ev && ev.type === 'ST_END') {
+          return { type: 'MISS', teaser: null };
+        }
+      }
+      return ev;
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // 6. 既存関数フック（ビート自動切替・切断＆レム残留完全防止）
   // -----------------------------------------------------------------------
   const _origSetActiveScene = window.setActiveScene;
   window.setActiveScene = function (sceneName) {
     _origSetActiveScene(sceneName);
+    // bonus/normal/reachに切り替わった瞬間にレムは即座に消す
+    if (sceneName !== 'rush-idle') setRemLampVisual('hidden');
     syncRemLampVisibility();
+
     if (sceneName === 'normal') {
       BeatEngine.setStyle('normal');
       BeatEngine.resume();
@@ -745,7 +735,6 @@
     syncRemLampVisibility();
   };
 
-  // ★プチュン・大当たり・落ちブル警報・RUSH終了の瞬間にビートをスパッと切る！★
   ['playPuchun', 'play1500Jackpot', 'play3000Jackpot', 'play6000Fanfare', 'playOchiburu', 'playReStart'].forEach(fnName => {
     if (typeof StudioAudio !== 'undefined' && typeof StudioAudio[fnName] === 'function') {
       const orig = StudioAudio[fnName];
@@ -759,13 +748,12 @@
   if (typeof window.playIwakanEffect === 'function') {
     const _origIwakan = window.playIwakanEffect;
     window.playIwakanEffect = async function (opts) {
-      // 違和感発動時は一部でビートも切って無音違和感を強調
       if (Math.random() < 0.45) BeatEngine.cut();
       return await _origIwakan(opts);
     };
   }
 
-  // レム告知パターン4種（鬼化レム画像ランプ発光）
+  // ★レム告知パターン4種：点灯が先（or 同時）にポキュ↑ーン↓が鳴る気持ちよさ重視★
   window.playRemNoticePattern = async function ({ is6000, forcePat = null, token }) {
     let pat = forcePat || 'NORMAL';
     if (!forcePat && is6000 && Math.random() < 0.75) {
@@ -773,7 +761,7 @@
       pat = p6[Math.floor(Math.random() * p6.length)];
     }
 
-    BeatEngine.cut(); // 点灯の瞬間にビートを切って静寂→キュイン！
+    BeatEngine.cut(); // ビートをスパッと切る
     let note = '';
     if (pat === 'SLOW_GLOW') {
       note = '💙 レム徐々に点灯';
@@ -782,14 +770,15 @@
       lampStatusText.textContent = 'じわ〜っ…';
       setLed('rem');
       setRemLampVisual('slow');
-      await wait(1220, token);
-      StudioAudio.playKyuin();
+      await wait(1150, token);
+      // じわっと光り切った瞬間に虹ポキュ↑ーン↓!!
+      StudioAudio.playPokyun(true);
       triggerLamp('rainbow', '6,000!!');
       setRemLampVisual('rainbow');
       setAmbientBg('rainbow');
       setSunburst(true);
-      FxCanvas.burstRainbow(55);
-      await wait(550, token);
+      FxCanvas.burstRainbow(58);
+      await wait(750, token);
     } else if (pat === 'DOUBLE_BLINK') {
       note = '💙 レム再点灯';
       oniLamp.classList.add('lamp-rem');
@@ -800,22 +789,24 @@
       lampStatusText.textContent = '……';
       setLed('off');
       setRemLampVisual('idle');
-      await wait(580, token);
-      StudioAudio.playKyuin();
-      triggerLamp('rainbow', '再点灯!!');
+      await wait(550, token);
+      // 再点灯と同時に虹ポキュ↑ーン↓!!
       setRemLampVisual('rainbow');
+      triggerLamp('rainbow', '再点灯!!');
+      StudioAudio.playPokyun(true);
       setAmbientBg('rainbow');
       setSunburst(true);
       FxCanvas.spawnLightning('#38bdf8', 5);
-      FxCanvas.burstRainbow(55);
-      await wait(620, token);
+      FxCanvas.burstRainbow(58);
+      await wait(780, token);
     } else if (pat === 'CLASSIC_FLASH') {
       note = '💙 旧レム閃光';
-      StudioAudio.playKyuin();
+      // ストロボ発光と同時に虹ポキュ↑ーン↓!!
+      setRemLampVisual('strobe');
       oniLamp.classList.add('lamp-rem-classic');
       lampStatusText.textContent = '閃光!!';
       setLed('rainbow');
-      setRemLampVisual('strobe');
+      StudioAudio.playPokyun(true);
       setAmbientBg('rainbow');
       setSunburst(true);
       FxCanvas.spawnRing('#38bdf8', 320, 9);
@@ -824,11 +815,12 @@
       oniLamp.classList.remove('lamp-rem-classic');
       setRemLampVisual('rainbow');
     } else {
-      StudioAudio.playKyuin();
-      triggerLamp('rem', 'キュイン!!');
+      // 通常点灯：点灯と同時にポキュ↑ーン↓!!
       setRemLampVisual('lit');
+      triggerLamp('rem', '点灯!!');
+      StudioAudio.playPokyun(false);
       FxCanvas.spawnRing('#38bdf8', 260, 8);
-      await wait(650, token);
+      await wait(750, token);
     }
     return note;
   };
@@ -940,15 +932,54 @@
     }
   };
 
-  // テストメニューに「💙 鬼化レムランプ点灯」ボタンを追加（終了後に必ずレム消去！）
+  // -----------------------------------------------------------------------
+  // 7. テストメニュー拡張（開発用：即RUSH突入＆無限ST＋鬼化レムテスト）
+  // -----------------------------------------------------------------------
   const testGrid = document.querySelector('#promoTestMenu .grid');
-  if (testGrid && !document.getElementById('btnTestRemLamp')) {
+  if (testGrid && !document.getElementById('btnDevInstantRush')) {
+    // ① 即RUSH突入（開発用）
+    const instantRushBtn = document.createElement('button');
+    instantRushBtn.id = 'btnDevInstantRush';
+    instantRushBtn.className = 'py-2 px-2 rounded-xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-300/80 text-white active:scale-95 transition';
+    instantRushBtn.textContent = '🚀 即RUSH突入（開発）';
+    testGrid.insertBefore(instantRushBtn, testGrid.firstChild);
+
+    instantRushBtn.addEventListener('click', () => {
+      document.getElementById('promoTestMenu').classList.add('hidden');
+      stopAuto();
+      seqToken++;
+      hideFullscreenOverlay();
+      resultModal.classList.add('hidden');
+      document.getElementById('tabPlay').click();
+      enterOnigakariRush(state.currentSpin || 1, false);
+    });
+
+    // ② 無限STトグル（開発用：残り回数が減らない）
+    const infBtn = document.createElement('button');
+    infBtn.id = 'btnDevInfRush';
+    infBtn.className = 'py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition';
+    infBtn.textContent = '♾️ 無限ST: OFF';
+    testGrid.insertBefore(infBtn, instantRushBtn.nextSibling);
+
+    infBtn.addEventListener('click', () => {
+      infiniteRushMode = !infiniteRushMode;
+      infBtn.textContent = `♾️ 無限ST: ${infiniteRushMode ? 'ON' : 'OFF'}`;
+      infBtn.className = infiniteRushMode
+        ? 'py-2 px-2 rounded-xl font-black bg-emerald-600 border border-yellow-200 text-white shadow active:scale-95 transition'
+        : 'py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition';
+      if (infiniteRushMode && state.phase === 'RUSH') {
+        state.stRemaining = SPEC.ST_TOTAL;
+        updateStatsUI();
+      }
+    });
+
+    // ③ 鬼化レムランプ点灯テスト（終了後100%消去）
     let remTestIdx = 0;
-    const pats = ['SLOW_GLOW', 'DOUBLE_BLINK', 'CLASSIC_FLASH', 'NORMAL'];
+    const pats = ['NORMAL', 'SLOW_GLOW', 'DOUBLE_BLINK', 'CLASSIC_FLASH'];
     const remBtn = document.createElement('button');
     remBtn.id = 'btnTestRemLamp';
     remBtn.className = 'col-span-2 sm:col-span-3 py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 via-blue-800 to-indigo-900 border border-sky-300/80 text-sky-100 active:scale-95 transition';
-    remBtn.textContent = '💙 鬼化レムランプ点灯（押すたび4パターン切替）';
+    remBtn.textContent = '💙 鬼化レムランプ点灯（同時ポキュ↑ーン↓・4種）';
     testGrid.appendChild(remBtn);
 
     remBtn.addEventListener('click', async () => {
@@ -975,7 +1006,7 @@
 
         const pat = pats[remTestIdx++ % pats.length];
         await playRemNoticePattern({ is6000: pat !== 'NORMAL', forcePat: pat, token: tok });
-        await wait(950, tok);
+        await wait(850, tok);
       } catch (e) {
       } finally {
         remTestOverride = false;
