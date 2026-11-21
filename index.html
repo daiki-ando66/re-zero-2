@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- ホーム画面追加で全画面アプリ風表示 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a0905">
-  <title>e Re:ゼロ 鬼がかり2 v3.0</title>
+  <title>e Re:ゼロ 鬼がかり2 v4.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&family=Shippori+Mincho:wght@600;800&display=swap');
@@ -29,7 +28,7 @@
     }
 
     /* =====================================================================
-       黄金×深紅 和柄ベース背景（縁外までドパい金和柄筐体）
+       黄金×深紅 和柄ベース背景 ＆ 縁外連動オーラ・サンバースト
        ===================================================================== */
     .bg-gold-wagara {
       background-color: #160705;
@@ -40,7 +39,6 @@
       background-attachment: fixed;
     }
 
-    /* 縁外連動アンビエントオーラ */
     #ambientBgLayer {
       transition: background 0.35s ease, opacity 0.35s ease;
       background:
@@ -48,105 +46,525 @@
         radial-gradient(ellipse at 88% 45%, rgba(245, 158, 11, 0.14) 0%, transparent 55%);
     }
     #ambientBgLayer.bg-mode-redbare {
-      background:
-        radial-gradient(circle at 50% 45%, rgba(239, 68, 68, 0.58) 0%, rgba(153, 27, 27, 0.36) 55%, rgba(69, 10, 10, 0.25) 100%) !important;
+      background: radial-gradient(circle at 50% 45%, rgba(239, 68, 68, 0.58) 0%, rgba(153, 27, 27, 0.36) 55%, rgba(69, 10, 10, 0.25) 100%) !important;
     }
     #ambientBgLayer.bg-mode-rush {
       background:
-        radial-gradient(ellipse at 15% 40%, rgba(250, 204, 21, 0.28) 0%, transparent 58%),
-        radial-gradient(ellipse at 85% 40%, rgba(239, 68, 68, 0.28) 0%, transparent 58%) !important;
+        radial-gradient(ellipse at 15% 40%, rgba(250, 204, 21, 0.32) 0%, transparent 58%),
+        radial-gradient(ellipse at 85% 40%, rgba(239, 68, 68, 0.30) 0%, transparent 58%) !important;
     }
     #ambientBgLayer.bg-mode-brain {
       background:
-        radial-gradient(ellipse at 15% 40%, rgba(192, 132, 252, 0.30) 0%, transparent 58%),
-        radial-gradient(ellipse at 85% 40%, rgba(217, 70, 239, 0.28) 0%, transparent 58%) !important;
+        radial-gradient(ellipse at 15% 40%, rgba(192, 132, 252, 0.34) 0%, transparent 58%),
+        radial-gradient(ellipse at 85% 40%, rgba(217, 70, 239, 0.30) 0%, transparent 58%) !important;
     }
     #ambientBgLayer.bg-mode-rem {
       background:
-        radial-gradient(ellipse at 15% 40%, rgba(56, 189, 248, 0.28) 0%, transparent 58%),
-        radial-gradient(ellipse at 85% 40%, rgba(14, 165, 233, 0.26) 0%, transparent 58%) !important;
-    }
-    #ambientBgLayer.bg-mode-zero {
-      background:
-        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.08) 0%, transparent 65%) !important;
+        radial-gradient(ellipse at 15% 40%, rgba(217, 70, 239, 0.28) 0%, transparent 58%),
+        radial-gradient(ellipse at 85% 40%, rgba(56, 189, 248, 0.30) 0%, transparent 58%) !important;
     }
     #ambientBgLayer.bg-mode-rainbow {
-      background:
-        radial-gradient(circle at 50% 45%, rgba(253, 224, 71, 0.42) 0%, rgba(244, 63, 94, 0.32) 40%, rgba(56, 189, 248, 0.28) 72%, rgba(168, 85, 247, 0.26) 100%) !important;
+      background: radial-gradient(circle at 50% 45%, rgba(253, 224, 71, 0.44) 0%, rgba(244, 63, 94, 0.34) 40%, rgba(56, 189, 248, 0.30) 72%, rgba(168, 85, 247, 0.28) 100%) !important;
     }
 
-    /* 縁外：大当たり・6000連動 虹色回転サンバースト後光 */
     @keyframes sunburstSpin {
       0% { transform: translate(-50%, -50%) rotate(0deg); }
       100% { transform: translate(-50%, -50%) rotate(360deg); }
     }
     .sunburst-rays {
-      position: fixed;
-      top: 50%; left: 50%;
-      width: 220vmax; height: 220vmax;
-      pointer-events: none;
+      position: fixed; top: 50%; left: 50%; width: 220vmax; height: 220vmax; pointer-events: none;
       background: repeating-conic-gradient(
         from 0deg,
-        rgba(253, 224, 71, 0.26) 0deg 10deg,
-        rgba(244, 63, 94, 0.14) 10deg 20deg,
-        rgba(56, 189, 248, 0.22) 20deg 30deg,
-        rgba(192, 132, 252, 0.14) 30deg 40deg,
-        rgba(52, 211, 153, 0.18) 40deg 50deg,
+        rgba(253, 224, 71, 0.28) 0deg 10deg,
+        rgba(244, 63, 94, 0.16) 10deg 20deg,
+        rgba(56, 189, 248, 0.24) 20deg 30deg,
+        rgba(192, 132, 252, 0.16) 30deg 40deg,
+        rgba(52, 211, 153, 0.20) 40deg 50deg,
         transparent 50deg 60deg
       );
       animation: sunburstSpin 14s linear infinite;
     }
 
-    /* 黄金メタリック液晶ベゼル */
+    /* 黄金メタリック液晶ベゼル ＆ サイドLED */
     .gold-bezel {
       border: 2px solid #eab308;
-      box-shadow:
-        0 0 28px rgba(234, 179, 8, 0.26),
-        inset 0 0 24px rgba(250, 204, 21, 0.14);
+      box-shadow: 0 0 28px rgba(234, 179, 8, 0.26), inset 0 0 24px rgba(250, 204, 21, 0.14);
     }
 
-    /* 筐体サイドLEDバー */
     .led-bar {
-      width: 6px;
-      border-radius: 9999px;
+      width: 6px; border-radius: 9999px;
       background: linear-gradient(180deg, #713f12, #eab308, #713f12);
       box-shadow: 0 0 10px rgba(234, 179, 8, 0.45);
       transition: all 0.25s ease;
     }
     .led-red {
       background: linear-gradient(180deg, #fecdd3, #ef4444, #991b1b, #ef4444, #fecdd3);
-      background-size: 100% 200%;
-      animation: ledChase 0.35s linear infinite;
+      background-size: 100% 200%; animation: ledChase 0.35s linear infinite;
       box-shadow: 0 0 18px 4px rgba(239, 68, 68, 0.95);
     }
     .led-rainbow {
       background: linear-gradient(180deg, #fde047, #fb7185, #c084fc, #38bdf8, #34d399, #fde047);
-      background-size: 100% 250%;
-      animation: ledChase 0.5s linear infinite;
+      background-size: 100% 250%; animation: ledChase 0.5s linear infinite;
       box-shadow: 0 0 22px 5px rgba(250, 204, 21, 0.95);
     }
     .led-rem {
-      background: linear-gradient(180deg, #082f49, #38bdf8, #e0f2fe, #38bdf8, #082f49);
-      background-size: 100% 200%;
-      animation: ledChase 1.8s ease-in-out infinite;
-      box-shadow: 0 0 16px 3px rgba(56, 189, 248, 0.85);
+      background: linear-gradient(180deg, #4c1d95, #38bdf8, #f0abfc, #38bdf8, #4c1d95);
+      background-size: 100% 200%; animation: ledChase 1.4s ease-in-out infinite;
+      box-shadow: 0 0 18px 4px rgba(56, 189, 248, 0.88);
     }
     .led-brain {
       background: linear-gradient(180deg, #3b0764, #a855f7, #e11d48, #a855f7, #3b0764);
-      background-size: 100% 200%;
-      animation: ledChase 0.7s linear infinite;
+      background-size: 100% 200%; animation: ledChase 0.7s linear infinite;
       box-shadow: 0 0 18px 4px rgba(168, 85, 247, 0.9);
     }
-    .led-off {
-      background: #09060c;
-      box-shadow: none;
+    .led-off { background: #09060c; box-shadow: none; }
+    @keyframes ledChase { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } }
+
+    /* 純粋ガラス球LEDレンズ（絵文字全撤廃） */
+    .led-lens-idle {
+      background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.28) 0%, rgba(120,53,15,0.35) 36%, rgba(18,8,10,0.95) 85%);
+      box-shadow: inset 0 2px 6px rgba(255,255,255,0.22), inset 0 -4px 8px rgba(0,0,0,0.95), 0 0 8px rgba(234,179,8,0.28);
     }
-    @keyframes ledChase {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 0% 200%; }
+    .lamp-red {
+      background: radial-gradient(circle at 32% 28%, #ffffff 0%, #ef4444 36%, #991b1b 78%, #450a0a 100%) !important;
+      box-shadow: 0 0 28px 10px rgba(239,68,68,0.98), inset 0 0 14px rgba(255,255,255,0.95) !important;
+      border-color: #fecaca !important;
+    }
+    .lamp-rem {
+      background: radial-gradient(circle at 32% 28%, #ffffff 0%, #38bdf8 38%, #0284c7 80%, #082f49 100%) !important;
+      box-shadow: 0 0 30px 10px rgba(56,189,248,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
+      border-color: #bae6fd !important;
+    }
+    .lamp-rainbow {
+      background: conic-gradient(from 0deg, #fde047, #fb7185, #c084fc, #38bdf8, #34d399, #fde047) !important;
+      box-shadow: 0 0 34px 12px rgba(250,204,21,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
+      border-color: #ffffff !important;
+    }
+    @keyframes remSlowGlow {
+      0% { opacity: 0.35; box-shadow: 0 0 0 rgba(56,189,248,0); }
+      65% { opacity: 0.92; box-shadow: 0 0 24px 8px rgba(56,189,248,0.9); }
+      100% { opacity: 1; box-shadow: 0 0 38px 14px rgba(250,204,21,0.98); }
+    }
+    .lamp-rem-slow {
+      background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 45%, #c084fc 85%, #fde047 100%) !important;
+      border-color: #fef08a !important;
+      animation: remSlowGlow 1.15s ease-in forwards !important;
+    }
+    @keyframes remClassicFlash {
+      0%, 100% { background: radial-gradient(circle, #ffffff 0%, #38bdf8 48%, #0284c7 100%); box-shadow: 0 0 36px 12px rgba(224,242,254,0.98); }
+      50% { background: radial-gradient(circle, #fef9c3 0%, #0ea5e9 55%, #082f49 100%); box-shadow: 0 0 10px 2px rgba(56,189,248,0.4); }
+    }
+    .lamp-rem-classic { border-color: #ffffff !important; animation: remClassicFlash 0.12s steps(2) infinite !important; }
+
+    @keyframes rippleExpand { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(3.4); opacity: 0; } }
+    .lamp-ripple {
+      position: absolute; inset: 0; border-radius: 9999px; border: 3px solid #ef4444; pointer-events: none;
+      animation: rippleExpand 0.72s cubic-bezier(0, 0.2, 0.8, 1) forwards;
     }
 
-    /* 激震・背景モード・落ちブル・3DドームPUSH */
+    /* =====================================================================
+       本家風 RUSH 上部メタリックHUD（RUSH×連数・残り回数・獲得pt・V-STOCK）
+       ===================================================================== */
+    .rush-meta-pill {
+      background: linear-gradient(180deg, rgba(48, 10, 56, 0.94) 0%, rgba(16, 4, 24, 0.96) 100%);
+      border: 1.5px solid rgba(250, 204, 21, 0.82);
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.55), inset 0 0 8px rgba(250, 204, 21, 0.25);
+    }
+    .rush-meta-gold {
+      background: linear-gradient(180deg, rgba(84, 34, 6, 0.95) 0%, rgba(28, 10, 4, 0.96) 100%);
+      border: 1.5px solid rgba(253, 224, 71, 0.9);
+      box-shadow: 0 0 14px rgba(234, 179, 8, 0.5), inset 0 0 8px rgba(253, 224, 71, 0.25);
+    }
+
+    /* =====================================================================
+       🔥 鬼がかりRUSH：超巨大3桁図柄ステージ（本家風・極太金縁×蒼紅エネルギー）
+       ===================================================================== */
+    #oniRushStage {
+      position: absolute; inset: 0; z-index: 7; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    #oniRushStage.hidden { display: none !important; }
+
+    .oni-big-num {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      line-height: 0.92;
+      -webkit-text-stroke: 3px #fef08a;
+      filter: drop-shadow(0 0 12px rgba(250,204,21,0.85)) drop-shadow(0 6px 14px rgba(0,0,0,0.95));
+      transition: transform 0.1s ease;
+    }
+    .oni-num-odd {
+      background: linear-gradient(180deg, #ffffff 0%, #fda4af 22%, #e11d48 54%, #991b1b 82%, #fef08a 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .oni-num-even {
+      background: linear-gradient(180deg, #ffffff 0%, #bae6fd 22%, #2563eb 54%, #312e81 82%, #f0abfc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .oni-num-gold {
+      background: linear-gradient(180deg, #ffffff 0%, #fef9c3 28%, #facc15 60%, #b45309 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 22px rgba(253,224,71,1)) drop-shadow(0 0 42px rgba(234,179,8,0.9));
+    }
+    @keyframes oniReelBlur {
+      0% { transform: translateY(-10px) scaleY(1.14); filter: blur(1.4px) drop-shadow(0 0 10px rgba(250,204,21,0.75)); }
+      50% { transform: translateY(10px) scaleY(1.18); filter: blur(2.0px) drop-shadow(0 0 14px rgba(244,63,94,0.85)); }
+      100% { transform: translateY(-10px) scaleY(1.14); filter: blur(1.4px) drop-shadow(0 0 10px rgba(250,204,21,0.75)); }
+    }
+    .oni-reel-spin { animation: oniReelBlur 0.085s linear infinite; }
+    @keyframes oniRemApproachAnim {
+      0% { opacity: 0; transform: scale(0.42); filter: brightness(0.6) drop-shadow(0 0 18px rgba(56,189,248,0.8)); }
+      45% { opacity: 0.92; transform: scale(0.95); filter: brightness(1.18) drop-shadow(0 0 32px rgba(250,204,21,0.95)); }
+      100% { opacity: 1; transform: scale(1.26); filter: brightness(1.38) drop-shadow(0 0 48px rgba(250,204,21,1)) drop-shadow(0 0 70px rgba(244,63,94,0.95)); }
+    }
+    .oni-rem-approach { animation: oniRemApproachAnim 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* =====================================================================
+       🧠 脳が震えるRUSH：本家4層サンドイッチ（完全中央固定・ズレ完全防止）
+       ===================================================================== */
+    #brainRushStage {
+      position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: hidden;
+    }
+    #brainRushStage.hidden { display: none !important; }
+
+    /* 位置決め専用ラッパー（transformは使わずflexで100%中央固定！） */
+    .brain-pete-pos {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 28px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.16s ease-out;
+    }
+    .brain-pete-pos.pete-cover-pos {
+      padding-top: 0;
+      align-items: center;
+    }
+    .brain-pete-pos.pete-shown { opacity: 1; }
+
+    @keyframes peteIdleBreath {
+      0%, 100% { transform: scale(1.00) translateY(0px); }
+      50%      { transform: scale(1.045) translateY(-4px); }
+    }
+    @keyframes petePunchIn {
+      0%   { transform: scale(1.38); filter: brightness(2.0) contrast(1.4) hue-rotate(-14deg); }
+      42%  { transform: scale(0.98); filter: brightness(1.16) contrast(1.18); }
+      100% { transform: scale(1.06); filter: brightness(1.06) contrast(1.14); }
+    }
+    @keyframes peteMadQuiver {
+      0%, 100% { transform: translate(0, 0) scale(1.06); }
+      25%      { transform: translate(-3px, 2px) scale(1.08); }
+      50%      { transform: translate(3px, -2px) scale(1.07); }
+      75%      { transform: translate(-2px, -2px) scale(1.09); }
+    }
+    .brain-pete-img {
+      width: 82%;
+      height: 82%;
+      max-width: 390px;
+      object-fit: contain;
+      filter: contrast(1.08) saturate(1.16) drop-shadow(0 0 22px rgba(168, 85, 247, 0.72));
+      will-change: transform, filter;
+    }
+    .brain-pete-img.pete-cover-img {
+      width: 108%;
+      height: 108%;
+      max-width: none;
+      object-fit: cover;
+    }
+    .brain-pete-img.pete-breath { animation: peteIdleBreath 2.6s ease-in-out infinite; }
+    .brain-pete-img.pete-punch  { animation: petePunchIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards, peteMadQuiver 0.11s linear 0.24s infinite; }
+
+    #brainAtmosphereVeil {
+      position: absolute; inset: 0; z-index: 12; pointer-events: none;
+      background:
+        radial-gradient(ellipse at 50% 42%, rgba(168, 85, 247, 0.06) 28%, rgba(46, 8, 72, 0.56) 74%, rgba(8, 2, 16, 0.90) 100%),
+        linear-gradient(180deg, rgba(16, 4, 28, 0.58) 0%, transparent 20%, transparent 66%, rgba(12, 2, 22, 0.88) 100%);
+    }
+    @keyframes brainEvoFlashAnim {
+      0%   { opacity: 0.95; background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(217,70,239,0.88) 45%, rgba(59,7,100,0.96) 100%); }
+      100% { opacity: 0; }
+    }
+    #brainEvoFlash { position: absolute; inset: 0; z-index: 24; pointer-events: none; opacity: 0; }
+    #brainEvoFlash.flash-fire { animation: brainEvoFlashAnim 0.22s ease-out forwards; }
+
+    /* 禍々しい「脳が」大量乱舞 */
+    #brainTextSwarm { position: absolute; inset: 0; z-index: 22; pointer-events: none; overflow: hidden; }
+    @keyframes nogaTremble {
+      0%, 100% { transform: translate(0, 0) rotate(var(--rot)) scale(var(--sc)); }
+      25%      { transform: translate(-3.5px, 2px) rotate(calc(var(--rot) - 2deg)) scale(calc(var(--sc) * 1.04)); }
+      50%      { transform: translate(3.5px, -2.5px) rotate(calc(var(--rot) + 2deg)) scale(calc(var(--sc) * 0.98)); }
+      75%      { transform: translate(-2.5px, -2px) rotate(calc(var(--rot) - 1.5deg)) scale(calc(var(--sc) * 1.05)); }
+    }
+    @keyframes nogaSlamIn {
+      0%   { opacity: 0; transform: translate(0, 0) rotate(var(--rot)) scale(calc(var(--sc) * 2.1)); }
+      55%  { opacity: 1; transform: translate(0, 0) rotate(var(--rot)) scale(calc(var(--sc) * 0.92)); }
+      100% { opacity: 1; transform: translate(0, 0) rotate(var(--rot)) scale(var(--sc)); }
+    }
+    .noga-word {
+      position: absolute; font-family: 'Shippori Mincho', 'Noto Sans JP', serif;
+      font-weight: 900; line-height: 1; letter-spacing: -0.04em; white-space: nowrap;
+      color: #f0abfc; -webkit-text-stroke: 2.5px #12021a;
+      text-shadow: 0 0 8px #a21caf, 0 0 18px #d946ef, 3px 3px 0 #09010d, -2px -2px 0 #2e0642;
+      animation: nogaSlamIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards, nogaTremble 0.085s linear 0.18s infinite;
+    }
+    .noga-word.noga-hot {
+      color: #fda4af; -webkit-text-stroke: 3px #1c020c;
+      text-shadow: 0 0 10px #e11d48, 0 0 24px #f43f5e, 0 0 38px #c026d3, 3px 3px 0 #09010d;
+    }
+    .noga-word.noga-gold {
+      color: #fef08a; -webkit-text-stroke: 3px #291202;
+      text-shadow: 0 0 12px #facc15, 0 0 28px #f59e0b, 0 0 44px #ef4444, 3px 3px 0 #120601;
+    }
+
+    /* =====================================================================
+       💙 レム告知モード：ツノ白熱発光＋レインボー輪郭オーラ（本家準拠）
+       ===================================================================== */
+    #remRushStage {
+      position: absolute; inset: 0; z-index: 7; pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; padding: 26px 8px 26px 8px;
+    }
+    #remRushStage.hidden { display: none !important; }
+
+    #remLampOuter {
+      position: relative;
+      height: 98%; width: 96%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #remLampImg {
+      position: relative; z-index: 2;
+      max-height: 100%; max-width: 100%; object-fit: contain;
+      transition: filter 0.16s ease, opacity 0.22s ease, transform 0.24s ease;
+      will-change: filter, opacity, transform;
+    }
+    /* ツノ白熱スポット光（鬼化レムの額〜ツノ位置に重なる） */
+    #remHornGlow {
+      position: absolute; z-index: 4;
+      top: 22%; left: 49%;
+      width: 56px; height: 78px;
+      transform: translate(-50%, -50%);
+      border-radius: 9999px;
+      background: radial-gradient(ellipse at center, #ffffff 0%, rgba(255,255,255,0.92) 28%, rgba(224,242,254,0.55) 55%, transparent 78%);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    #remHornGlow.horn-on {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.25);
+      filter: drop-shadow(0 0 18px #ffffff) drop-shadow(0 0 36px #38bdf8);
+    }
+
+    .rem-img-idle {
+      opacity: 0.36; filter: brightness(0.28) saturate(0.32) contrast(1.20); transform: scale(0.97);
+    }
+    .rem-img-lit {
+      opacity: 1 !important;
+      filter: brightness(1.22) saturate(1.38)
+        drop-shadow(0 0 10px rgba(56,189,248,1))
+        drop-shadow(0 0 26px rgba(14,165,233,0.95))
+        drop-shadow(0 0 46px rgba(217,70,239,0.75)) !important;
+      transform: scale(1.04) !important;
+    }
+    @keyframes remImgSlowWake {
+      0%   { opacity: 0.32; filter: brightness(0.26) saturate(0.3); transform: scale(0.97); }
+      55%  { opacity: 0.90; filter: brightness(1.02) saturate(1.25) drop-shadow(0 0 18px rgba(56,189,248,0.92)); transform: scale(1.02); }
+      100% { opacity: 1; filter: brightness(1.34) saturate(1.48) drop-shadow(0 0 12px rgba(74,222,128,1)) drop-shadow(0 0 28px rgba(56,189,248,1)) drop-shadow(0 0 48px rgba(217,70,239,0.95)); transform: scale(1.06); }
+    }
+    .rem-img-slow { animation: remImgSlowWake 1.2s ease-in forwards !important; }
+
+    /* 本家スクショ準拠：緑〜黄〜シアン〜マゼンタの強烈な虹色輪郭オーラ!! */
+    @keyframes remImgRainbowEdge {
+      0%   { filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 10px #4ade80) drop-shadow(0 0 24px #38bdf8) drop-shadow(0 0 44px #e879f9); }
+      33%  { filter: brightness(1.34) saturate(1.50) drop-shadow(0 0 10px #fde047) drop-shadow(0 0 24px #4ade80) drop-shadow(0 0 44px #38bdf8); }
+      66%  { filter: brightness(1.30) saturate(1.48) drop-shadow(0 0 10px #f472b6) drop-shadow(0 0 24px #fde047) drop-shadow(0 0 44px #4ade80); }
+      100% { filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 10px #4ade80) drop-shadow(0 0 24px #38bdf8) drop-shadow(0 0 44px #e879f9); }
+    }
+    .rem-img-rainbow {
+      opacity: 1 !important; transform: scale(1.06) !important;
+      animation: remImgRainbowEdge 0.55s linear infinite !important;
+    }
+    @keyframes remImgStrobe {
+      0%, 100% { opacity: 1; filter: brightness(1.85) saturate(1.4) drop-shadow(0 0 16px #ffffff) drop-shadow(0 0 38px #38bdf8) drop-shadow(0 0 64px #4ade80); transform: scale(1.07); }
+      50%      { opacity: 0.28; filter: brightness(0.35) saturate(0.4); transform: scale(0.98); }
+    }
+    .rem-img-strobe { animation: remImgStrobe 0.13s steps(2) infinite !important; }
+
+    /* =====================================================================
+       共通：botan.jpg 3Dクリスタルボタン振動・5色天面発光・落ちブル落下
+       ===================================================================== */
+    .botan-stage-wrap {
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .botan-img-base {
+      width: 100%; height: auto; display: block;
+      filter: brightness(0.96) drop-shadow(0 8px 18px rgba(0,0,0,0.92));
+      transition: filter 0.14s ease, transform 0.14s ease;
+      will-change: transform, filter;
+    }
+    /* 天面クリスタル発光オーバーレイ（5色切替） */
+    .botan-crystal-glow {
+      position: absolute;
+      top: 10%; left: 16%; width: 68%; height: 58%;
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.18s ease, background 0.18s ease;
+    }
+    .botan-glow-red     { opacity: 0.78; background: radial-gradient(circle, #fecdd3 0%, #ef4444 55%, transparent 80%); }
+    .botan-glow-purple  { opacity: 0.78; background: radial-gradient(circle, #f5d0fe 0%, #c026d3 55%, transparent 80%); }
+    .botan-glow-gold    { opacity: 0.85; background: radial-gradient(circle, #fef9c3 0%, #facc15 55%, transparent 80%); }
+    .botan-glow-cyan    { opacity: 0.82; background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 55%, transparent 80%); }
+    @keyframes botanRainbowSpin {
+      0%   { filter: hue-rotate(0deg) brightness(1.25); }
+      100% { filter: hue-rotate(360deg) brightness(1.25); }
+    }
+    .botan-glow-rainbow {
+      opacity: 0.92;
+      background: conic-gradient(from 0deg, #fde047, #fb7185, #c084fc, #38bdf8, #4ade80, #fde047);
+      animation: botanRainbowSpin 0.6s linear infinite;
+    }
+
+    @keyframes btnVibeWeak {
+      0%, 100% { transform: translate(0, 0) scale(1.02); }
+      25% { transform: translate(-2.5px, 1.5px) scale(1.03); }
+      50% { transform: translate(2.5px, -1.5px) scale(1.02); }
+      75% { transform: translate(-2px, -1.5px) scale(1.03); }
+    }
+    @keyframes btnVibeMid {
+      0%, 100% { transform: translate(0, 0) scale(1.07) rotate(0deg); }
+      20% { transform: translate(-6px, 3px) scale(1.09) rotate(-1.6deg); }
+      40% { transform: translate(6px, -4px) scale(1.06) rotate(1.6deg); }
+      60% { transform: translate(-5px, -3px) scale(1.10) rotate(-1.4deg); }
+      80% { transform: translate(5px, 3px) scale(1.07) rotate(1.4deg); }
+    }
+    @keyframes btnVibeMax {
+      0%, 100% { transform: translate(0, 0) scale(1.14) rotate(0deg); filter: brightness(1.38) saturate(1.6) drop-shadow(0 0 24px rgba(250,204,21,1)) drop-shadow(0 0 52px rgba(236,72,153,0.95)); }
+      16% { transform: translate(-10px, -6px) scale(1.18) rotate(-3deg); filter: brightness(1.5) saturate(1.8) drop-shadow(0 0 30px rgba(56,189,248,1)) drop-shadow(0 0 58px rgba(250,204,21,1)); }
+      33% { transform: translate(10px, 5px) scale(1.12) rotate(3deg); filter: brightness(1.42) saturate(1.7) drop-shadow(0 0 28px rgba(244,63,94,1)) drop-shadow(0 0 54px rgba(192,132,252,1)); }
+      50% { transform: translate(-9px, 6px) scale(1.20) rotate(-2.5deg); }
+      66% { transform: translate(9px, -6px) scale(1.14) rotate(2.5deg); }
+      83% { transform: translate(-7px, -4px) scale(1.17) rotate(-2deg); }
+    }
+    @keyframes botanDropSlam {
+      0%   { transform: translateY(-34px) scale(1.18); }
+      38%  { transform: translateY(10px) scale(0.92); }
+      68%  { transform: translateY(3px) scale(1.05); }
+      100% { transform: translateY(6px) scale(1.02); }
+    }
+    @keyframes btnRingPulse { 0% { transform: scale(0.75); opacity: 0.95; } 100% { transform: scale(1.55); opacity: 0; } }
+
+    .btn-vibe-weak { animation: btnVibeWeak 0.08s linear infinite !important; filter: brightness(1.14) drop-shadow(0 0 18px rgba(217,70,239,0.92)) !important; }
+    .btn-vibe-mid  { animation: btnVibeMid 0.07s linear infinite !important; filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 24px rgba(244,63,94,0.98)) drop-shadow(0 0 46px rgba(250,204,21,0.88)) !important; }
+    .btn-vibe-max  { animation: btnVibeMax 0.065s linear infinite !important; }
+    .btn-drop-ochi { animation: botanDropSlam 0.17s cubic-bezier(0.22, 1, 0.36, 1) forwards, btnVibeMax 0.065s linear 0.17s infinite !important; }
+
+    .btn-ring-active {
+      border: 3px solid #f0abfc; box-shadow: 0 0 24px #e879f9, inset 0 0 18px #f43f5e;
+      animation: btnRingPulse 0.42s ease-out infinite !important;
+    }
+    .btn-ring-rainbow {
+      border: 4px solid #fde047; box-shadow: 0 0 34px #fde047, 0 0 58px #ec4899, inset 0 0 24px #38bdf8;
+      animation: btnRingPulse 0.28s ease-out infinite !important;
+    }
+
+    @keyframes botanRiseIn {
+      0%   { transform: translateY(65px) scale(0.72); opacity: 0; }
+      65%  { transform: translateY(-4px) scale(1.04); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .botan-rise-in { animation: botanRiseIn 0.30s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    /* =====================================================================
+       神秘×超ド派手レインボー「鬼がかってますね」カットイン専用アニメーション
+       ===================================================================== */
+    #softSparkleCanvas {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      z-index: 1003; pointer-events: none; opacity: 0; transition: opacity 0.9s ease-in-out;
+    }
+    #softSparkleCanvas.sparkle-on { opacity: 1; }
+
+    @keyframes slowGentleFadeIn {
+      0%   { opacity: 0; transform: scale(0.96); filter: brightness(0.45); }
+      45%  { opacity: 0.48; transform: scale(0.99); filter: brightness(0.88); }
+      100% { opacity: 1; transform: scale(1.03); filter: brightness(1.08); }
+    }
+    .cutin-gentle-fade { animation: slowGentleFadeIn 2.35s cubic-bezier(0.37, 0, 0.63, 1) forwards; }
+
+    @keyframes mysticAuroraSpin {
+      0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+      50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1.12); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(1); }
+    }
+    .mystic-prism-rays {
+      position: absolute; top: 50%; left: 50%; width: 180vmax; height: 180vmax;
+      pointer-events: none; opacity: 0; transition: opacity 1.15s ease-in-out;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.38) 0%, rgba(253,224,71,0.22) 18%, rgba(244,114,182,0.18) 36%, rgba(56,189,248,0.18) 56%, transparent 74%),
+        repeating-conic-gradient(
+          from 0deg,
+          rgba(255,255,255,0.22) 0deg 8deg,
+          rgba(253,224,71,0.26) 8deg 18deg,
+          rgba(244,114,182,0.22) 18deg 28deg,
+          rgba(56,189,248,0.26) 28deg 38deg,
+          rgba(192,132,252,0.24) 38deg 48deg,
+          rgba(74,222,128,0.20) 48deg 58deg,
+          transparent 58deg 68deg
+        );
+      animation: mysticAuroraSpin 16s linear infinite;
+    }
+    .mystic-prism-rays.rays-on { opacity: 1; }
+
+    @keyframes prismShimmerSweep {
+      0%   { transform: translateX(-140%) skewX(-24deg); opacity: 0; }
+      25%  { opacity: 0.9; }
+      75%  { opacity: 0.85; }
+      100% { transform: translateX(220%) skewX(-24deg); opacity: 0; }
+    }
+    .prism-shimmer-bar {
+      position: absolute; inset: 0; width: 42%; pointer-events: none;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(253,224,71,0.45) 40%, rgba(255,255,255,0.85) 52%, rgba(56,189,248,0.45) 68%, rgba(244,114,182,0.28) 82%, transparent 100%);
+      mix-blend-mode: screen;
+      animation: prismShimmerSweep 1.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes mysticHaloPulse {
+      0%   { box-shadow: 0 0 26px 6px rgba(255,255,255,0.75), 0 0 58px 16px rgba(253,224,71,0.78), 0 0 96px 28px rgba(244,114,182,0.58); border-color: #ffffff; }
+      33%  { box-shadow: 0 0 30px 8px rgba(255,255,255,0.85), 0 0 64px 18px rgba(56,189,248,0.82), 0 0 104px 32px rgba(192,132,252,0.62); border-color: #e0f2fe; }
+      66%  { box-shadow: 0 0 28px 7px rgba(255,255,255,0.80), 0 0 60px 16px rgba(74,222,128,0.76), 0 0 98px 28px rgba(253,224,71,0.60); border-color: #fef9c3; }
+      100% { box-shadow: 0 0 26px 6px rgba(255,255,255,0.75), 0 0 58px 16px rgba(253,224,71,0.78), 0 0 96px 28px rgba(244,114,182,0.58); border-color: #ffffff; }
+    }
+    .mystic-halo-frame { animation: mysticHaloPulse 1.3s ease-in-out infinite; }
+
+    /* =====================================================================
+       モード別専用大当たり画面 ＆ 出玉カウントアップ突破
+       ===================================================================== */
+    .bonus-theme-brain {
+      background: radial-gradient(circle at 50% 45%, rgba(126,34,206,0.72) 0%, rgba(46,16,101,0.88) 55%, rgba(12,3,22,0.96) 100%) !important;
+      border-color: #e879f9 !important;
+      box-shadow: inset 0 0 48px rgba(192,38,211,0.72), 0 0 30px rgba(168,85,247,0.78) !important;
+    }
+    .bonus-theme-rem {
+      background: radial-gradient(circle at 50% 42%, rgba(14,165,233,0.58) 0%, rgba(12,74,110,0.85) 55%, rgba(4,16,32,0.96) 100%) !important;
+      border-color: #7dd3fc !important;
+      box-shadow: inset 0 0 48px rgba(56,189,248,0.72), 0 0 30px rgba(14,165,233,0.78) !important;
+    }
+    @keyframes countBreakPop {
+      0%   { transform: scale(0.75); filter: brightness(2.2); }
+      45%  { transform: scale(1.24); filter: brightness(1.3); }
+      100% { transform: scale(1.0); filter: brightness(1.0); }
+    }
+    .count-break-pop { animation: countBreakPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* =====================================================================
+       汎用アニメーション（激震・画面破壊・違和感・文字グラデ）
+       ===================================================================== */
     @keyframes brainShake {
       0%, 100% { transform: translate(0, 0) rotate(0deg); }
       15% { transform: translate(-7px, -4px) rotate(-1deg); }
@@ -157,11 +575,39 @@
       90% { transform: translate(6px, 4px) rotate(0.8deg); }
     }
     .shake-intense { animation: brainShake 0.14s linear infinite; }
-    .shake-burst { animation: brainShake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) 2; }
+    .shake-burst   { animation: brainShake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) 2; }
+    @keyframes brainShakeWeak { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2.5px, 1px); } 75% { transform: translate(2.5px, -1px); } }
+    @keyframes brainShakeMid  { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-5px, 2.5px) rotate(-0.5deg); } 75% { transform: translate(5px, -2.5px) rotate(0.5deg); } }
+    .shake-weak { animation: brainShakeWeak 0.11s linear infinite; }
+    .shake-mid  { animation: brainShakeMid 0.10s linear infinite; }
+
+    @keyframes pageMegaShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      12% { transform: translate(-11px, -7px) rotate(-1.4deg); }
+      25% { transform: translate(11px, 6px) rotate(1.4deg); }
+      37% { transform: translate(-13px, 5px) rotate(-1.8deg); }
+      50% { transform: translate(12px, -8px) rotate(1.6deg); }
+      62% { transform: translate(-9px, -6px) rotate(-1.2deg); }
+      75% { transform: translate(10px, 7px) rotate(1.3deg); }
+      87% { transform: translate(-7px, 4px) rotate(-0.9deg); }
+    }
+    .page-mega-shake { animation: pageMegaShake 0.11s linear infinite !important; }
+
+    @keyframes rgbGlitchAnim {
+      0% { filter: drop-shadow(-5px 0 0 rgba(255,0,80,0.95)) drop-shadow(5px 0 0 rgba(0,240,255,0.95)) contrast(135%); transform: skewX(-4deg); }
+      33% { filter: drop-shadow(6px -2px 0 rgba(255,0,80,0.95)) drop-shadow(-6px 2px 0 rgba(0,240,255,0.95)) saturate(200%); transform: skewX(5deg); }
+      66% { filter: drop-shadow(-4px 3px 0 rgba(250,204,21,0.95)) drop-shadow(4px -3px 0 rgba(168,85,247,0.95)) contrast(150%); transform: skewX(-3deg); }
+      100% { filter: drop-shadow(0 0 0 transparent); transform: skewX(0deg); }
+    }
+    .fx-rgb-glitch { animation: rgbGlitchAnim 0.10s steps(2) infinite !important; }
+
+    .iwakan-mono { filter: grayscale(100%) contrast(125%) !important; }
+    .iwakan-fade-remain { transition: opacity 0.85s ease; opacity: 0.06 !important; }
+    @keyframes remPuru { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2px, 1.5px); } 50% { transform: translate(2px, -1.5px); } 75% { transform: translate(-1.5px, -1.5px); } }
+    .iwakan-rempuru { animation: remPuru 0.09s linear infinite !important; }
 
     @keyframes subtleWhisperIn {
       0% { opacity: 0; transform: translateY(6px) scale(0.96); letter-spacing: 0.10em; }
-      60% { opacity: 0.92; transform: translateY(0) scale(1); letter-spacing: 0.16em; }
       100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.18em; }
     }
     @keyframes microQuiver {
@@ -170,57 +616,9 @@
       50% { transform: translate(0.7px, -0.5px); }
       75% { transform: translate(-0.5px, -0.5px); }
     }
-    .fx-whisper-in {
-      animation: subtleWhisperIn 0.70s cubic-bezier(0.22, 1, 0.36, 1) forwards, microQuiver 0.18s steps(2) 0.55s infinite;
-    }
+    .fx-whisper-in { animation: subtleWhisperIn 0.70s cubic-bezier(0.22, 1, 0.36, 1) forwards, microQuiver 0.18s steps(2) 0.55s infinite; }
 
-    @keyframes brainWarp {
-      0%, 100% { filter: hue-rotate(0deg) saturate(125%); }
-      50% { filter: hue-rotate(16deg) saturate(175%) contrast(112%); }
-    }
-    .mode-brain-bg {
-      background: radial-gradient(circle at 50% 45%, #3b0764 0%, #1c0424 54%, #07030b 100%) !important;
-      animation: brainWarp 2.6s ease-in-out infinite;
-    }
-    .mode-rem-bg {
-      background: radial-gradient(circle at 50% 35%, #0c4a6e 0%, #082036 55%, #040b14 100%) !important;
-    }
-    .mode-despair-bg {
-      background: radial-gradient(circle at 50% 40%, #0f172a 0%, #060914 60%, #020308 100%) !important;
-    }
-
-    @keyframes domeDrop {
-      0% { transform: translateY(-26px) scale(1.12); }
-      38% { transform: translateY(10px) scale(0.93); }
-      68% { transform: translateY(4px) scale(1.04); }
-      100% { transform: translateY(7px) scale(1); }
-    }
-    .ochiburu-dome {
-      animation: domeDrop 0.17s cubic-bezier(0.22, 1, 0.36, 1) forwards, brainShake 0.09s linear 0.17s infinite !important;
-      box-shadow: 0 0 42px 14px rgba(250, 204, 21, 0.98), 0 0 75px 24px rgba(225, 29, 72, 0.85), inset 0 0 24px rgba(255,255,255,0.95) !important;
-    }
-
-    .push-dome {
-      background: radial-gradient(circle at 32% 24%, #fecdd3 0%, #ef4444 26%, #b91c1c 62%, #450a0a 100%);
-      box-shadow:
-        0 10px 24px rgba(0, 0, 0, 0.85),
-        0 0 24px rgba(225, 29, 72, 0.72),
-        inset 0 6px 12px rgba(255, 255, 255, 0.55),
-        inset 0 -10px 18px rgba(69, 10, 10, 0.9);
-      transition: transform 0.08s ease, box-shadow 0.15s ease;
-    }
-    .push-dome:active {
-      transform: translateY(4px) scale(0.95);
-      box-shadow: 0 3px 10px rgba(0,0,0,0.9), 0 0 32px rgba(250, 204, 21, 0.95), inset 0 4px 10px rgba(255,255,255,0.7);
-    }
-    .push-dome-gold {
-      background: radial-gradient(circle at 32% 24%, #fef9c3 0%, #facc15 30%, #d97706 68%, #713f12 100%);
-      box-shadow:
-        0 10px 26px rgba(0, 0, 0, 0.85),
-        0 0 30px rgba(250, 204, 21, 0.88),
-        inset 0 6px 14px rgba(255, 255, 255, 0.75),
-        inset 0 -10px 18px rgba(113, 63, 18, 0.9);
-    }
+    .mode-despair-bg { background: radial-gradient(circle at 50% 40%, #0f172a 0%, #060914 60%, #020308 100%) !important; }
 
     @keyframes redBareFlash {
       0% { box-shadow: inset 0 0 0 0 rgba(239,68,68,0); border-color: #7f1d1d; }
@@ -245,146 +643,56 @@
     }
     .fx-gold { animation: goldFlash 0.8s ease-in-out infinite; }
 
-    @keyframes glitchJitter {
-      0% { transform: translate(0, 0) skew(0deg); }
-      25% { transform: translate(-5px, 2px) skew(-4deg); }
-      50% { transform: translate(5px, -2px) skew(5deg); }
-      75% { transform: translate(-4px, -2px) skew(-3deg); }
-      100% { transform: translate(0, 0) skew(0deg); }
-    }
+    @keyframes glitchJitter { 0% { transform: translate(0, 0) skew(0deg); } 25% { transform: translate(-5px, 2px) skew(-4deg); } 50% { transform: translate(5px, -2px) skew(5deg); } 75% { transform: translate(-4px, -2px) skew(-3deg); } 100% { transform: translate(0, 0) skew(0deg); } }
     .fx-glitch { animation: glitchJitter 0.1s steps(2) infinite; }
 
     .crt-scanlines {
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.42) 0px,
-        rgba(0, 0, 0, 0.42) 2px,
-        rgba(255, 255, 255, 0.05) 2px,
-        rgba(255, 255, 255, 0.05) 4px
-      );
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0px, rgba(0,0,0,0.42) 2px, rgba(255,255,255,0.05) 2px, rgba(255,255,255,0.05) 4px);
     }
 
-    @keyframes splitLeftFly {
-      0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-      18% { transform: translate(-12px, -10px) rotate(-1.5deg); opacity: 1; }
-      100% { transform: translate(-120%, -48%) rotate(-15deg); opacity: 0; }
-    }
-    @keyframes splitRightFly {
-      0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-      18% { transform: translate(12px, 10px) rotate(1.5deg); opacity: 1; }
-      100% { transform: translate(120%, 48%) rotate(15deg); opacity: 0; }
-    }
-    .split-panel-left {
-      position: absolute; inset: 0; z-index: 54; pointer-events: none;
-      background: linear-gradient(135deg, #09030a 0%, #020103 65%, #3b0712 100%);
-      border: 2px solid rgba(254, 240, 138, 0.9);
-      clip-path: polygon(0 0, 100% 0, 100% 24%, 0 76%);
-      box-shadow: inset 0 0 36px rgba(239, 68, 68, 0.75);
-      animation: splitLeftFly 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    }
-    .split-panel-right {
-      position: absolute; inset: 0; z-index: 54; pointer-events: none;
-      background: linear-gradient(315deg, #09030a 0%, #020103 65%, #713f12 100%);
-      border: 2px solid rgba(254, 240, 138, 0.9);
-      clip-path: polygon(0 76%, 100% 24%, 100% 100%, 0 100%);
-      box-shadow: inset 0 0 36px rgba(250, 204, 21, 0.75);
-      animation: splitRightFly 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    }
-    @keyframes slashLineAnim {
-      0% { transform: translate(-120%, -120%) rotate(-27deg) scaleX(0.3); opacity: 1; }
-      34% { transform: translate(0%, 0%) rotate(-27deg) scaleX(1.9); opacity: 1; }
-      100% { transform: translate(120%, 120%) rotate(-27deg) scaleX(2.6); opacity: 0; }
-    }
-    .slash-beam {
-      position: absolute; top: 45%; left: -40%; width: 180%; height: 26px;
-      background: linear-gradient(90deg, transparent, #ffffff, #fef08a, #ef4444, #ffffff, transparent);
-      box-shadow: 0 0 46px 18px rgba(254, 240, 138, 1), 0 0 78px 30px rgba(239, 68, 68, 0.95);
-      pointer-events: none; z-index: 56;
-      animation: slashLineAnim 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+    @keyframes splitLeftFly  { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 18% { transform: translate(-12px, -10px) rotate(-1.5deg); opacity: 1; } 100% { transform: translate(-120%, -48%) rotate(-15deg); opacity: 0; } }
+    @keyframes splitRightFly { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 18% { transform: translate(12px, 10px) rotate(1.5deg); opacity: 1; } 100% { transform: translate(120%, 48%) rotate(15deg); opacity: 0; } }
+    .split-panel-left  { position: absolute; inset: 0; z-index: 54; pointer-events: none; background: linear-gradient(135deg, #09030a 0%, #020103 65%, #3b0712 100%); border: 2px solid rgba(254,240,138,0.9); clip-path: polygon(0 0, 100% 0, 100% 24%, 0 76%); box-shadow: inset 0 0 36px rgba(239,68,68,0.75); animation: splitLeftFly 0.78s cubic-bezier(0.22,1,0.36,1) forwards; }
+    .split-panel-right { position: absolute; inset: 0; z-index: 54; pointer-events: none; background: linear-gradient(315deg, #09030a 0%, #020103 65%, #713f12 100%); border: 2px solid rgba(254,240,138,0.9); clip-path: polygon(0 76%, 100% 24%, 100% 100%, 0 100%); box-shadow: inset 0 0 36px rgba(250,204,21,0.75); animation: splitRightFly 0.78s cubic-bezier(0.22,1,0.36,1) forwards; }
+    @keyframes slashLineAnim { 0% { transform: translate(-120%, -120%) rotate(-27deg) scaleX(0.3); opacity: 1; } 34% { transform: translate(0%, 0%) rotate(-27deg) scaleX(1.9); opacity: 1; } 100% { transform: translate(120%, 120%) rotate(-27deg) scaleX(2.6); opacity: 0; } }
+    .slash-beam { position: absolute; top: 45%; left: -40%; width: 180%; height: 26px; background: linear-gradient(90deg, transparent, #ffffff, #fef08a, #ef4444, #ffffff, transparent); box-shadow: 0 0 46px 18px rgba(254,240,138,1), 0 0 78px 30px rgba(239,68,68,0.95); pointer-events: none; z-index: 56; animation: slashLineAnim 0.48s cubic-bezier(0.16,1,0.3,1) forwards; }
+    @keyframes dropCrashAnim { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 16% { transform: translateY(-6px) rotate(-3.5deg); opacity: 1; } 28% { transform: translateY(10px) rotate(4.2deg); opacity: 1; } 100% { transform: translateY(135%) rotate(18deg) scale(0.92); opacity: 0; } }
+    .drop-crash-panel { position: absolute; inset: 0; z-index: 56; pointer-events: none; background: linear-gradient(180deg, #1b0614 0%, #050208 55%, #2b0712 100%); border: 3px solid rgba(250,204,21,0.9); box-shadow: inset 0 0 42px rgba(239,68,68,0.85), 0 18px 40px rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; animation: dropCrashAnim 0.82s cubic-bezier(0.55,0.055,0.675,0.19) forwards; }
+    @keyframes shardFly { 0% { transform: translate3d(0,0,0) rotate(0deg) scale(1); opacity: 1; } 18% { transform: translate3d(calc(var(--tx)*0.12), calc(var(--ty)*0.12), 20px) rotate(calc(var(--rot)*0.15)) scale(1.05); opacity: 1; } 100% { transform: translate3d(var(--tx), var(--ty), 120px) rotate(var(--rot)) scale(1.45); opacity: 0; } }
+    .shatter-shard { position: absolute; z-index: 56; pointer-events: none; background: linear-gradient(135deg, #120410 0%, #030105 60%, #4c0519 100%); border: 2px solid rgba(254,240,138,0.92); box-shadow: inset 0 0 24px rgba(239,68,68,0.78), 0 0 18px rgba(250,204,21,0.65); animation: shardFly 0.84s cubic-bezier(0.16,1,0.3,1) forwards; }
 
-    @keyframes rewindFlip {
-      0% { transform: rotate(0deg) scale(1); filter: grayscale(100%) contrast(150%); }
-      50% { transform: rotate(-180deg) scale(1.04); filter: grayscale(100%) invert(18%) contrast(185%); }
-      100% { transform: rotate(-360deg) scale(1); filter: grayscale(100%) contrast(130%); }
-    }
+    @keyframes rewindFlip { 0% { transform: rotate(0deg) scale(1); filter: grayscale(100%) contrast(150%); } 50% { transform: rotate(-180deg) scale(1.04); filter: grayscale(100%) invert(18%) contrast(185%); } 100% { transform: rotate(-360deg) scale(1); filter: grayscale(100%) contrast(130%); } }
     .fx-restart { animation: rewindFlip 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
 
-    @keyframes rippleExpand {
-      0% { transform: scale(0.8); opacity: 1; }
-      100% { transform: scale(3.4); opacity: 0; }
-    }
-    .lamp-ripple {
-      position: absolute; inset: 0; border-radius: 9999px;
-      border: 3px solid #ef4444; pointer-events: none;
-      animation: rippleExpand 0.72s cubic-bezier(0, 0.2, 0.8, 1) forwards;
-    }
-    .lamp-red {
-      background: radial-gradient(circle at 35% 30%, #fee2e2 0%, #ef4444 40%, #991b1b 82%, #450a0a 100%) !important;
-      box-shadow: 0 0 30px 10px rgba(239,68,68,0.98), inset 0 0 14px rgba(255,255,255,0.95) !important;
-      border-color: #fecaca !important;
-    }
-    .lamp-rem {
-      background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 42%, #0284c7 82%, #082f49 100%) !important;
-      box-shadow: 0 0 30px 10px rgba(56,189,248,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
-      border-color: #bae6fd !important;
-    }
-    .lamp-rainbow {
-      background: conic-gradient(from 0deg, #fde047, #fb7185, #c084fc, #38bdf8, #34d399, #fde047) !important;
-      box-shadow: 0 0 34px 12px rgba(250,204,21,0.98), inset 0 0 16px rgba(255,255,255,0.95) !important;
-      border-color: #ffffff !important;
-    }
+    @keyframes globalRainbowBurstAnim { 0% { opacity: 0.92; } 35% { opacity: 0.55; } 100% { opacity: 0; } }
+    .global-rainbow-burst { background: conic-gradient(from 0deg at 50% 50%, rgba(253,224,71,0.9), rgba(244,63,94,0.9), rgba(168,85,247,0.9), rgba(56,189,248,0.9), rgba(52,211,153,0.9), rgba(253,224,71,0.9)); animation: globalRainbowBurstAnim 0.72s ease-out forwards; }
 
-    .reel-box {
-      background: linear-gradient(180deg, rgba(24,10,8,0.95) 0%, rgba(56,22,12,0.9) 50%, rgba(24,10,8,0.95) 100%);
-      box-shadow: inset 0 4px 12px rgba(0,0,0,0.9), 0 0 14px rgba(234,179,8,0.28);
-    }
-    .reel-tenpai {
-      border-color: #facc15 !important;
-      box-shadow: inset 0 0 16px rgba(250,204,21,0.55), 0 0 22px rgba(250,204,21,0.85) !important;
-    }
-    @keyframes reelBlurSpin {
-      0% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; }
-      50% { transform: translateY(6px); filter: blur(1.8px); opacity: 1; }
-      100% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; }
-    }
+    .reel-box { background: linear-gradient(180deg, rgba(24,10,8,0.95) 0%, rgba(56,22,12,0.9) 50%, rgba(24,10,8,0.95) 100%); box-shadow: inset 0 4px 12px rgba(0,0,0,0.9), 0 0 14px rgba(234,179,8,0.28); }
+    .reel-tenpai { border-color: #facc15 !important; box-shadow: inset 0 0 16px rgba(250,204,21,0.55), 0 0 22px rgba(250,204,21,0.85) !important; }
+    @keyframes reelBlurSpin { 0% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; } 50% { transform: translateY(6px); filter: blur(1.8px); opacity: 1; } 100% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; } }
     .reel-spinning { animation: reelBlurSpin 0.08s linear infinite; }
 
-    .gold-grad-text {
-      background: linear-gradient(180deg, #fef9c3 0%, #facc15 48%, #d97706 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 3px 12px rgba(250,204,21,0.55));
-    }
-    .crimson-grad-text {
-      background: linear-gradient(180deg, #fecaca 0%, #ef4444 50%, #991b1b 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 3px 14px rgba(239,68,68,0.7));
-    }
-    .rainbow-grad-text {
-      background: linear-gradient(90deg, #fde047, #fb7185, #38bdf8, #c084fc, #fde047);
-      background-size: 200% auto;
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      animation: shineTxt 1.15s linear infinite;
-    }
-    @keyframes shineTxt { to { background-position: 200% center; } }
+    @keyframes slotBlink { 0%, 100% { opacity: 1; transform: scale(1.06); } 50% { opacity: 0.35; transform: scale(0.95); } }
+    .res-blink { animation: slotBlink 0.45s ease-in-out infinite; }
+    .res-blink-fast { animation: slotBlink 0.15s linear infinite; }
 
-    @keyframes popIn {
-      0% { transform: scale(0.48); opacity: 0; }
-      60% { transform: scale(1.12); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
-    }
+    .gold-grad-text    { background: linear-gradient(180deg, #fef9c3 0%, #facc15 48%, #d97706 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 12px rgba(250,204,21,0.55)); }
+    .crimson-grad-text { background: linear-gradient(180deg, #fecaca 0%, #ef4444 50%, #991b1b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(239,68,68,0.7)); }
+    .purple-grad-text  { background: linear-gradient(180deg, #fae8ff 0%, #e879f9 48%, #9333ea 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(192,38,211,0.75)); }
+    .cyan-grad-text    { background: linear-gradient(180deg, #e0f2fe 0%, #38bdf8 48%, #0284c7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(56,189,248,0.75)); }
+    .rainbow-grad-text { background: linear-gradient(90deg, #fde047, #fb7185, #38bdf8, #c084fc, #4ade80, #fde047); background-size: 220% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineTxt 1.15s linear infinite; }
+    @keyframes shineTxt { to { background-position: 220% center; } }
+
+    @keyframes popIn { 0% { transform: scale(0.48); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
     .pop-in { animation: popIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-
-    @keyframes cutinSlam {
-      0% { transform: scale(1.9) skewX(-10deg); opacity: 0; }
-      55% { transform: scale(0.95) skewX(-5deg); opacity: 1; }
-      100% { transform: scale(1) skewX(-3deg); opacity: 1; }
-    }
+    @keyframes cutinSlam { 0% { transform: scale(1.9) skewX(-10deg); opacity: 0; } 55% { transform: scale(0.95) skewX(-5deg); opacity: 1; } 100% { transform: scale(1) skewX(-3deg); opacity: 1; } }
     .cutin-slam { animation: cutinSlam 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
+    @keyframes rainbowBgFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
     .overlay-blackout { background-color: #020104; }
-    .overlay-6000 { background: radial-gradient(circle at 50% 42%, #4a0d22 0%, #1c0518 52%, #07020a 100%); }
-    .overlay-wedding { background: radial-gradient(circle at 50% 35%, #ffffff 0%, #fff1f2 46%, #fef3c7 100%); }
+    .overlay-6000     { background: radial-gradient(circle at 50% 42%, #4a0d22 0%, #1c0518 52%, #07020a 100%); }
+    .overlay-wedding  { background: radial-gradient(circle at 50% 35%, #ffffff 0%, #fff1f2 46%, #fef3c7 100%); }
+    .overlay-rainbow  { background: linear-gradient(135deg, #7f1d1d 0%, #854d0e 18%, #065f46 36%, #075985 54%, #581c87 74%, #9d174d 90%, #7f1d1d 100%); background-size: 260% 260%; animation: rainbowBgFlow 2.0s ease infinite; }
 
     .secret-ok-btn {
       background: radial-gradient(circle at 35% 30%, #44403c 0%, #1c1917 65%, #0c0a09 100%);
@@ -392,10 +700,7 @@
       transition: transform 0.08s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .secret-ok-btn:active { transform: scale(0.90) translateY(1px); }
-    .secret-ok-active {
-      border-color: rgba(251, 191, 36, 0.78) !important;
-      box-shadow: inset 0 2px 4px rgba(254,240,138,0.32), 0 0 12px rgba(251,191,36,0.45);
-    }
+    .secret-ok-active { border-color: rgba(251, 191, 36, 0.78) !important; box-shadow: inset 0 2px 4px rgba(254,240,138,0.32), 0 0 12px rgba(251,191,36,0.45); }
 
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #1a0b05; }
@@ -404,14 +709,20 @@
 </head>
 <body class="min-h-screen bg-gold-wagara text-slate-100 pb-10 relative">
 
-  <!-- 縁外連動ライティング＆虹色回転サンバースト後光（背景最背面） -->
+  <!-- 縁外連動ライティング＆虹色回転サンバースト -->
   <div id="ambientBgLayer" class="fixed inset-0 pointer-events-none z-0"></div>
   <div id="sunburstLayer" class="hidden fixed inset-0 pointer-events-none z-0 overflow-hidden">
     <div class="sunburst-rays"></div>
   </div>
 
+  <!-- 全画面ブラックアウト／虹フラッシュ／神秘カットイン／サラサラキラキラ -->
+  <div id="globalBlackoutCurtain" class="hidden fixed inset-0 z-[999] bg-black pointer-events-none"></div>
+  <div id="globalRainbowFlash" class="hidden fixed inset-0 z-[998] pointer-events-none"></div>
+  <div id="globalCutinOverlay" class="hidden fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden"></div>
+  <canvas id="softSparkleCanvas"></canvas>
+
   <!-- =======================================================================
-       コンパクト2行ヘッダー（黄金ベゼル・テスト選択メニュー搭載）
+       コンパクト2行ヘッダー（BGM・テスト・チューナー・スピード）
        ======================================================================= -->
   <header class="bg-[#180806]/92 border-b border-amber-500/45 shadow-lg sticky top-0 z-40 backdrop-blur-md">
     <div class="max-w-lg sm:max-w-4xl mx-auto px-2.5 pt-2 pb-1.5 space-y-1.5">
@@ -424,7 +735,7 @@
             <h1 class="text-[11px] sm:text-sm font-black bg-gradient-to-r from-yellow-200 via-amber-300 to-rose-300 bg-clip-text text-transparent truncate">
               リゼロ鬼がかり2
             </h1>
-            <p class="text-[9px] text-amber-200/80 truncate">1/349.9・v3.0</p>
+            <p class="text-[9px] text-amber-200/80 truncate">1/349.9・v4.0</p>
           </div>
         </div>
 
@@ -437,6 +748,9 @@
           </button>
           <button id="btnToggleTuner" class="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-[#241008] hover:bg-[#33180c] text-amber-300 border border-amber-500/55 active:scale-95 transition">
             🎛️ 音
+          </button>
+          <button id="btnToggleBgm" class="px-1.5 py-1.5 rounded-lg text-[10px] font-black bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/60 active:scale-95 transition">
+            🎵 BGM
           </button>
           <button id="btnSpeedToggle" class="px-1.5 py-1.5 rounded-lg text-[10px] font-black bg-indigo-950 hover:bg-indigo-900 text-cyan-300 border border-cyan-500/50 active:scale-95 transition" title="演出スピード切替">
             ⏱ 極上
@@ -455,37 +769,55 @@
       </div>
     </div>
 
-    <!-- 折りたたみ式：演出テスト選択ミニメニュー -->
+    <!-- 折りたたみ式：演出テスト＆開発メニュー -->
     <div id="promoTestMenu" class="hidden border-t border-amber-500/40 bg-[#1b0a07]/98">
       <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-2.5 space-y-2">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-black text-amber-300">🎬 演出テスト（1タップ再生）</span>
+          <span class="text-[11px] font-black text-amber-300">🎬 開発＆演出テスト（1タップ再生）</span>
           <button id="btnClosePromoMenu" class="text-[10px] text-amber-200/80 px-2 py-0.5 rounded bg-black/50 border border-amber-800/60">閉じる</button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+          <button id="btnDevInstantRush" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-300/80 text-white active:scale-95 transition">
+            🚀 即RUSH突入（開発）
+          </button>
+          <button id="btnDevInfRush" class="py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition">
+            ♾️ 無限ST: OFF
+          </button>
           <button data-test="freeze3s" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-900 to-rose-900 border border-amber-300/70 text-amber-100 active:scale-95 transition">
-            💀 3秒フリーズ→鬼がかってますね
+            💀 3秒フリーズ→神秘鬼がかってますね
           </button>
-          <button data-test="pokyun" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-800 to-amber-700 border border-yellow-200/70 text-white active:scale-95 transition">
-            🌈 偽Re:Start→虹ポキュ↑ーン↓
+          <button data-test="countup6000" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-600 via-rose-600 to-fuchsia-700 border border-yellow-200/80 text-white active:scale-95 transition">
+            📈 出玉カウントアップ突破6,000
           </button>
-          <button data-test="whisper" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-800 to-purple-900 border border-fuchsia-400/70 text-fuchsia-100 active:scale-95 transition">
-            👁️ 答え合わせ→これから脳が震える
+          <button data-test="brain4" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-800 via-fuchsia-800 to-rose-900 border border-fuchsia-300/80 text-fuchsia-100 active:scale-95 transition">
+            🧠 脳が震える4層＆ボタン激震
           </button>
-          <button data-test="suddenOchi" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-600 to-red-700 border border-yellow-200/80 text-white active:scale-95 transition">
+          <button data-test="remLamp" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 via-blue-800 to-fuchsia-900 border border-sky-300/80 text-sky-100 active:scale-95 transition">
+            💙 レム虹オーラ＆ツノ白熱（4種）
+          </button>
+          <button data-test="oniApproach" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-red-800 border border-amber-300/80 text-amber-100 active:scale-95 transition">
+            🔥 鬼がかり巨大図柄＆鬼レム接近
+          </button>
+          <button data-test="suddenOchi" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-700 to-amber-600 border border-yellow-200/80 text-white active:scale-95 transition">
             🚨 突発落ちブル警報→6,000
           </button>
           <button data-test="whale3000" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 to-indigo-900 border border-cyan-300/70 text-cyan-100 active:scale-95 transition">
             🐋 白鯨3,000 ダイレクト直撃
           </button>
+          <button data-test="pokyun" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-800 to-amber-700 border border-yellow-200/70 text-white active:scale-95 transition">
+            🌈 偽Re:Start→虹ポキュ↑ーン↓
+          </button>
+          <button data-test="revivalResult" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-800 to-purple-900 border border-fuchsia-400/70 text-fuchsia-100 active:scale-95 transition">
+            ⏪ リザルト死に戻り強制復活
+          </button>
           <button data-test="randomCrash" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-900 to-rose-950 border border-amber-400/70 text-amber-200 active:scale-95 transition">
-            💥 落下 / 粉砕 / 激震 / 斬撃
+            💥 落下 / 粉砕 / 激震 / ボタン昇格
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 折りたたみ式：音響チューナー（＋新落ちブル・残響プチュン試聴ボタン） -->
+    <!-- 折りたたみ式：音響チューナー（SE神設定＋BGM音量） -->
     <div id="audioTunerDrawer" class="hidden border-t border-amber-500/40 bg-[#1b0a07]/98">
       <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-3 space-y-2.5">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -497,55 +829,41 @@
             <button id="btnMute" class="text-[10px] font-black text-emerald-300 px-2 py-1 rounded bg-slate-800 border border-slate-600 active:scale-95 transition">🔊 ON</button>
           </div>
         </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[11px]">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px]">
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-amber-100 font-bold">リバーブ深さ</span>
-              <span id="valReverbWet" class="font-black text-amber-300">44%</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-amber-100 font-bold">リバーブ深さ</span><span id="valReverbWet" class="font-black text-amber-300">44%</span></div>
             <input id="sliderReverbWet" type="range" min="0" max="100" step="1" value="44" class="w-full accent-rose-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-amber-100 font-bold">高音キレ・ピッチ</span>
-              <span id="valPeakBright" class="font-black text-amber-300">0.73x</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-amber-100 font-bold">高音キレ・ピッチ</span><span id="valPeakBright" class="font-black text-amber-300">0.73x</span></div>
             <input id="sliderPeakBright" type="range" min="0.60" max="1.30" step="0.01" value="0.73" class="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-amber-100 font-bold">「ーン↓」落ち幅</span>
-              <span id="valDownBend" class="font-black text-amber-300">115%</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-amber-100 font-bold">「ーン↓」落ち幅</span><span id="valDownBend" class="font-black text-amber-300">115%</span></div>
             <input id="sliderDownBend" type="range" min="0" max="150" step="5" value="115" class="w-full accent-fuchsia-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-amber-200 font-black">「ポ」の強さ</span>
-              <span id="valPoEmphasis" class="font-black text-amber-300">160%</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-amber-200 font-black">「ポ」の強さ</span><span id="valPoEmphasis" class="font-black text-amber-300">160%</span></div>
             <input id="sliderPoEmphasis" type="range" min="50" max="200" step="5" value="160" class="w-full accent-orange-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-rose-300 font-black">ジャリジャリ感</span>
-              <span id="valGrit" class="font-black text-amber-300">115%</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-rose-300 font-black">ジャリジャリ感</span><span id="valGrit" class="font-black text-amber-300">115%</span></div>
             <input id="sliderGrit" type="range" min="0" max="160" step="5" value="115" class="w-full accent-red-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
           <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-amber-100 font-bold">マスター音量</span>
-              <span id="valVolume" class="font-black text-amber-300">80%</span>
-            </div>
+            <div class="flex justify-between mb-1"><span class="text-amber-100 font-bold">SE 音量</span><span id="valVolume" class="font-black text-amber-300">80%</span></div>
             <input id="sliderVolume" type="range" min="0" max="100" step="5" value="80" class="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div class="col-span-2">
+            <div class="flex justify-between mb-1"><span class="text-emerald-300 font-black">🎵 BGM 音量</span><span id="valBgmVolume" class="font-black text-emerald-300">65%</span></div>
+            <input id="sliderBgmVolume" type="range" min="0" max="100" step="5" value="65" class="w-full accent-emerald-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- フルスクリーン固定モーダル：RUSHリザルト -->
+  <!-- フルスクリーン固定モーダル：RUSHリザルト（死に戻り復活のトリガーにもなる） -->
   <div id="resultModal" class="hidden fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto">
     <div class="w-full max-w-sm my-auto rounded-3xl bg-gradient-to-b from-[#331407] via-[#1c080d] to-[#0a0406] border-2 border-amber-400/90 p-5 shadow-2xl text-center">
       <div class="text-[10px] font-black tracking-[0.28em] text-amber-300 mb-1">ONIGAKARI RUSH RESULT</div>
@@ -605,47 +923,126 @@
       </section>
 
       <!-- ===================================================================
-           黄金ベゼル液晶筐体（完全排他レイヤー・固定高さ）
+           黄金ベゼル液晶筐体（動的ステージ＋3モード専用フル画面＋完全中央固定）
            =================================================================== -->
       <div class="flex items-stretch gap-1.5">
         <div id="ledLeft" class="led-bar shrink-0"></div>
 
-        <section id="lcdFrame" class="gold-bezel relative flex-1 overflow-hidden rounded-3xl bg-gradient-to-b from-[#240a0d] via-[#14070e] to-[#0a0407] h-[356px] sm:h-[388px] flex flex-col justify-between p-3 sm:p-4 transition-colors duration-200">
+        <section id="lcdFrame" class="gold-bezel relative flex-1 overflow-hidden rounded-3xl bg-[#0e0407] h-[368px] sm:h-[404px] flex flex-col justify-between p-3 sm:p-4 transition-colors duration-200">
 
-          <!-- ① 上部HUDバー -->
-          <div class="relative z-10 flex items-center justify-between gap-1.5 shrink-0 h-11">
-            <div id="stateBadge" class="px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide bg-black/80 border border-amber-500/70 text-amber-200 shadow whitespace-nowrap">
-              通常時 1/349.9
-            </div>
+          <!-- 最背面：動的ステージ背景Canvas（通常4ステージ＋3RUSHモード＋ビート脈動） -->
+          <canvas id="stageBgCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-[1]"></canvas>
 
-            <div class="relative flex items-center justify-center">
-              <div id="lampRippleHost" class="absolute inset-0 pointer-events-none"></div>
-              <div id="oniLamp" class="w-10 h-10 rounded-full border-2 border-amber-600/80 bg-gradient-to-br from-slate-900 via-[#2a1109] to-black flex items-center justify-center shadow-inner transition-all duration-150">
-                <span id="lampEmoji" class="text-base">👹</span>
+          <!-- 通常時ステージ名ピル -->
+          <div id="stageNamePill" class="pointer-events-none absolute top-[54px] left-3 z-[15] px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-black/70 border border-amber-400/50 text-amber-200 backdrop-blur-sm">
+            王都ルグニカ
+          </div>
+
+          <!-- ① 上部HUDバー（通常時用＆RUSH本家メタリックHUDの切替） -->
+          <div class="relative z-20 shrink-0 h-11 flex items-center justify-between gap-1.5">
+            <!-- 通常時HUD -->
+            <div id="normalHudRow" class="w-full flex items-center justify-between gap-1.5">
+              <div id="stateBadge" class="px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide bg-black/80 border border-amber-500/70 text-amber-200 shadow whitespace-nowrap">
+                通常時 1/349.9
               </div>
-            </div>
 
-            <div class="text-right shrink-0">
-              <div id="normalSpinWrap" class="text-[11px] font-bold text-amber-200 bg-black/65 px-2.5 py-1 rounded-lg border border-amber-700/70 whitespace-nowrap">
+              <!-- 絵文字なしの純粋LEDガラス球ランプ -->
+              <div class="relative flex items-center justify-center">
+                <div id="lampRippleHost" class="absolute inset-0 pointer-events-none"></div>
+                <div id="oniLamp" class="w-9 h-9 rounded-full border-2 border-amber-600/80 led-lens-idle transition-all duration-150"></div>
+              </div>
+
+              <div id="normalSpinWrap" class="text-[11px] font-bold text-amber-200 bg-black/70 px-2.5 py-1 rounded-lg border border-amber-700/70 whitespace-nowrap">
                 <strong id="currentSpinDisplay" class="text-white text-sm">0</strong> 回転
               </div>
-              <div id="stRemainingWrap" class="hidden bg-rose-950/90 px-2 py-1 rounded-lg border border-amber-400/80 shadow">
-                <div class="text-[10px] font-black text-amber-200 leading-none whitespace-nowrap">
-                  残 <strong id="stHudRemain" class="text-amber-300 text-xs">144</strong> 回
+            </div>
+
+            <!-- 本家風 RUSH共通メタリックHUD（RUSH×連数／残り回数／獲得pt／残保留＆V-STOCK） -->
+            <div id="rushMetaHud" class="hidden w-full flex items-center justify-between gap-1">
+              <div class="rush-meta-gold px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
+                <span class="text-[9px] font-black text-amber-300 italic">RUSH</span>
+                <span id="hudRushChains" class="text-sm font-black gold-grad-text leading-none">×1</span>
+              </div>
+
+              <div class="rush-meta-pill px-3 py-0.5 rounded-full flex items-baseline gap-1">
+                <span class="text-[9px] font-black text-fuchsia-200">残り</span>
+                <strong id="hudRushRemain" class="text-lg sm:text-xl font-black gold-grad-text leading-none">144</strong>
+                <span class="text-[9px] font-black text-fuchsia-200">回</span>
+              </div>
+
+              <div class="flex items-center gap-1 shrink-0">
+                <div id="hudVStockBadge" class="hidden px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-400 via-rose-500 to-fuchsia-500 text-slate-950 text-[9px] font-black shadow animate-pulse border border-white">
+                  V-STOCK
                 </div>
-                <div class="flex items-center justify-end gap-1 mt-1" title="残保留4個">
-                  <span class="text-[8px] text-rose-200 font-bold">残保</span>
-                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
-                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
-                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
-                  <span class="res4-dot w-2 h-2 rounded-full bg-slate-800 border border-slate-600"></span>
+                <div class="bg-black/80 px-2 py-0.5 rounded-lg border border-amber-500/70 text-right">
+                  <div id="hudRushPts" class="text-[11px] font-black text-amber-300 leading-tight">1,500pt</div>
+                  <div class="flex items-center justify-end gap-0.5 mt-0.5" title="残保留4個">
+                    <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                    <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                    <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                    <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- ② 中央メインステージ（単一シーン排他切替） -->
-          <div class="relative z-10 flex-1 flex items-center justify-center overflow-hidden py-1">
+          <!-- =================================================================
+               RUSH3モード専用フル画面演出レイヤー（HUDの下・保留の上）
+               ================================================================= -->
+
+          <!-- 🔥 鬼がかりRUSH：超巨大3桁図柄ステージ＆鬼レム接近 -->
+          <div id="oniRushStage" class="hidden">
+            <div id="oniRemApproachWrap" class="hidden absolute inset-0 z-[2] flex items-center justify-center pointer-events-none">
+              <img id="oniRemApproachImg" class="max-h-[92%] max-w-[92%] object-contain" alt="鬼レム接近">
+            </div>
+            <div class="relative z-[5] flex items-center justify-center gap-2 sm:gap-4 px-2">
+              <div id="oniReel0" class="oni-big-num oni-num-odd text-[72px] sm:text-[92px]">7</div>
+              <div id="oniReel1" class="oni-big-num oni-num-even text-[56px] sm:text-[74px] translate-y-2">3</div>
+              <div id="oniReel2" class="oni-big-num oni-num-odd text-[72px] sm:text-[92px]">7</div>
+            </div>
+            <div id="oniRushSubBanner" class="relative z-[6] mt-1 px-3 py-0.5 rounded-full bg-black/70 border border-amber-400/60 text-[10px] font-black text-amber-200 tracking-wider">
+              ONIGAKARI RUSH — 25% 鬼がかり6000
+            </div>
+          </div>
+
+          <!-- 🧠 脳が震えるRUSH：本家4層サンドイッチ（完全中央固定） -->
+          <div id="brainRushStage" class="hidden">
+            <div id="brainPetePos0" class="brain-pete-pos" style="z-index: 10;">
+              <img id="brainPeteImg0" class="brain-pete-img" alt="ペテルギウスA">
+            </div>
+            <div id="brainPetePos1" class="brain-pete-pos" style="z-index: 10;">
+              <img id="brainPeteImg1" class="brain-pete-img" alt="ペテルギウスB">
+            </div>
+            <div id="brainAtmosphereVeil"></div>
+
+            <!-- 手前下部中央：巨大botan.jpg（5色天面発光＋4段階激震） -->
+            <div id="brainBotanWrap" class="botan-stage-wrap absolute bottom-[38px] left-1/2 -translate-x-1/2 w-[188px] sm:w-[214px] max-w-[54%] z-[18]">
+              <div id="brainBotanRing" class="absolute w-[118%] h-[118%] rounded-full pointer-events-none opacity-0"></div>
+              <img id="brainBotanImg" class="botan-img-base" alt="3Dボタン">
+              <div id="brainBotanGlow" class="botan-crystal-glow"></div>
+            </div>
+
+            <!-- 禍々しい「脳が」文字乱舞層＆進化フラッシュ -->
+            <div id="brainTextSwarm"></div>
+            <div id="brainEvoFlash"></div>
+          </div>
+
+          <!-- 💙 レム告知モード：本家準拠・ツノ白熱発光＋虹オーラ縁取り -->
+          <div id="remRushStage" class="hidden">
+            <div id="remLampOuter">
+              <img id="remLampImg" class="rem-img-idle" alt="鬼化レムランプ">
+              <div id="remHornGlow"></div>
+            </div>
+          </div>
+
+          <!-- RUSH中共通：カウントダウン／信頼度／特殊告知ポップアップバッジ -->
+          <div id="rushTopBadge" class="hidden pointer-events-none absolute top-[54px] left-1/2 -translate-x-1/2 z-[28] px-3.5 py-0.5 rounded-full text-xs font-black tracking-wide bg-black/90 border border-amber-400 text-amber-300 shadow-lg whitespace-nowrap"></div>
+          <div id="hiddenRemBadge" class="hidden pointer-events-none absolute bottom-12 left-3 z-[25] text-xs font-black px-2 py-0.5 rounded-full bg-sky-950/90 border border-sky-300/80 text-sky-200 shadow">REM</div>
+          <div id="rushNoiseVeil" class="hidden pointer-events-none absolute inset-0 z-[26] crt-scanlines bg-black/25"></div>
+
+          <!-- ② 中央メインステージ（通常時・リーチ・大当たり） -->
+          <div class="relative z-[16] flex-1 flex items-center justify-center overflow-hidden py-1">
 
             <!-- シーンA：通常時 -->
             <div id="scene-normal" class="scene-pane w-full flex flex-col items-center justify-center text-center">
@@ -661,51 +1058,46 @@
                 </div>
               </div>
               <div id="normalTitle" class="text-2xl sm:text-3xl font-black text-white tracking-tight">STANDBY</div>
-              <p id="normalSub" class="mt-1 text-[11px] sm:text-xs text-amber-100/80 max-w-sm leading-snug px-2">
-                「🔥 先バレオート」で爆音ポキュ↑ーン↓＆鬼がかりRUSHを体感！
+              <p id="normalSub" class="mt-1 text-[11px] sm:text-xs text-amber-100/85 max-w-sm leading-snug px-2">
+                「🔥 先バレオート」で爆音ポキュ↑ーン↓＆新BGMを体感！
               </p>
             </div>
 
-            <!-- シーンB：先バレ・リーチ・3DドームPUSH -->
+            <!-- シーンB：通常時・先バレ＆2段階チャンスアップ＆botan.jpgジャッジ -->
             <div id="scene-reach" class="scene-pane hidden w-full flex flex-col items-center justify-center text-center">
-              <span id="reachYokokuBadge" class="mb-1.5 px-3 py-0.5 rounded-full text-[11px] font-black tracking-wide bg-black/85 border border-amber-400/80 text-amber-300 shadow-lg"></span>
+              <div class="flex items-center justify-center gap-1.5 mb-1">
+                <span id="reachYokokuBadge" class="px-3 py-0.5 rounded-full text-[11px] font-black tracking-wide bg-black/85 border border-amber-400/80 text-amber-300 shadow-lg"></span>
+                <span id="reachStepBadge" class="hidden px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-black/85 border border-rose-400 text-rose-200 shadow-lg"></span>
+              </div>
               <div id="reachTitle" class="font-mincho text-2xl sm:text-3xl font-black text-white leading-tight px-2"></div>
-              <p id="reachSub" class="mt-1 text-[11px] text-rose-100/85 max-w-sm leading-snug px-2"></p>
+              <p id="reachSub" class="mt-1 text-[11px] text-rose-100/90 max-w-sm leading-snug px-2"></p>
 
-              <div id="pushButtonArea" class="hidden mt-2.5 flex flex-col items-center gap-1">
-                <div class="relative w-28 h-28 flex items-center justify-center">
-                  <button id="btnOniPush" class="push-dome w-24 h-24 rounded-full border-4 border-amber-300 flex flex-col items-center justify-center text-white cursor-pointer select-none">
-                    <span id="btnPushMain" class="text-2xl font-black tracking-wider drop-shadow leading-none">PUSH</span>
-                    <span id="btnPushSub" class="text-[9px] font-black text-amber-200 mt-1 tracking-widest">当落ジャッジ</span>
-                  </button>
-                </div>
+              <!-- botan.jpg 巨大3DクリスタルPUSHジャッジ -->
+              <div id="pushButtonArea" class="hidden mt-2 flex flex-col items-center gap-1">
+                <button id="btnOniPush" class="botan-stage-wrap relative w-[144px] sm:w-[164px] cursor-pointer select-none active:scale-95 transition focus:outline-none">
+                  <div id="reachBotanRing" class="absolute w-[116%] h-[116%] rounded-full pointer-events-none opacity-0"></div>
+                  <img id="reachBotanImg" class="botan-img-base" alt="PUSH">
+                  <div id="reachBotanGlow" class="botan-crystal-glow"></div>
+                  <span id="reachBotanText" class="pointer-events-none absolute top-[34%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-black text-slate-950 drop-shadow-[0_0_8px_rgba(255,255,255,0.98)] tracking-wider">PUSH</span>
+                </button>
                 <div id="pushHintText" class="text-[10px] font-black text-amber-300">
-                  タップで当落ジャッジ！（右下OKで裏告知）
+                  ボタンタップで当落ジャッジ！（右下OKで裏告知）
                 </div>
               </div>
             </div>
 
-            <!-- シーンC：RUSH消化待機中 -->
-            <div id="scene-rush-idle" class="scene-pane hidden w-full flex flex-col items-center justify-center text-center">
-              <div id="rushModeBanner" class="text-[11px] font-black tracking-[0.2em] text-amber-300/90 mb-1">ONIGAKARI RUSH</div>
-              <div class="flex items-baseline justify-center gap-1.5">
-                <span class="text-sm font-black text-rose-200">残り</span>
-                <span id="rushBigRemain" class="text-6xl sm:text-7xl font-black gold-grad-text leading-none tracking-tight">144</span>
-                <span class="text-sm font-black text-rose-200">回</span>
-              </div>
-              <p id="rushIdleSub" class="mt-2.5 text-[11px] sm:text-xs font-bold text-rose-100/85 max-w-sm leading-snug px-2">
-                25%の「鬼がかり6000」を引け！
-              </p>
-            </div>
+            <!-- シーンC：RUSH消化中（実表示は上の3モード専用ステージが担当） -->
+            <div id="scene-rush-idle" class="scene-pane hidden w-full h-full pointer-events-none"></div>
 
-            <!-- シーンD：大当たり＆右下「違和感答え合わせ／レア『これから脳が震える…』」枠 -->
+            <!-- シーンD：モード別専用大当たり画面＆出玉カウントアップ＆違和感答え合わせ枠 -->
             <div id="scene-bonus" class="scene-pane hidden w-full h-full flex flex-col items-center justify-center text-center relative px-2">
-              <div id="bonusSubLabel" class="text-[11px] sm:text-xs font-black tracking-[0.18em] text-amber-300 mb-1.5"></div>
+              <div id="bonusSubLabel" class="text-[11px] sm:text-xs font-black tracking-[0.18em] text-amber-300 mb-1"></div>
               <div id="bonusMainTitle" class="text-3xl sm:text-4xl font-black gold-grad-text tracking-tight leading-tight"></div>
-              <p id="bonusDesc" class="mt-1.5 text-xs font-bold text-slate-200/90 max-w-sm"></p>
+              <div id="bonusCountNum" class="hidden mt-1 text-5xl sm:text-6xl font-black rainbow-grad-text tracking-tight leading-none">1,500</div>
+              <p id="bonusDesc" class="mt-1.5 text-xs font-bold text-slate-200/95 max-w-sm"></p>
 
               <!-- 本家仕様：右下「違和感の答え合わせ」兼 レア「これから脳が震える…」枠 -->
-              <div id="subtleWhisperSlot" class="hidden absolute bottom-1 right-1 sm:right-2 px-2.5 py-1 rounded-md bg-black/80 border border-amber-500/45 shadow-lg max-w-[85%]">
+              <div id="subtleWhisperSlot" class="hidden absolute bottom-1 right-1 sm:right-2 px-2.5 py-1 rounded-md bg-black/82 border border-amber-500/45 shadow-lg max-w-[85%]">
                 <span id="subtleWhisperText" class="font-mincho text-[11px] sm:text-xs font-semibold text-amber-100/95 tracking-wider"></span>
               </div>
             </div>
@@ -713,16 +1105,26 @@
           </div>
 
           <!-- ③ 下部保留スロット -->
-          <div class="relative z-10 pt-2 border-t border-amber-800/50 flex items-center justify-between gap-2 shrink-0 h-11">
+          <div id="reserveBar" class="relative z-20 pt-2 border-t border-amber-800/50 flex items-center justify-between gap-2 shrink-0 h-11">
             <span id="reserveLabel" class="text-[10px] font-black text-amber-200/85 tracking-wider whitespace-nowrap">保留</span>
             <div class="flex items-center justify-center gap-2 flex-1">
-              <div id="resSlot0" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/70 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
-              <div id="resSlot1" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/70 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
-              <div id="resSlot2" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/70 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
-              <div id="resSlot3" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/70 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
+              <div id="resSlot0" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
+              <div id="resSlot1" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
+              <div id="resSlot2" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
+              <div id="resSlot3" class="w-8 h-8 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[11px] font-black text-amber-200/60 transition-all">○</div>
               <div id="resSlot4" class="hidden w-8 h-8 rounded-full border-2 border-purple-700 bg-purple-950/90 flex items-center justify-center text-[11px] font-black text-purple-300 transition-all">る</div>
             </div>
-            <span id="lampStatusText" class="text-[10px] font-black text-amber-200 min-w-[54px] text-right whitespace-nowrap">待機中</span>
+            <span id="lampStatusText" class="text-[10px] font-black text-amber-200 min-w-[56px] text-right whitespace-nowrap">待機中</span>
+          </div>
+
+          <!-- 汎用：一撃昇格・復活時用 botan.jpg せり上がりオーバーレイ -->
+          <div id="universalBotanOverlay" class="hidden pointer-events-none absolute inset-0 z-[45] bg-black/68 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-4">
+            <div id="uniBotanLabel" class="text-sm sm:text-base font-black rainbow-grad-text tracking-widest drop-shadow">一撃解放!!</div>
+            <div class="botan-stage-wrap w-[186px] sm:w-[214px] botan-rise-in">
+              <div id="uniBotanRing" class="absolute w-[122%] h-[122%] rounded-full pointer-events-none opacity-0"></div>
+              <img id="uniBotanImg" class="botan-img-base" alt="一撃ボタン">
+              <div id="uniBotanGlow" class="botan-crystal-glow"></div>
+            </div>
           </div>
 
           <!-- 完全不透明・全画面演出オーバーレイ -->
@@ -733,10 +1135,8 @@
             <div id="fsExtra" class="relative z-10 mt-3 text-xs sm:text-sm font-bold text-amber-100/95 max-w-md leading-relaxed"></div>
           </div>
 
-          <!-- 最前面HTML5 Canvasエフェクト -->
+          <!-- 最前面HTML5 Canvasエフェクト＆物理破壊ホスト -->
           <canvas id="fxCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-50"></canvas>
-
-          <!-- 物理スラッシュ・落下・粉砕ホスト -->
           <div id="slashHost" class="pointer-events-none absolute inset-0 overflow-hidden z-[55]"></div>
 
         </section>
@@ -766,7 +1166,7 @@
         </div>
       </section>
 
-      <!-- カスタム切替バー -->
+      <!-- カスタム切替バー（通常3種 ／ RUSH3モード集約＋RUSHカスタム3種） -->
       <section class="rounded-2xl bg-[#1a0a07]/92 border border-amber-700/50 px-2.5 py-2 shadow">
         <div id="normalCustomPanel" class="grid grid-cols-3 gap-1.5">
           <button id="toggleSakibare" class="py-2 px-1 rounded-xl text-[11px] font-black border transition bg-rose-700/85 border-rose-400 text-white shadow active:scale-95">
@@ -789,6 +1189,18 @@
           </button>
           <button data-rmode="rem" class="rmode-btn py-2 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
             💙 レム告知
+          </button>
+        </div>
+
+        <div id="rushExtraCustomRow" class="hidden grid grid-cols-3 gap-1.5 mt-1.5 pt-1.5 border-t border-amber-900/60">
+          <button id="toggleRushTrust" class="py-1.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
+            🎯 信頼度先バレ: OFF
+          </button>
+          <button id="toggleRushIwakan" class="py-1.5 px-1 rounded-xl text-[10px] font-black border transition bg-purple-700/80 border-fuchsia-300 text-white shadow active:scale-95">
+            👁️ 違和感UP: ON
+          </button>
+          <button id="toggleRushNoNotice" class="py-1.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">
+            🤫 予告無し: OFF
           </button>
         </div>
       </section>
@@ -838,7 +1250,7 @@
         </div>
 
         <div class="shrink-0 pl-1.5 border-l border-amber-900/70 flex flex-col items-center justify-center">
-          <button id="btnSecretOk" title="裏ボタン（リーチ中・仮表示中に押すと先行告知／割り込み昇格を抽選）" class="secret-ok-btn w-11 h-11 rounded-full border-2 border-amber-800/80 flex flex-col items-center justify-center text-amber-200 cursor-pointer">
+          <button id="btnSecretOk" title="裏ボタン（リーチ中・仮表示中に押すと先行告知／割り込み昇格）" class="secret-ok-btn w-11 h-11 rounded-full border-2 border-amber-800/80 flex flex-col items-center justify-center text-amber-200 cursor-pointer">
             <span class="text-[11px] font-black tracking-tighter leading-none">OK</span>
             <span class="text-[7px] text-amber-400/80 font-bold mt-0.5">裏</span>
           </button>
@@ -990,10 +1402,10 @@
     </div>
   </main>
 
-  <!-- v3.0 キャッシュ突破バージョン付き読み込み -->
-  <script src="sound.js?v=5"></script>
-  <script src="effects.js?v=5"></script>
-  <script src="game.js?v=5"></script>
-  <script src="addons.js?v=3"></script>
+  <!-- v4.0 クリーン5ファイル構成（sound.jsは確定神設定のまま維持／addons.js卒業） -->
+  <script src="sound.js?v=6"></script>
+  <script src="bgm.js?v=6"></script>
+  <script src="effects.js?v=6"></script>
+  <script src="game.js?v=6"></script>
 </body>
 </html>
