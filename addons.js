@@ -1,14 +1,14 @@
 // =========================================================================
-// addons.js (v4.2) :
-//  1. 単体ロゴ oni_rush.jpg / oni_6000.jpg の高画質白透過＆最優先差し替え
-//  2. レム点灯時の前面数字消去＆終了後の光りっぱなし完全防止
-//  3. 実機図柄法則（偶数=300 / 1・5=1500 / 3・7=6000濃厚 / 予告あり+偶数=6000昇格濃厚）
-//  4. 1画面完結レイアウト＆ヘッダー「⚙️ 設定」一括モーダル
-//  5. PCキーボード「スペース長押しハンドル（演出時自動停止・リーチ中PUSH）」＆「Oキー裏OK」
+// addons.js (v4.3) :
+//  1. ヘッダー整理（試聴・音・BGM・スピードを「⚙️ 設定」モーダルへ完全移設）
+//  2. 大当たり画面のロゴサイズ・余白調整＆違和感答え合わせ枠を右上へ移設（文字被りゼロ）
+//  3. レム告知の重複pt表示を撤去＆スマホ1画面に全操作ボタンが収まるようスリム化
+//  4. 単体ロゴ（oni_rush / oni_6000：jpg/png/webp全対応）＆レム点灯時数字消去
+//  5. 実機図柄法則＆PCスペース長押しハンドル（演出時自動停止・Oキー裏OK）
 // =========================================================================
-(function initV42Pack() {
+(function initV43Pack() {
   // -----------------------------------------------------------------------
-  // 1. 単体ロゴ oni_rush.jpg / oni_6000.jpg の白透過＆Assets差し替え
+  // 1. 単体ロゴ oni_rush / oni_6000 の高画質白透過＆Assets差し替え
   // -----------------------------------------------------------------------
   const customLogos = { oniRush: null, oni6000: null };
 
@@ -50,7 +50,6 @@
         if (y < h - 1) push(idx + w);
       }
 
-      // 外周白フチ除去＆ソフトフェザー
       const passes = softAura ? 3 : 1;
       for (let pass = 0; pass < passes; pass++) {
         const snap = new Uint8Array(total);
@@ -63,20 +62,15 @@
               const p = idx * 4;
               const minC = Math.min(d[p], d[p + 1], d[p + 2]);
               const lum = (d[p] + d[p + 1] + d[p + 2]) / 3;
-              if (lum > 200 && minC > 180) {
-                d[p + 3] = 0;
-              } else if (minC > 165) {
-                d[p + 3] = Math.min(d[p + 3], Math.round(((255 - minC) / 90) * 240));
-              } else if (pass === 0) {
-                d[p + 3] = Math.min(d[p + 3], 215);
-              }
+              if (lum > 200 && minC > 180) d[p + 3] = 0;
+              else if (minC > 165) d[p + 3] = Math.min(d[p + 3], Math.round(((255 - minC) / 90) * 240));
+              else if (pass === 0) d[p + 3] = Math.min(d[p + 3], 215);
             }
           }
         }
       }
       c.putImageData(imgData, 0, 0);
 
-      // 透明余白トリミング
       let minX = w, minY = h, maxX = -1, maxY = -1;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -114,8 +108,8 @@
     next();
   }
 
-  tryLoadLogo(['oni_rush.jpg', 'oni_rush.png', 'onigakari_rush.jpg', 'onirush.jpg'], 'oniRush', false);
-  tryLoadLogo(['oni_6000.jpg', 'oni_6000.png', 'onigakari_6000.jpg', 'oni6000.jpg'], 'oni6000', true);
+  tryLoadLogo(['oni_rush.jpg', 'oni_rush.png', 'oni_rush.webp', 'onigakarirush.webp', 'onigakari_rush.jpg'], 'oniRush', false);
+  tryLoadLogo(['oni_6000.jpg', 'oni_6000.png', 'oni_6000.webp', 'onigakari6000.webp', 'onigakari_6000.jpg'], 'oni6000', true);
 
   if (typeof Assets !== 'undefined' && typeof Assets.getLogo === 'function') {
     const _origGetLogo = Assets.getLogo;
@@ -206,7 +200,6 @@
   // -----------------------------------------------------------------------
   // 3. 実機図柄法則（偶数=300 / 1・5=1500 / 3・7=6000濃厚 / 予告あり+偶数=6000昇格濃厚）
   // -----------------------------------------------------------------------
-  // 通常時：7テンパイ・揃いは3,000＋RUSH直行濃厚（1500_RUSHでは7を出さない）
   if (typeof window.buildNormalScenario === 'function') {
     const _origBuildNormal = window.buildNormalScenario;
     window.buildNormalScenario = function (res) {
@@ -218,19 +211,11 @@
     };
   }
 
-  // RUSH中：現在の当選種別と予告経由フラグに応じて実機法則どおりの図柄を選ぶ
   function pickRushRuleDigit(bonusType, hadNotice = false) {
     const evens = [2, 4, 6, 8];
-    if (bonusType === 'BONUS_300') {
-      return evens[Math.floor(Math.random() * evens.length)];
-    }
-    if (bonusType === 'BONUS_1500') {
-      return Math.random() < 0.5 ? 1 : 5;
-    }
-    // BONUS_6000：3 or 7揃い（王道6000濃厚）、または「予告あり+偶数揃い（激アツ法則崩れ昇格）」
-    if (hadNotice && Math.random() < 0.28) {
-      return evens[Math.floor(Math.random() * evens.length)];
-    }
+    if (bonusType === 'BONUS_300') return evens[Math.floor(Math.random() * evens.length)];
+    if (bonusType === 'BONUS_1500') return Math.random() < 0.5 ? 1 : 5;
+    if (hadNotice && Math.random() < 0.28) return evens[Math.floor(Math.random() * evens.length)];
     if (Math.random() < 0.55) return 7;
     if (Math.random() < 0.82) return 3;
     return Math.random() < 0.5 ? 1 : 5;
@@ -242,18 +227,15 @@
     const winDig = pickRushRuleDigit(bType, hadNotice);
     setOniReels(winDig, winDig, winDig, { spinning: false, hitLock: true });
 
-    // 予告経由＋偶数揃いの激アツ裏法則（6000昇格濃厚）や3・7揃いの気持ちいい間
     StudioAudio.playSoftHeartbeat();
     const ringCol = (winDig === 7 || winDig === 3) ? '#fde047' : (winDig % 2 === 1 ? '#fb7185' : '#38bdf8');
     FxCanvas.spawnRing(ringCol, 260, 8);
     await wait(550, token);
 
     if (winDig === 7 || winDig === 3) {
-      StudioAudio.playPokyun(true);
-      FxCanvas.burstRainbow(64);
+      StudioAudio.playPokyun(true); FxCanvas.burstRainbow(64);
     } else {
-      StudioAudio.playKyuin();
-      FxCanvas.burstGold(52);
+      StudioAudio.playKyuin(); FxCanvas.burstGold(52);
     }
     await wait(340, token);
   };
@@ -286,48 +268,118 @@
   };
 
   // -----------------------------------------------------------------------
-  // 4. 1画面完結デザイン＆ヘッダー「⚙️ 設定」一括モーダル
+  // 4. CSS最適化（大当たり文字被りゼロ・レムpt撤去・スマホ1画面完結）
   // -----------------------------------------------------------------------
-  if (!document.getElementById('v42-layout-css')) {
+  if (!document.getElementById('v43-layout-css')) {
     const st = document.createElement('style');
-    st.id = 'v42-layout-css';
+    st.id = 'v43-layout-css';
     st.textContent = `
-      /* 設定モーダル内では通常・RUSHどちらのカスタムも常時表示 */
+      /* 設定モーダル内では通常・RUSHカスタム＆チューナーを常時表示 */
       #settingsModalBody #normalCustomPanel,
       #settingsModalBody #rushExtraCustomRow {
         display: grid !important;
       }
-      /* 1画面に収まるよう液晶と下部パネルを最適化 */
-      #playModeContainer { gap: 6px; }
-      @media (max-height: 760px) {
-        #lcdFrame { height: 320px !important; }
+      #settingsModalBody #slotQuickButtons button {
+        width: 100%;
+        padding-top: 8px; padding-bottom: 8px;
+        font-size: 11px;
+      }
+
+      /* 大当たり画面：ロゴと文字が絶対に被らず・見切れないサイズ設計 */
+      #scene-bonus {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        gap: 2px;
+      }
+      #scene-bonus .bonus-logo-img {
+        max-height: 104px !important;
+        max-width: 78% !important;
       }
       @media (min-width: 640px) {
-        #lcdFrame { height: 380px !important; }
+        #scene-bonus .bonus-logo-img {
+          max-height: 136px !important;
+        }
+      }
+      #scene-bonus #bonusSubLabel {
+        font-size: 10px !important;
+        margin-bottom: 0 !important;
+      }
+      #scene-bonus #bonusMainTitle {
+        font-size: 1.35rem !important;
+        line-height: 1.15 !important;
+      }
+      @media (min-width: 640px) {
+        #scene-bonus #bonusMainTitle {
+          font-size: 1.75rem !important;
+        }
+      }
+      #scene-bonus #bonusDesc {
+        margin-top: 2px !important;
+        font-size: 11px !important;
+        line-height: 1.25 !important;
+      }
+
+      /* 違和感答え合わせ枠：右上へ移設して下の文字と100%分離！ */
+      #subtleWhisperSlot {
+        top: 2px !important;
+        right: 4px !important;
+        bottom: auto !important;
+        padding: 2px 8px !important;
+      }
+
+      /* レム告知モード：重複していた左下ptを撤去＆図柄位置を整える */
+      #remBottomPtBar { display: none !important; }
+      #remDigitsLayer { bottom: 44px !important; }
+
+      /* スマホ1画面完結：縦余白を詰めて操作ボタン全体を表示 */
+      #playModeContainer { gap: 6px !important; }
+      #rushStatusBar { padding-top: 5px !important; padding-bottom: 5px !important; }
+      #rushControls button, #normalControls button {
+        padding-top: 9px !important;
+        padding-bottom: 9px !important;
+      }
+      @media (max-width: 639px) {
+        #lcdFrame { height: 326px !important; padding: 10px 12px !important; }
+      }
+      @media (min-width: 640px) {
+        #lcdFrame { height: 382px !important; }
       }
     `;
     document.head.appendChild(st);
   }
 
+  // -----------------------------------------------------------------------
+  // 5. ヘッダー整理（試聴・音・BGM・スピードをすべて「⚙️ 設定」モーダルへ移設）
+  // -----------------------------------------------------------------------
+  const testBtn = document.getElementById('btnTestPromo');
+  const pokyunBtn = document.getElementById('btnTestPokyun');
+  const tunerBtn = document.getElementById('btnToggleTuner');
+  const bgmBtn = document.getElementById('btnToggleBgm');
   const speedBtn = document.getElementById('btnSpeedToggle');
-  if (speedBtn && !document.getElementById('btnOpenSettings')) {
+  const tunerDrawer = document.getElementById('audioTunerDrawer');
+
+  if (testBtn && !document.getElementById('btnOpenSettings')) {
     const setBtn = document.createElement('button');
     setBtn.id = 'btnOpenSettings';
-    setBtn.className = 'px-2 py-1.5 rounded-lg text-[10px] font-black bg-slate-900 hover:bg-slate-800 text-amber-200 border border-amber-500/60 active:scale-95 transition';
+    setBtn.className = 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-slate-900 hover:bg-slate-800 text-amber-200 border border-amber-500/70 active:scale-95 transition';
     setBtn.textContent = '⚙️ 設定';
-    speedBtn.parentElement.insertBefore(setBtn, speedBtn);
+    testBtn.parentElement.appendChild(setBtn);
 
-    // 設定一括モーダル生成
     const modal = document.createElement('div');
     modal.id = 'settingsModal';
     modal.className = 'hidden fixed inset-0 z-[900] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto';
     modal.innerHTML = `
       <div class="w-full max-w-md my-auto rounded-3xl bg-gradient-to-b from-[#2a1008] via-[#18080a] to-[#0c0406] border-2 border-amber-500/75 p-4 shadow-2xl space-y-3">
         <div class="flex items-center justify-between border-b border-amber-800/60 pb-2">
-          <h3 class="text-sm font-black text-amber-300">⚙️ カスタム＆台設定</h3>
+          <h3 class="text-sm font-black text-amber-300">⚙️ 設定・サウンド・カスタム</h3>
           <button id="btnCloseSettings" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-black/60 text-amber-200 border border-amber-700/70 active:scale-95">閉じる</button>
         </div>
         <div id="settingsModalBody" class="space-y-3">
+          <div class="space-y-1.5">
+            <div class="text-[10px] font-black text-emerald-300/90">サウンド・スピード</div>
+            <div id="slotQuickButtons" class="grid grid-cols-3 gap-1.5"></div>
+            <div id="slotAudioTuner" class="pt-1"></div>
+          </div>
           <div class="space-y-1.5">
             <div class="text-[10px] font-black text-amber-200/80">通常時カスタム</div>
             <div id="slotNormalCustom"></div>
@@ -350,7 +402,19 @@
     `;
     document.body.appendChild(modal);
 
-    // 既存のカスタムDOM＆回転率パネルをモーダルへ移設（イベントリスナーは100%維持！）
+    // ヘッダーにあった4ボタン＆チューナー本体を設定モーダル内へ綺麗に収容
+    const quickBox = document.getElementById('slotQuickButtons');
+    if (pokyunBtn) quickBox.appendChild(pokyunBtn);
+    if (bgmBtn) quickBox.appendChild(bgmBtn);
+    if (speedBtn) quickBox.appendChild(speedBtn);
+    if (tunerBtn) tunerBtn.classList.add('hidden'); // チューナーは設定内に直接表示するのでトグル不要
+
+    if (tunerDrawer) {
+      tunerDrawer.classList.remove('hidden', 'border-t', 'bg-[#1b0a07]/98');
+      tunerDrawer.classList.add('rounded-xl', 'bg-black/50', 'border', 'border-amber-800/50');
+      document.getElementById('slotAudioTuner').appendChild(tunerDrawer);
+    }
+
     const normalCustom = document.getElementById('normalCustomPanel');
     const rushExtra = document.getElementById('rushExtraCustomRow');
     const rushModePanel = document.getElementById('rushCustomPanel');
@@ -364,7 +428,6 @@
     }
     if (statsSection) document.getElementById('slotMachineStats').appendChild(statsSection);
 
-    // 元のカスタムバーは「RUSH中だけ3モード切替が出るスリムバー」にする
     if (customSection && rushModePanel) {
       const syncSlimBar = () => {
         const inRush = !rushModePanel.classList.contains('hidden');
@@ -381,7 +444,7 @@
   }
 
   // -----------------------------------------------------------------------
-  // 5. PCキーボード「スペース長押しハンドル」＆「Oキー裏OK」
+  // 6. PCキーボード「スペース長押しハンドル」＆「Oキー裏OK」
   // -----------------------------------------------------------------------
   let spaceDown = false;
   let spaceHoldDelay = null;
@@ -392,7 +455,6 @@
     if (spaceHoldDelay) { clearTimeout(spaceHoldDelay); spaceHoldDelay = null; }
     if (spaceHoldLoop) { clearInterval(spaceHoldLoop); spaceHoldLoop = null; }
     if (lockUntilUp) spaceLockedUntilRelease = true;
-    // リールのスピン演出を解除
     if (typeof state !== 'undefined') {
       if (state.phase === 'NORMAL' && !state.autoMode && typeof randomMissReels === 'function') randomMissReels();
       else if (state.phase === 'RUSH' && !state.autoMode) {
@@ -411,7 +473,7 @@
       stopAuto();
       const res = drawNormalSpin();
       if (res.bareType || res.isHit) {
-        stopSpaceHandle(true); // ★演出発生で即ストップ＆離すまでロック★
+        stopSpaceHandle(true);
         startNormalReach(res);
       } else {
         clearVisualEffects(); setActiveScene('normal');
@@ -439,14 +501,11 @@
         if (state.rushMode === 'onigakari') randomOniMissReels(true);
         else if (state.rushMode === 'rem') randomRemMissReels(true);
       }
-      if (ev.type !== 'MISS' || ev.teaser) {
-        stopSpaceHandle(true); // ★当たり・煽り・終了で即ストップ★
-      }
+      if (ev.type !== 'MISS' || ev.teaser) stopSpaceHandle(true);
       handleRushEvent(ev, { fromAuto: false });
       return;
     }
 
-    // 演出進行中（ANIMATING等）になったら即ロックして止める
     stopSpaceHandle(true);
   }
 
@@ -454,7 +513,6 @@
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-    // Oキー：裏OKボタン
     if (e.code === 'KeyO' && !e.repeat) {
       const okBtn = document.getElementById('btnSecretOk');
       if (okBtn) okBtn.click();
@@ -462,12 +520,10 @@
     }
 
     if (e.code !== 'Space') return;
-    e.preventDefault(); // 画面スクロールを完全防止
-
+    e.preventDefault();
     if (e.repeat || spaceDown || spaceLockedUntilRelease) return;
     spaceDown = true;
 
-    // リーチ中ならPUSHジャッジを実行して終了
     if (typeof state !== 'undefined' && state.phase === 'REACH') {
       const pushBtn = document.getElementById('btnOniPush');
       if (pushBtn && !document.getElementById('pushButtonArea').classList.contains('hidden')) {
@@ -477,10 +533,7 @@
       return;
     }
 
-    // まず単押し1回転を実行
     stepHandleSpin(false);
-
-    // 220ms以上押し続けたら連続ハンドル回転へ移行
     if (!spaceLockedUntilRelease) {
       spaceHoldDelay = setTimeout(() => {
         if (!spaceDown || spaceLockedUntilRelease) return;
@@ -494,14 +547,10 @@
 
   window.addEventListener('keyup', (e) => {
     if (e.code !== 'Space') return;
-    spaceDown = false;
-    spaceLockedUntilRelease = false;
-    stopSpaceHandle(false);
+    spaceDown = false; spaceLockedUntilRelease = false; stopSpaceHandle(false);
   });
 
   window.addEventListener('blur', () => {
-    spaceDown = false;
-    spaceLockedUntilRelease = false;
-    stopSpaceHandle(false);
+    spaceDown = false; spaceLockedUntilRelease = false; stopSpaceHandle(false);
   });
 })();
