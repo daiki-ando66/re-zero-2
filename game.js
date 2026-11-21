@@ -1700,3 +1700,32 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
 // 初期表示
 setActiveScene('normal');
 updateStatsUI();
+// ★開発者用隠しコマンド：左上の「鬼2」アイコンを5回連打でウェディング12,000テスト再生★
+(function initSecretWeddingTest() {
+  const icon = document.querySelector('header .w-7.h-7');
+  if (!icon) return;
+  let taps = 0, tapTimer = null;
+  icon.style.cursor = 'pointer';
+  icon.addEventListener('click', async () => {
+    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => { taps = 0; }, 1200);
+    if (taps < 5) return;
+    taps = 0;
+
+    stopAuto(); stopHandleHold(true);
+    const prevPhase = state.phase, prevScene = state.activeScene;
+    const tok = ++seqToken;
+    state.phase = 'ANIMATING'; setControlMode('BUSY');
+    try {
+      await playWedding12000Cinema(tok);
+    } catch (e) {
+    } finally {
+      state.phase = prevPhase;
+      clearVisualEffects(); setActiveScene(prevScene);
+      if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
+      else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
+    }
+  });
+})();
