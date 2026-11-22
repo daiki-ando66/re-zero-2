@@ -1576,11 +1576,33 @@ function setBonusSceneBackdrop(kind = null) {
     layer.classList.remove('hidden');
   } else if (kind === 'restart' && Assets.getVStock('restart')) {
     const src = Assets.getVStock('restart');
+    const feather = 'style="-webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 100%)"';
+    const N = 7;
+    const strips = Array.from({ length: N }, (_, i) => `<img data-rs="${i}" src="${src}" ${feather} class="absolute inset-0 w-full h-full object-contain" style="clip-path:inset(${(i / N * 100).toFixed(2)}% 0 ${(100 - (i + 1) / N * 100).toFixed(2)}% 0);opacity:0" alt="">`).join('');
     layer.innerHTML = `
-      <img src="${src}" class="absolute inset-0 w-full h-full object-cover blur-md scale-115 opacity-75" alt="">
-      <img src="${src}" class="relative z-10 w-full h-full object-contain drop-shadow-[0_0_24px_rgba(249,115,22,0.85)]" alt="Re:Start">
-    `;
+      <div class="absolute inset-0 bg-black"></div>
+      <div id="rsZoom" class="absolute inset-0">
+        <img id="rsBase" src="${src}" ${feather} class="absolute inset-0 w-full h-full object-contain" style="opacity:0" alt="Re:Start">
+        ${strips}
+      </div>
+      <div id="rsHeart" class="absolute inset-0" style="background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 38%,rgba(170,0,24,.62) 100%);opacity:0"></div>
+      <div id="rsScan" class="absolute inset-0" style="background:repeating-linear-gradient(0deg,rgba(255,255,255,.07) 0 1px,rgba(0,0,0,0) 1px 3px);opacity:.9"></div>
+      <div id="rsBar" class="absolute left-0 right-0" style="top:0;height:15%;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.42) 45%,rgba(120,200,255,.28) 55%,rgba(255,255,255,0));opacity:0"></div>`;
     layer.classList.remove('hidden');
+    try {
+      const q = id => layer.querySelector('#' + id);
+      // 巻き戻しの横ノイズ帯が2回走る
+      q('rsBar').animate([{ transform: 'translateY(-110%)', opacity: 1 }, { transform: 'translateY(700%)', opacity: 1 }], { duration: 560, iterations: 2, easing: 'linear' });
+      // 画像が横ずれした帯から元の位置へ戻る（巻き戻って揃う）
+      layer.querySelectorAll('img[data-rs]').forEach((el, i) => {
+        const dx = (Math.random() < .5 ? -1 : 1) * (28 + Math.random() * 70);
+        el.animate([{ transform: `translateX(${dx}px)`, opacity: 0 }, { transform: `translateX(${dx * .35}px)`, opacity: 1, offset: .45 }, { transform: 'translateX(0)', opacity: 1 }],
+          { duration: 680, delay: 280 + i * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' });
+      });
+      q('rsBase').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 1250, fill: 'forwards' });
+      q('rsZoom').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }], { duration: 4200, delay: 900, easing: 'ease-out', fill: 'forwards' });
+      q('rsHeart').animate([{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: .2, offset: .35 }, { opacity: .85, offset: .55 }, { opacity: 0 }], { duration: 1150, delay: 1100, iterations: Infinity });
+    } catch (e) { console.error('restart rewind', e); }
   } else {
     layer.classList.add('hidden'); layer.innerHTML = '';
   }
@@ -1621,7 +1643,7 @@ function fireImageRipSlash(sourceKind = 'restart') {
   let frontHtml = '';
   if (sourceKind === 'restart' && Assets.getVStock('restart')) {
     const r = Assets.getVStock('restart');
-    frontHtml = `<div class="w-full h-full bg-black relative flex items-center justify-center"><img src="${r}" class="absolute inset-0 w-full h-full object-cover blur-md scale-115 opacity-75"><img src="${r}" class="relative z-10 w-full h-full object-contain"></div>`;
+    frontHtml = `<div class="w-full h-full bg-black relative flex items-center justify-center"><img src="${r}" class="relative z-10 w-full h-full object-contain" style="-webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 100%)"><div class="absolute inset-0" style="background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 40%,rgba(150,0,20,.5) 100%)"></div></div>`;
   } else if (sourceKind === '300' && Assets.getVStock('bg300')) {
     const b = Assets.getVStock('bg300'), v = Assets.getVStock('v300');
     frontHtml = `<div class="w-full h-full bg-black relative flex items-center justify-center"><img src="${b}" class="absolute inset-0 w-full h-full object-cover">${v ? `<img src="${v}" class="relative z-10 max-h-[60%] object-contain">` : ''}</div>`;
@@ -2597,6 +2619,7 @@ async function playOnigakariImageCutin({
   const host = lcdOnigakariOverlay;
   if (!host) return;
   const rnd = (a, b) => a + Math.random() * (b - a);
+  let sparkTimer = null;
 
   try {
     // ① 暗転（液晶内のみ・背景は黒のまま）。役物・レム・背景の光も落とす
@@ -2609,13 +2632,17 @@ async function playOnigakariImageCutin({
     const sp = document.createElement('div');
     sp.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:20';
     host.appendChild(sp);
-    for (let i = 0; i < 46; i++) {
+    const spawnStar = () => {
+      if (!sp.isConnected) return;
       const sz = rnd(3, 9), st = document.createElement('div');
       st.style.cssText = `position:absolute;left:${rnd(4, 96)}%;top:${rnd(6, 94)}%;width:${sz}px;height:${sz}px;border-radius:50%;background:#fff;box-shadow:0 0 ${sz * 2}px ${sz / 2}px rgba(254,240,138,.85);opacity:0`;
       sp.appendChild(st);
-      st.animate([{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.4)' }, { opacity: 0, transform: 'scale(.3)' }],
-        { duration: rnd(800, 1500), delay: rnd(0, 3000), easing: 'ease-in-out' });
-    }
+      const an = st.animate([{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.4)' }, { opacity: 0, transform: 'scale(.3)' }],
+        { duration: rnd(800, 1500), easing: 'ease-in-out' });
+      an.onfinish = () => st.remove();
+    };
+    for (let i = 0; i < 14; i++) setTimeout(spawnStar, rnd(0, 700));   // 立ち上がり
+    sparkTimer = setInterval(spawnStar, 75);                           // 以降は最後まで継続
     await waitFreeze(1000, token);                         // キラキラが始まってから
 
     // ③ キラキラの途中で、画像をとても緩やかにフェードイン
@@ -2629,9 +2656,7 @@ async function playOnigakariImageCutin({
         <div id="cutinCapText" class="font-mincho text-xl sm:text-3xl font-black tracking-widest whitespace-nowrap" style="min-height:1.4em"></div>
       </div>`);
     const box = document.getElementById('cutinFrameBox'), shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
-    if (withPokyun) StudioAudio.playPokyun(true);
     if (box) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 3000, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
-    sp.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, delay: 2000, fill: 'forwards' });
     await waitFreeze(3000, token);
 
     // ④ 画面表示（枠が脈打つ。背景は黒のまま、縁だけ虹）
@@ -2653,6 +2678,7 @@ async function playOnigakariImageCutin({
     }
     await waitFreeze(chars.length * 320 + 560 + 900, token);
   } finally {
+    if (sparkTimer) clearInterval(sparkTimer);
     host.classList.add('hidden'); host.innerHTML = '';
   }
 }
