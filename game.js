@@ -515,7 +515,8 @@ async function startNormalReach(res) {
     } else if (sc.titleColor === 'red') {
       await dropSafe({ color: 'red', holdMs: 500, withNiziiroBack: false, token: tok });
     } else {
-      Yakumono.fire('chance');
+      if (typeof Yakumono !== 'undefined') Yakumono.fire('chance');
+      else console.warn('effects.js が古い版です（Yakumono 未定義）。effects.js を v7.3 に差し替えてください');
       FxCanvas.burstFlames(28);
     }
 
@@ -650,8 +651,9 @@ async function resolveNormalReach() {
     setReels(sc.tenpaiNum, sc.tenpaiNum, sc.tenpaiNum, { tenpai: true });
     normalTitle.textContent = '大当り!!'; normalTitle.className = 'text-2xl sm:text-3xl font-black rainbow-grad-text pop-in';
     normalSub.textContent = '';
+    await wait(1100, tok);                       // ボタン後に少し間：図柄揃いを見せてからロゴ落下
     fireRainbowBurst('大当り!!', { withBackNiziiro: true });
-    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1080, withNiziiroBack: true, token: tok });
+    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1000, withNiziiroBack: true, landOffset: -70, scaleMul: 0.8, token: tok });   // 図柄より上に・少し小さめに着地
 
     StudioAudio.play1500Jackpot(false); setActiveScene('bonus');
     setBonusSceneBackdrop('niziiro');
