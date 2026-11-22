@@ -1951,15 +1951,64 @@ updateStatsUI();
         animation: wedHolyFlashSlow 0.85s ease-out forwards;
       }
 
-      .wedding-btn-exact {
+     .wed-btn-frame {
+        position: relative; z-index: 10;
+        aspect-ratio: 9 / 16;
+        height: min(100dvh, calc(100vw * 16 / 9));
+        max-height: 100dvh; max-width: 100vw;
+        display: flex; align-items: center; justify-content: center;
+      }
+      @media (min-width: 640px) {
+        .wed-btn-frame { height: min(96vh, calc(92vw * 16 / 9)); }
+      }
+      .wed-btn-hotspot {
         position: absolute;
-        bottom: 1%; left: 50%; transform: translateX(-50%);
-        width: 64%; height: 43%;
-        border-radius: 50%;
-        border: 3px solid rgba(254, 249, 195, 0.96);
-        background: radial-gradient(circle, rgba(255,255,255,0.24) 0%, transparent 72%);
-        z-index: 25; cursor: pointer;
-        animation: weddingBtnPulse 0.85s ease-in-out infinite;
+        top: 68%; left: 50%; transform: translate(-50%, -50%);
+        width: 72%; aspect-ratio: 1.15 / 1;
+        border: none; background: transparent; padding: 0;
+        z-index: 25; cursor: pointer; outline: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .wed-btn-hotspot:active { transform: translate(-50%, -50%) scale(0.95); }
+      @keyframes wedCrystalPulse {
+        0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.92); }
+        50%      { opacity: 0.92; transform: translate(-50%, -50%) scale(1.08); }
+      }
+      @keyframes wedShockRing {
+        0%   { opacity: 0.92; transform: translate(-50%, -50%) scale(0.55); border-width: 3px; }
+        100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.55); border-width: 1px; }
+      }
+      @keyframes wedPushFloat {
+        0%, 100% { transform: translate(-50%, -50%) scale(1.00); }
+        50%      { transform: translate(-50%, -50%) scale(1.09); }
+      }
+      .wed-btn-crystal-glow {
+        position: absolute; top: 35%; left: 50%;
+        width: 70%; aspect-ratio: 1.45 / 1; border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgba(255,255,255,0.95) 0%, rgba(254,249,195,0.62) 45%, rgba(250,204,21,0.18) 72%, transparent 100%);
+        mix-blend-mode: screen; pointer-events: none;
+        animation: wedCrystalPulse 1.1s ease-in-out infinite;
+      }
+      .wed-btn-wave {
+        position: absolute; top: 35%; left: 50%;
+        width: 76%; aspect-ratio: 1.35 / 1; border-radius: 50%;
+        border: 3px solid rgba(254, 249, 195, 0.95);
+        box-shadow: 0 0 18px rgba(253, 224, 71, 0.85), inset 0 0 12px rgba(255, 255, 255, 0.6);
+        pointer-events: none;
+        animation: wedShockRing 1.35s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      }
+      .wed-btn-wave-2 { animation-delay: 0.67s; }
+      .wed-btn-push-text {
+        position: absolute; top: 35%; left: 50%;
+        font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        font-size: clamp(22px, 6.8vw, 34px);
+        font-weight: 900; letter-spacing: 0.14em;
+        color: #fffbeb;
+        text-shadow:
+          0 2px 0 #78350f, 0 -1px 0 #78350f, 2px 0 0 #78350f, -2px 0 0 #78350f,
+          0 0 16px rgba(245, 158, 11, 1), 0 4px 12px rgba(0, 0, 0, 0.78);
+        pointer-events: none;
+        animation: wedPushFloat 1.1s ease-in-out infinite;
       }
     `;
     document.head.appendChild(st);
@@ -2100,15 +2149,21 @@ updateStatsUI();
       StudioAudio.playSoftHeartbeat();
 
       const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
+      const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
       const btnStageHtml = `
         <img src="${wedBtn}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
         <div class="absolute inset-0 bg-gradient-to-b from-amber-300/15 via-transparent to-amber-300/20 pointer-events-none"></div>
-        <div class="relative z-10 inline-flex items-center justify-center max-w-full max-h-full">
-          <img src="${wedBtn}" class="block max-w-[100vw] max-h-[86vh] w-auto h-auto object-contain shadow-[0_0_65px_rgba(254,240,138,0.65)] sm:rounded-2xl" alt="ウェディングボタン">
-          <button id="weddingTapHotspot" class="wedding-btn-exact" aria-label="ウェディングボタンを押す"></button>
+        <div class="wed-btn-frame">
+          <img src="${wedBtn}" class="w-full h-full object-cover shadow-[0_0_65px_rgba(254,240,138,0.65)] sm:rounded-2xl sm:border sm:border-yellow-200/50" alt="ウェディングボタン">
+          <button id="weddingTapHotspot" class="wed-btn-hotspot" aria-label="ウェディングボタンを押す">
+            <span class="wed-btn-wave"></span>
+            <span class="wed-btn-wave wed-btn-wave-2"></span>
+            <span class="wed-btn-crystal-glow"></span>
+            <span class="wed-btn-push-text">PUSH</span>
+          </button>
         </div>
-        <div class="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-5 py-1.5 rounded-full bg-black/78 border border-yellow-200 text-xs sm:text-sm font-black text-amber-200 animate-pulse whitespace-nowrap shadow-xl">
-          ✨ ボタンをタップ / Spaceで誓いを結べ!! ✨
+        <div class="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-4 py-1 rounded-full bg-black/72 border border-yellow-200/80 text-[11px] sm:text-xs font-black text-amber-200 whitespace-nowrap shadow-xl">
+          ボタンをタップ / Spaceで誓いを結べ!!
         </div>
       `;
       crossfadeTo(btnStageHtml, { flash: true, strongFlash: true });
