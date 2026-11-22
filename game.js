@@ -1,5 +1,5 @@
 // =========================================================================
-// game.js (v7.0) : 筐体デザイン・ロゴ役物落下・固定枠ステータス完全統合版
+// game.js (v7.1) : 筐体デザイン・ロゴ役物落下・固定枠ステータス完全統合版
 // =========================================================================
 
 const SPEC = {
@@ -134,6 +134,7 @@ const busyNotice = document.getElementById('busyNotice');
 
 // バックグラウンド移行時の発熱防止：裏画面へ行ったらオート＆BGMを自動停止
 document.addEventListener('visibilitychange', () => {
+  document.documentElement.classList.toggle('is-hidden', document.hidden);
   if (document.hidden) {
     stopAuto();
     stopHandleHold(false);
@@ -319,31 +320,44 @@ function stopAuto() {
   document.getElementById('btnRushAuto').textContent = '⚡ RUSHオート';
 }
 
+// ---- v7.1 UiBatch：DOM更新をrAFで1回にまとめ、値が変わった時だけ書く ----
+const UiBatch = (() => {
+  const els = new Map();
+  const get = id => { if (!els.has(id)) els.set(id, document.getElementById(id)); return els.get(id); };
+  return {
+    text(id, v) { const el = get(id); if (!el) return; v = String(v); if (el._v !== v) { el._v = v; el.textContent = v; } },
+    tone(id, cls, all) { const el = get(id); if (!el || el._t === cls) return; el._t = cls; el.classList.remove(...all); el.classList.add(cls); }
+  };
+})();
+const BAL_TONES = ['text-emerald-400', 'text-rose-400', 'text-white'];
+let statsQueued = false;
 function updateStatsUI() {
-  if (hudRushRemain) hudRushRemain.textContent = state.stRemaining;
+  if (statsQueued) return;
+  statsQueued = true;
+  requestAnimationFrame(flushStatsUI);
+}
+function flushStatsUI() {
+  statsQueued = false;
+  UiBatch.text('hudRushRemain', state.stRemaining);
+  UiBatch.text('dashCurSpin', state.currentSpin.toLocaleString());
+  UiBatch.text('dashTotalSpin', `総 ${state.totalNormalSpins.toLocaleString()}`);
+  UiBatch.text('dashInvest', `${state.totalInvestYen.toLocaleString()}円`);
+  UiBatch.text('dashBalls', `${Math.floor(state.balls).toLocaleString()}発`);
 
-  const curEl = document.getElementById('dashCurSpin');
-  const totEl = document.getElementById('dashTotalSpin');
-  if (curEl) curEl.textContent = state.currentSpin.toLocaleString();
-  if (totEl) totEl.textContent = `総 ${state.totalNormalSpins.toLocaleString()}`;
+  const bal = Math.round(state.balls * exchangeRate) - state.totalInvestYen;
+  const balTxt = `${bal >= 0 ? '+' : ''}${bal.toLocaleString()}円`;
+  const tone = bal > 0 ? 'text-emerald-400' : bal < 0 ? 'text-rose-400' : 'text-white';
+  UiBatch.text('dashBalance', balTxt); UiBatch.tone('dashBalance', tone, BAL_TONES);
+  UiBatch.text('rushBalanceDisplay', balTxt); UiBatch.tone('rushBalanceDisplay', tone, BAL_TONES);
 
-  document.getElementById('dashInvest').textContent = `${state.totalInvestYen.toLocaleString()}円`;
-  document.getElementById('dashBalls').textContent = `${Math.floor(state.balls).toLocaleString()}発`;
-
-  const cash = Math.round(state.balls * exchangeRate);
-  const bal = cash - state.totalInvestYen;
-  const balEl = document.getElementById('dashBalance');
-  balEl.textContent = `${bal >= 0 ? '+' : ''}${bal.toLocaleString()}円`;
-  balEl.className = `text-[11px] sm:text-xs font-black leading-none num-fixed ${bal > 0 ? 'text-emerald-400' : bal < 0 ? 'text-rose-400' : 'text-white'}`;
-
-  document.getElementById('statHits').textContent = `${state.rushHits} / ${state.firstHits}`;
+  UiBatch.text('statHits', `${state.rushHits} / ${state.firstHits}`);
   const sbPct = state.sakibareTotal > 0 ? Math.round((state.sakibareWins / state.sakibareTotal) * 100) : '-';
-  document.getElementById('statSakibare').textContent = `${state.sakibareWins}/${state.sakibareTotal} (${sbPct}%)`;
+  UiBatch.text('statSakibare', `${state.sakibareWins}/${state.sakibareTotal} (${sbPct}%)`);
 
-  document.getElementById('rushChainDisplay').textContent = `${state.rushChains}連`;
-  document.getElementById('rushDispDisplay').textContent = `${state.rushDisp.toLocaleString()}個`;
-  document.getElementById('rushNetDisplay').textContent = `${state.rushNet.toLocaleString()}発`;
-  document.getElementById('rush6000Display').textContent = `${state.rush6000Count}回`;
+  UiBatch.text('rushChainDisplay', `${state.rushChains}連`);
+  UiBatch.text('rushDispDisplay', `${state.rushDisp.toLocaleString()}個`);
+  UiBatch.text('rushNetDisplay', `${state.rushNet.toLocaleString()}発`);
+  UiBatch.text('rush6000Display', `${state.rush6000Count}回`);
 }
 
 let logRenderQueued = false;
@@ -495,6 +509,7 @@ async function startNormalReach(res) {
     } else if (sc.titleColor === 'red') {
       await triggerYakumonoDrop({ color: 'red', holdMs: 500, withNiziiroBack: false, token: tok });
     } else {
+      Yakumono.fire('chance');
       FxCanvas.burstFlames(28);
     }
 
