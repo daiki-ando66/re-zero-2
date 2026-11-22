@@ -1,15 +1,11 @@
 // =========================================================================
-// effects.js (v6.1)
-//  ・zugara.jpg 完全復元 / niziiro.jpg フル活用 / リッチ画質60fps完全復元
-//  ・バックグラウンド(別アプリ切替)時の描画＆Audio完全停止で発熱対策
-//  ・restart.jpg 見切れゼロ＋本物の斜め引き裂き(奥からniziiro.jpg＋6000)
-//  ・青V(300) / 赤V(1500) 大当たり画面一体表示＆重低音強化
+// effects.js (v7.0) : 筐体盤面ズーム・ロゴ役物落下＆色変化・液晶内鬼がかってますね
 // =========================================================================
 
 // -------------------------------------------------------------------------
-// 1. 強化サウンドエンジン（バックグラウンド完全自動停止対応）
+// 1. 強化サウンドエンジン（役物落下金属SE・重低音V・バックグラウンド自動停止）
 // -------------------------------------------------------------------------
-const ExtraAudioV61 = (() => {
+const ExtraAudioV70 = (() => {
   let ctx = null;
   let noiseBuf = null;
   let muted = false;
@@ -29,7 +25,6 @@ const ExtraAudioV61 = (() => {
     return ctx;
   }
 
-  // 別アプリ・別タブへ移ったらAudioContextを完全停止して発熱＆電池消費を防ぐ
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
     if (document.hidden) {
@@ -39,6 +34,50 @@ const ExtraAudioV61 = (() => {
     }
   });
 
+  // ★ロゴ役物「ガシャーン!!」落下SE（色に応じて重厚感・閃光音が変化）★
+  function playYakumonoDrop(color = 'rainbow') {
+    if (muted || vol <= 0.01) return;
+    const c = ensure(); if (!c) return;
+    const now = c.currentTime + 0.005;
+    const master = c.createGain(); master.gain.value = vol * 0.72;
+    const comp = c.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 8;
+    comp.connect(master).connect(c.destination);
+
+    // 1. メカ落下ショック（重低音ドスン）
+    const sub = c.createOscillator(), subG = c.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(190, now);
+    sub.frequency.exponentialRampToValueAtTime(32, now + 0.38);
+    subG.gain.setValueAtTime(0.001, now);
+    subG.gain.linearRampToValueAtTime(1.35, now + 0.006);
+    subG.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    sub.connect(subG).connect(comp); sub.start(now); sub.stop(now + 0.50);
+
+    // 2. 金属ロック音「ガシャッ!!」
+    const ns = c.createBufferSource(); ns.buffer = noiseBuf;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2850; bp.Q.value = 1.6;
+    const ng = c.createGain(); ng.gain.setValueAtTime(0.85, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    ns.connect(bp).connect(ng).connect(comp); ns.start(now); ns.stop(now + 0.30);
+
+    // 3. 色別ハーモニー閃光音
+    const notes = color === 'rainbow'
+      ? [587.33, 880.00, 1174.66, 1760.00, 2349.32]
+      : color === 'gold'
+        ? [523.25, 783.99, 1046.50, 1567.98]
+        : [440.00, 659.25, 880.00];
+    notes.forEach((hz, idx) => {
+      const st = now + 0.02 + idx * 0.028;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = idx % 2 === 0 ? 'triangle' : 'sawtooth';
+      o.frequency.setValueAtTime(hz * 0.94, st);
+      o.frequency.exponentialRampToValueAtTime(hz, st + 0.04);
+      g.gain.setValueAtTime(0.001, st);
+      g.gain.linearRampToValueAtTime(0.24 - idx * 0.03, st + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, st + (color === 'rainbow' ? 0.68 : 0.45));
+      o.connect(g).connect(comp); o.start(st); o.stop(st + 0.72);
+    });
+  }
+
   function play1500(isRush = false) {
     if (muted || vol <= 0.01) return;
     const c = ensure(); if (!c) return;
@@ -47,7 +86,6 @@ const ExtraAudioV61 = (() => {
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6;
     comp.connect(master).connect(c.destination);
 
-    // 腹に響く重低音インパクト
     const sub = c.createOscillator(), subG = c.createGain();
     sub.type = 'sine'; sub.frequency.setValueAtTime(175, now); sub.frequency.exponentialRampToValueAtTime(34, now + 0.42);
     subG.gain.setValueAtTime(0.001, now); subG.gain.linearRampToValueAtTime(1.25, now + 0.006); subG.gain.exponentialRampToValueAtTime(0.001, now + 0.50);
@@ -156,7 +194,6 @@ const ExtraAudioV61 = (() => {
     });
   }
 
-  // ★重低音ドスン＋重厚ブラス＆金属斬撃のVインパクト音★
   function playVImpact(isRed = false) {
     if (muted || vol <= 0.01) return;
     const c = ensure(); if (!c) return;
@@ -165,19 +202,16 @@ const ExtraAudioV61 = (() => {
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 8;
     comp.connect(master).connect(c.destination);
 
-    // 1. 地響きサブベース（2段）
     const sub = c.createOscillator(), subG = c.createGain();
     sub.type = 'sine'; sub.frequency.setValueAtTime(isRed ? 160 : 130, now); sub.frequency.exponentialRampToValueAtTime(30, now + 0.45);
     subG.gain.setValueAtTime(0.001, now); subG.gain.linearRampToValueAtTime(1.4, now + 0.008); subG.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
     sub.connect(subG).connect(comp); sub.start(now); sub.stop(now + 0.58);
 
-    // 2. 金属ノイズスラム
     const ns = c.createBufferSource(); ns.buffer = noiseBuf;
     const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = isRed ? 2400 : 1800; bp.Q.value = 1.4;
     const ng = c.createGain(); ng.gain.setValueAtTime(0.75, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
     ns.connect(bp).connect(ng).connect(comp); ns.start(now); ns.stop(now + 0.32);
 
-    // 3. 分厚いデチューン・ブラス和音
     const chord = isRed ? [220, 329.63, 440, 659.25] : [196, 293.66, 392, 587.33];
     const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5200, now); lp.frequency.exponentialRampToValueAtTime(1400, now + 0.65);
     const cg = c.createGain(); cg.gain.setValueAtTime(0.001, now); cg.gain.linearRampToValueAtTime(0.32, now + 0.015); cg.gain.exponentialRampToValueAtTime(0.001, now + 0.72);
@@ -202,35 +236,38 @@ const ExtraAudioV61 = (() => {
   }
 
   return {
-    play1500, play300, playGlassBreak, playVImpact, playMiniPokyun,
+    playYakumonoDrop, play1500, play300, playGlassBreak, playVImpact, playMiniPokyun,
     setMuted: (m) => { muted = !!m; },
     setVolume: (v) => { vol = Math.max(0, Math.min(1, v)); }
   };
 })();
 
 if (typeof StudioAudio !== 'undefined') {
-  StudioAudio.play1500Jackpot = (isRush = false) => ExtraAudioV61.play1500(isRush);
-  StudioAudio.play300Sound = () => ExtraAudioV61.play300();
-  StudioAudio.playGlassBreak = () => ExtraAudioV61.playGlassBreak();
-  StudioAudio.playVImpact = (isRed = false) => ExtraAudioV61.playVImpact(isRed);
-  StudioAudio.playMiniPokyun = () => ExtraAudioV61.playMiniPokyun();
+  StudioAudio.playYakumonoDrop = (col = 'rainbow') => ExtraAudioV70.playYakumonoDrop(col);
+  StudioAudio.play1500Jackpot = (isRush = false) => ExtraAudioV70.play1500(isRush);
+  StudioAudio.play300Sound = () => ExtraAudioV70.play300();
+  StudioAudio.playGlassBreak = () => ExtraAudioV70.playGlassBreak();
+  StudioAudio.playVImpact = (isRed = false) => ExtraAudioV70.playVImpact(isRed);
+  StudioAudio.playMiniPokyun = () => ExtraAudioV70.playMiniPokyun();
   const _origToggleMute = StudioAudio.toggleMute;
-  StudioAudio.toggleMute = function () { const m = _origToggleMute(); ExtraAudioV61.setMuted(m); return m; };
+  StudioAudio.toggleMute = function () { const m = _origToggleMute(); ExtraAudioV70.setMuted(m); return m; };
   const _origSetVol = StudioAudio.setVolume;
-  StudioAudio.setVolume = function (v) { ExtraAudioV61.setVolume(v); return _origSetVol(v); };
+  StudioAudio.setVolume = function (v) { ExtraAudioV70.setVolume(v); return _origSetVol(v); };
 }
 
 // -------------------------------------------------------------------------
-// 2. 画像素材エンジン（zugara.jpg 復元 ＋ niziiro.jpg / V素材 / restart.jpg）
+// 2. 画像素材エンジン（kyoutai.jpg盤面ズーム透過 ＋ rezeroロゴ全色生成）
 // -------------------------------------------------------------------------
 const Assets = (() => {
   let onigakariSrc = null;
   let remLampUrl = null;
   let botanUrl = null;
   let premiaFrameUrl = null;
+  let cabinetOverlayUrl = null;
+  const yakumono = { white: null, red: null, gold: null, rainbow: null };
   const peteFrames = new Array(6).fill(null);
   const wedding9Frames = new Array(9).fill(null);
-  const digits = {}; // 0..8
+  const digits = {};
   const wedding = { bg1: null, gensitu: null, stairs: null, arch: null, btn: null, onigakari: null };
   const logos = {
     brainRush: null, wedding: null, brain6000: null, oniRush: null, oni6000: null,
@@ -311,20 +348,146 @@ const Assets = (() => {
         }
       }
     }
-    const midA = new Uint8Array(total);
-    for (let i = 0; i < total; i++) midA[i] = d[i * 4 + 3];
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        const idx = y * w + x;
-        if (midA[idx] === 0) continue;
-        if (midA[idx - 1] === 0 || midA[idx + 1] === 0 || midA[idx - w] === 0 || midA[idx + w] === 0) {
-          const p = idx * 4;
-          const lum = (d[p] + d[p + 1] + d[p + 2]) / 3;
-          d[p + 3] = Math.min(d[p + 3], lum > 180 ? 120 : 210);
+    c.putImageData(imgData, 0, 0);
+  }
+
+  // ★kyoutai.jpg：盤面ズーム（下部スマパチ枠カット）＋中央の白い液晶窓だけ自動透過★
+  function processCabinetOverlay(img) {
+    try {
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const sx = Math.round(W * 0.03), sy = Math.round(H * 0.07);
+      const sw = Math.round(W * 0.94), sh = Math.round(H * 0.54);
+      const scale = Math.min(1, 900 / Math.max(sw, sh));
+      const w = Math.max(10, Math.round(sw * scale)), h = Math.max(10, Math.round(sh * scale));
+
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const c = cv.getContext('2d');
+      c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+      c.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+
+      const imgData = c.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      const total = w * h;
+      const visited = new Uint8Array(total);
+      const isWhiteWin = (idx) => {
+        const p = idx * 4;
+        const r = d[p], g = d[p + 1], b = d[p + 2];
+        return r > 232 && g > 232 && b > 232 && (Math.max(r, g, b) - Math.min(r, g, b)) < 24;
+      };
+
+      const queue = new Int32Array(total);
+      let head = 0, tail = 0;
+      const push = (idx) => { if (!visited[idx]) { visited[idx] = 1; queue[tail++] = idx; } };
+      // 液晶窓の中央付近からシードして、レムの服などを誤透過せず液晶窓だけを綺麗に抜く
+      for (let ry = 0.42; ry <= 0.68; ry += 0.06) {
+        for (let rx = 0.36; rx <= 0.62; rx += 0.06) {
+          const idx = Math.round(h * ry) * w + Math.round(w * rx);
+          if (idx >= 0 && idx < total && isWhiteWin(idx)) push(idx);
         }
       }
-    }
-    c.putImageData(imgData, 0, 0);
+      while (head < tail) {
+        const idx = queue[head++];
+        if (!isWhiteWin(idx)) continue;
+        d[idx * 4 + 3] = 0;
+        const x = idx % w, y = (idx - x) / w;
+        if (x > 0) push(idx - 1);
+        if (x < w - 1) push(idx + 1);
+        if (y > 0) push(idx - w);
+        if (y < h - 1) push(idx + w);
+      }
+
+      // 境界の白いジャギーを1px柔らかく馴染ませる
+      const snapA = new Uint8Array(total);
+      for (let i = 0; i < total; i++) snapA[i] = d[i * 4 + 3];
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = y * w + x;
+          if (snapA[idx] === 0) continue;
+          const nT = (snapA[idx - 1] === 0 ? 1 : 0) + (snapA[idx + 1] === 0 ? 1 : 0) + (snapA[idx - w] === 0 ? 1 : 0) + (snapA[idx + w] === 0 ? 1 : 0);
+          if (nT > 0) {
+            const p = idx * 4;
+            const lum = (d[p] + d[p + 1] + d[p + 2]) / 3;
+            if (lum > 205) d[p + 3] = 0;
+            else d[p + 3] = Math.round(d[p + 3] * 0.65);
+          }
+        }
+      }
+      c.putImageData(imgData, 0, 0);
+      cabinetOverlayUrl = cv.toDataURL('image/png');
+      const el = document.getElementById('cabinetOverlayImg');
+      if (el) el.src = cabinetOverlayUrl;
+    } catch (e) {}
+  }
+
+  // ★rezero_logo.jpg / rezero.jpg：金フチを残して白文字内部だけ 赤/金/虹 へ着色生成★
+  function processYakumonoLogo(img) {
+    try {
+      const scale = Math.min(1, 860 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(10, Math.round(img.naturalWidth * scale));
+      const h = Math.max(10, Math.round(img.naturalHeight * scale));
+      const baseCv = document.createElement('canvas'); baseCv.width = w; baseCv.height = h;
+      const bc = baseCv.getContext('2d');
+      bc.imageSmoothingEnabled = true; bc.imageSmoothingQuality = 'high';
+      bc.drawImage(img, 0, 0, w, h);
+      applyCleanWhiteCutout(bc, w, h, 228, false);
+      const trimmed = trimTransparentCanvas(baseCv, 4);
+      yakumono.white = trimmed.toDataURL('image/png');
+
+      const tw = trimmed.width, th = trimmed.height;
+      const baseData = trimmed.getContext('2d').getImageData(0, 0, tw, th);
+
+      function makeVariant(mode) {
+        const cv = document.createElement('canvas'); cv.width = tw; cv.height = th;
+        const c = cv.getContext('2d');
+        const out = c.createImageData(tw, th);
+        const s = baseData.data, d = out.data;
+        const stops = [
+          [244, 114, 182], [250, 204, 21], [74, 222, 128], [56, 189, 248], [192, 132, 252], [251, 113, 133]
+        ];
+        for (let y = 0; y < th; y++) {
+          const vy = y / Math.max(1, th - 1);
+          for (let x = 0; x < tw; x++) {
+            const p = (y * tw + x) * 4;
+            const r = s[p], g = s[p + 1], b = s[p + 2], a = s[p + 3];
+            d[p] = r; d[p + 1] = g; d[p + 2] = b; d[p + 3] = a;
+            if (a < 180) continue;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            // 金フチ(彩度高)と黒縁(暗部)は保護し、白文字内部だけ着色
+            if (mn > 195 && (mx - mn) < 34) {
+              const lum = (r + g + b) / 765;
+              if (mode === 'red') {
+                d[p]     = Math.min(255, Math.round((255 - vy * 35) * lum));
+                d[p + 1] = Math.round((155 - vy * 125) * lum);
+                d[p + 2] = Math.round((145 - vy * 120) * lum);
+              } else if (mode === 'gold') {
+                d[p]     = Math.min(255, Math.round(255 * lum));
+                d[p + 1] = Math.round((245 - vy * 70) * lum);
+                d[p + 2] = Math.round((185 - vy * 155) * lum);
+              } else if (mode === 'rainbow') {
+                const t = ((x / Math.max(1, tw)) * 1.15 + vy * 0.25) % 1;
+                const pos = t * (stops.length - 1);
+                const i0 = Math.floor(pos), i1 = Math.min(stops.length - 1, i0 + 1), f = pos - i0;
+                const cr = stops[i0][0] + (stops[i1][0] - stops[i0][0]) * f;
+                const cg = stops[i0][1] + (stops[i1][1] - stops[i0][1]) * f;
+                const cb = stops[i0][2] + (stops[i1][2] - stops[i0][2]) * f;
+                d[p]     = Math.min(255, Math.round((cr * 0.86 + 38) * lum));
+                d[p + 1] = Math.min(255, Math.round((cg * 0.86 + 38) * lum));
+                d[p + 2] = Math.min(255, Math.round((cb * 0.86 + 38) * lum));
+              }
+            }
+          }
+        }
+        c.putImageData(out, 0, 0);
+        return cv.toDataURL('image/png');
+      }
+
+      yakumono.red = makeVariant('red');
+      yakumono.gold = makeVariant('gold');
+      yakumono.rainbow = makeVariant('rainbow');
+
+      const el = document.getElementById('yakumonoLogoImg');
+      if (el && !el.src) el.src = yakumono.white;
+    } catch (e) {}
   }
 
   function processPremiaFrame(img) {
@@ -485,6 +648,10 @@ const Assets = (() => {
   }
 
   function preloadAll() {
+    // ★v7.0 新筐体＆ロゴ役物（ファイル名ゆれ両対応）★
+    tryLoadList(['kyoutai.jpg', 'kyoutai.png'], processCabinetOverlay);
+    tryLoadList(['rezero_logo.jpg', 'rezero_logo.png', 'rezero.jpg', 'rezero.png'], processYakumonoLogo);
+
     tryLoadList(['onigakari.jpg', 'onigakari.png'], (_img, src) => { onigakariSrc = src; });
     tryLoadList(['rem_lamp.jpg', 'rem_lamp.png'], (img) => {
       remLampUrl = processSingleImage(img, 920);
@@ -498,7 +665,6 @@ const Assets = (() => {
     });
     tryLoadList(['pete.jpg', 'pete.png'], (img) => { processPeteGrid(img); if (typeof syncRushStages === 'function') syncRushStages(); });
 
-    // ★zugara.jpg を最優先で読み込み（完全復元）★
     tryLoadList(['zugara.jpg', 'zugara.png', 'digits.jpg', 'digits.png'], processDigitsGrid);
     tryLoadList(['0.jpg', '0.png'], (img) => { digits[0] = processSingleImage(img, 540, { softFlame: true, trim: true }); });
 
@@ -528,7 +694,6 @@ const Assets = (() => {
     tryLoadList(['wed_botan.jpg', 'wedding_btn.jpg'], (_img, src) => { wedding.btn = src; });
     tryLoadList(['wedding_onigakari.jpg', 'wed_onigakari.jpg'], (_img, src) => { wedding.onigakari = src; });
 
-    // ★新素材6枚（v1500 / v300 / 1500 / 300 / restart / niziiro）★
     tryLoadList(['v1500.jpg', 'v1500.png'], (img) => { vstock.v1500 = processSingleImage(img, 820, { trim: true }); });
     tryLoadList(['v300.jpg', 'v300.png'], (img) => { vstock.v300 = processSingleImage(img, 820, { trim: true }); });
     tryLoadList(['1500.jpg', '1500.png'], (_img, src) => { vstock.bg1500 = src; });
@@ -540,6 +705,8 @@ const Assets = (() => {
   setTimeout(preloadAll, 10);
 
   return {
+    getCabinetOverlay: () => cabinetOverlayUrl,
+    getYakumono: (col = 'white') => yakumono[col] || yakumono.white,
     getOnigakari: () => onigakariSrc,
     getRemLamp: () => remLampUrl,
     getBotan: () => botanUrl,
@@ -556,21 +723,16 @@ const Assets = (() => {
 })();
 
 // -------------------------------------------------------------------------
-// 3. v6.1 追加CSS（本物の画像斜め引き裂き / niziiro背景ズーム / V一体表示）
+// 3. v7.0 追加CSS（画像斜め引き裂き / niziiro背景ズーム / V一体表示）
 // -------------------------------------------------------------------------
-if (!document.getElementById('v61-fx-css')) {
+if (!document.getElementById('v70-fx-css')) {
   const st = document.createElement('style');
-  st.id = 'v61-fx-css';
+  st.id = 'v70-fx-css';
   st.textContent = `
     @keyframes niziiroZoomPulse {
       0%   { transform: scale(1.02) rotate(0deg); filter: brightness(1.22) saturate(1.15); }
       50%  { transform: scale(1.12) rotate(1.2deg); filter: brightness(1.06) saturate(1.22); }
       100% { transform: scale(1.02) rotate(0deg); filter: brightness(1.22) saturate(1.15); }
-    }
-    @keyframes niziiroFlashBurst {
-      0%   { opacity: 0.95; transform: scale(0.92); filter: brightness(1.9); }
-      35%  { opacity: 0.85; transform: scale(1.06); filter: brightness(1.25); }
-      100% { opacity: 0;    transform: scale(1.18); filter: brightness(1.0); }
     }
     @keyframes ripHalfTop {
       0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
@@ -595,7 +757,6 @@ if (!document.getElementById('v61-fx-css')) {
       100% { opacity: 1; transform: scale(1.00) rotate(0deg); filter: brightness(1.0); }
     }
     .fx-niziiro-bg { animation: niziiroZoomPulse 5.5s ease-in-out infinite; }
-    .fx-niziiro-flash { animation: niziiroFlashBurst 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     .rip-half-top {
       position: absolute; inset: 0;
       clip-path: polygon(0 0, 100% 0, 100% 41%, 0 59%);
@@ -618,7 +779,7 @@ if (!document.getElementById('v61-fx-css')) {
 }
 
 // -------------------------------------------------------------------------
-// 4. サラサラキラキラ専用Canvas（高画質復元＋裏画面完全停止）
+// 4. サラサラキラキラ専用Canvas（高画質＋裏画面完全停止）
 // -------------------------------------------------------------------------
 const SoftSparkle = (() => {
   const cv = document.getElementById('softSparkleCanvas');
@@ -646,8 +807,7 @@ const SoftSparkle = (() => {
     }
   }
   function draw() {
-    if (!running) { rafId = null; return; }
-    if (document.hidden) { rafId = null; return; }
+    if (!running || document.hidden) { rafId = null; return; }
     ctx.clearRect(0, 0, w, h);
     for (let i = 0; i < motes.length; i++) {
       const m = motes[i];
@@ -683,20 +843,12 @@ const SoftSparkle = (() => {
 })();
 
 // -------------------------------------------------------------------------
-// 5. 動的ステージ背景Canvas（リッチ画質60fps完全復元＋裏画面完全停止）
+// 5. 動的ステージ背景Canvas（通常時ステージ廃止・深紅×黄金統一＋裏画面停止）
 // -------------------------------------------------------------------------
 const StageBg = (() => {
   const cv = document.getElementById('stageBgCanvas');
   const ctx = cv.getContext('2d');
-  const stageNamePill = document.getElementById('stageNamePill');
   let w = 360, h = 360, angle = 0, rafId = null;
-
-  const NORMAL_STAGES = [
-    { name: '王都ルグニカ', c1: '#451218', c2: '#1f080d', accent: '#facc15', glow: 'rgba(250,204,21,0.38)' },
-    { name: 'ロズワール邸・夕暮れ', c1: '#5c1d0c', c2: '#230b08', accent: '#fb923c', glow: 'rgba(251,146,60,0.40)' },
-    { name: '蒼月の森', c1: '#0c2748', c2: '#071124', accent: '#38bdf8', glow: 'rgba(56,189,248,0.38)' },
-    { name: '霧の街道', c1: '#12383a', c2: '#07171a', accent: '#2dd4bf', glow: 'rgba(45,212,191,0.36)' }
-  ];
 
   const goldShards = Array.from({ length: 54 }, (_, i) => ({ x: Math.random(), y: Math.random(), vx: (Math.random() - 0.5) * 0.009, vy: -(0.004 + Math.random() * 0.011), sz: 4 + Math.random() * 8.5, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.16, isKanji: i % 6 === 0, color: i % 3 === 0 ? '#fef9c3' : i % 3 === 1 ? '#facc15' : '#f59e0b' }));
   const rays = Array.from({ length: 42 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), spd: 0.018 + Math.random() * 0.026, len: 0.14 + Math.random() * 0.24 }));
@@ -745,9 +897,8 @@ const StageBg = (() => {
     const rm = (typeof state !== 'undefined') ? state.rushMode : 'onigakari';
     const frozen = isCut && ph === 'ANIMATING';
     if (!frozen) angle += 0.006 + pulse * 0.012;
-    if (stageNamePill) stageNamePill.classList.toggle('hidden', !(ph === 'NORMAL' && sc === 'normal'));
 
-    const cx = w * 0.5, cy = h * 0.48;
+    const cx = w * 0.52, cy = h * 0.50;
     ctx.clearRect(0, 0, w, h);
 
     if (ph === 'RUSH' || (ph === 'ANIMATING' && sc === 'rush-idle')) {
@@ -758,9 +909,9 @@ const StageBg = (() => {
         bg.addColorStop(1, 'rgba(30, 8, 4, 0.96)');
         ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
         ctx.save(); ctx.globalAlpha = 0.16 + pulse * 0.08; ctx.fillStyle = '#fef08a';
-        ctx.font = `900 ${Math.round(Math.min(w, h) * 0.76)}px "Shippori Mincho", serif`;
+        ctx.font = `900 ${Math.round(Math.min(w, h) * 0.74)}px "Shippori Mincho", serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('鬼', cx, cy + 8); ctx.restore();
-        drawMagicCircle(cx, cy, 134 + pulse * 16, '#fde047', angle * 1.4, 0.26 + pulse * 0.14);
+        drawMagicCircle(cx, cy, 122 + pulse * 14, '#fde047', angle * 1.4, 0.26 + pulse * 0.14);
         rays.forEach((r, idx) => {
           if (!frozen) { r.r += r.spd * (1 + pulse * 0.95); if (r.r > 1.25) { r.r = 0.05; r.a = Math.random() * Math.PI * 2; } }
           const maxD = Math.max(w, h) * 0.80, r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
@@ -787,10 +938,10 @@ const StageBg = (() => {
         });
         ctx.globalAlpha = 1; drawUnseenTendrils(angle * 4, pulse);
       } else {
-        const bg = ctx.createRadialGradient(cx, cy * 0.78, 14, cx, cy, Math.max(w, h) * 0.82);
+        const bg = ctx.createRadialGradient(cx, cy * 0.82, 14, cx, cy, Math.max(w, h) * 0.82);
         bg.addColorStop(0, `rgba(217, 70, 239, ${0.45 + pulse * 0.24})`); bg.addColorStop(0.42, `rgba(88, 28, 135, ${0.80 + pulse * 0.14})`); bg.addColorStop(0.78, 'rgba(18, 24, 62, 0.92)'); bg.addColorStop(1, 'rgba(8, 6, 26, 0.98)');
         ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-        drawMagicCircle(cx, cy * 0.86, 135 + pulse * 14, '#e879f9', -angle * 1.1, 0.24 + pulse * 0.14);
+        drawMagicCircle(cx, cy * 0.88, 122 + pulse * 14, '#e879f9', -angle * 1.1, 0.24 + pulse * 0.14);
         rays.forEach((r, idx) => {
           if (!frozen) { r.r += r.spd * 0.95; if (r.r > 1.25) { r.r = 0.06; r.a = Math.random() * Math.PI * 2; } }
           const maxD = Math.max(w, h) * 0.82, r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
@@ -805,28 +956,22 @@ const StageBg = (() => {
         });
       }
     } else {
-      const spins = (typeof state !== 'undefined') ? state.currentSpin : 0;
-      const stg = NORMAL_STAGES[Math.floor(spins / 30) % NORMAL_STAGES.length];
-      if (stageNamePill && stageNamePill.textContent !== stg.name) stageNamePill.textContent = stg.name;
-      const bg = ctx.createRadialGradient(cx, cy * 0.85, 16, cx, cy, Math.max(w, h) * 0.8);
-      bg.addColorStop(0, stg.c1); bg.addColorStop(0.65, stg.c2); bg.addColorStop(1, '#0d0407');
+      const bg = ctx.createRadialGradient(cx, cy * 0.90, 14, cx, cy, Math.max(w, h) * 0.82);
+      bg.addColorStop(0, '#441118'); bg.addColorStop(0.62, '#1d070c'); bg.addColorStop(1, '#0b0306');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-      const aura = ctx.createRadialGradient(cx, cy, 10, cx, cy, 148 + pulse * 38);
-      aura.addColorStop(0, stg.glow); aura.addColorStop(1, 'transparent');
+      const aura = ctx.createRadialGradient(cx, cy, 10, cx, cy, 138 + pulse * 36);
+      aura.addColorStop(0, 'rgba(250, 204, 21, 0.34)'); aura.addColorStop(1, 'transparent');
       ctx.fillStyle = aura; ctx.fillRect(0, 0, w, h);
-      drawMagicCircle(cx, cy, 124 + pulse * 8, stg.accent, angle * 0.75, 0.25 + pulse * 0.14);
+      drawMagicCircle(cx, cy, 114 + pulse * 8, '#facc15', angle * 0.75, 0.24 + pulse * 0.14);
     }
     rafId = requestAnimationFrame(tick);
   }
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && !rafId) rafId = requestAnimationFrame(tick);
-  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rafId) rafId = requestAnimationFrame(tick); });
   window.addEventListener('resize', resize); setTimeout(resize, 40); rafId = requestAnimationFrame(tick);
   return { resize };
 })();
-
 // -------------------------------------------------------------------------
-// 6. 最前面FX Canvas（リッチ画質完全復元＋裏画面完全停止）
+// 6. 最前面FX Canvas（リッチ画質＋裏画面完全停止）
 // -------------------------------------------------------------------------
 const FxCanvas = (() => {
   const canvas = document.getElementById('fxCanvas');
@@ -978,15 +1123,13 @@ const FxCanvas = (() => {
 
     rafId = requestAnimationFrame(tick);
   }
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && !rafId) rafId = requestAnimationFrame(tick);
-  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rafId) rafId = requestAnimationFrame(tick); });
   window.addEventListener('resize', resize); setTimeout(resize, 40); rafId = requestAnimationFrame(tick);
   return { resize, clearAll, setAmbient: m => { ambientMode = m; }, spawnRing, spawnLightning, spawnPurpleHands, spawnRedCracks, clearCracks, triggerGlassShatter, burstGold, burstRainbow, burstFlames, spawnFeathers };
 })();
 
 // -------------------------------------------------------------------------
-// 7. タイミング制御＆DOM参照
+// 7. タイミング制御＆v7.0 筐体DOM参照
 // -------------------------------------------------------------------------
 let seqToken = 0;
 
@@ -1026,6 +1169,15 @@ const globalCutinOverlay = document.getElementById('globalCutinOverlay');
 const weddingCinemaOverlay = document.getElementById('weddingCinemaOverlay');
 const pageShakeTargets = [document.querySelector('header'), document.querySelector('main')].filter(Boolean);
 
+const cabinetShell = document.getElementById('cabinetShell');
+const cabinetRemGlow = document.getElementById('cabinetRemGlow');
+const cabinetRightGlow = document.getElementById('cabinetRightGlow');
+const logoPocketShadow = document.getElementById('logoPocketShadow');
+const yakumonoLogoWrap = document.getElementById('yakumonoLogoWrap');
+const yakumonoLogoImg = document.getElementById('yakumonoLogoImg');
+const lcdNiziiroBackLayer = document.getElementById('lcdNiziiroBackLayer');
+const lcdOnigakariOverlay = document.getElementById('lcdOnigakariOverlay');
+
 const lcdFrame = document.getElementById('lcdFrame');
 const ledLeft = document.getElementById('ledLeft');
 const ledRight = document.getElementById('ledRight');
@@ -1039,11 +1191,8 @@ const fsSub = document.getElementById('fsSub');
 const fsMain = document.getElementById('fsMain');
 const fsExtra = document.getElementById('fsExtra');
 
-const normalHudRow = document.getElementById('normalHudRow');
 const rushMetaHud = document.getElementById('rushMetaHud');
-const hudRushChains = document.getElementById('hudRushChains');
 const hudRushRemain = document.getElementById('hudRushRemain');
-const hudRushPts = document.getElementById('hudRushPts');
 const hudVStockBadge = document.getElementById('hudVStockBadge');
 const res4Dots = document.querySelectorAll('.res4-dot');
 
@@ -1107,7 +1256,6 @@ const bonusDesc = document.getElementById('bonusDesc');
 const subtleWhisperSlot = document.getElementById('subtleWhisperSlot');
 const subtleWhisperText = document.getElementById('subtleWhisperText');
 
-const oniLamp = document.getElementById('oniLamp');
 const lampRippleHost = document.getElementById('lampRippleHost');
 const lampStatusText = document.getElementById('lampStatusText');
 const reserveLabel = document.getElementById('reserveLabel');
@@ -1116,7 +1264,112 @@ const resSlots = [0,1,2,3,4].map(i => document.getElementById(`resSlot${i}`));
 let remTestOverride = false, brainTestOverride = false, oniTestOverride = false;
 
 // -------------------------------------------------------------------------
-// 8. 3D図柄レンダラー（zugara.jpg 1〜8 + 0.jpg）
+// 8. ★v7.0 役物落下・色変化・背面niziiro・筐体イルミネーション制御★
+// -------------------------------------------------------------------------
+let yakumonoReturnTimer = null;
+
+function setYakumonoColor(color = 'white') {
+  if (!yakumonoLogoWrap || !yakumonoLogoImg) return;
+  const src = Assets.getYakumono(color);
+  if (src) yakumonoLogoImg.src = src;
+  yakumonoLogoWrap.classList.remove('yakumono-red', 'yakumono-gold', 'yakumono-rainbow', 'yakumono-off');
+  if (color === 'red') yakumonoLogoWrap.classList.add('yakumono-red');
+  else if (color === 'gold') yakumonoLogoWrap.classList.add('yakumono-gold');
+  else if (color === 'rainbow') yakumonoLogoWrap.classList.add('yakumono-rainbow');
+  else if (color === 'off') yakumonoLogoWrap.classList.add('yakumono-off');
+}
+
+function resetYakumono(color = 'white') {
+  if (yakumonoReturnTimer) { clearTimeout(yakumonoReturnTimer); yakumonoReturnTimer = null; }
+  if (yakumonoLogoWrap) yakumonoLogoWrap.classList.remove('yakumono-dropped');
+  if (logoPocketShadow) logoPocketShadow.classList.remove('pocket-open');
+  setYakumonoColor(color);
+}
+
+async function triggerYakumonoDrop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, token = seqToken } = {}) {
+  if (!yakumonoLogoWrap) return;
+  if (yakumonoReturnTimer) { clearTimeout(yakumonoReturnTimer); yakumonoReturnTimer = null; }
+
+  setYakumonoColor(color);
+  if (logoPocketShadow) logoPocketShadow.classList.add('pocket-open');
+  yakumonoLogoWrap.classList.remove('yakumono-dropped');
+  void yakumonoLogoWrap.offsetWidth;
+  yakumonoLogoWrap.classList.add('yakumono-dropped');
+
+  if (withSound) StudioAudio.playYakumonoDrop(color);
+  if (withNiziiroBack) setLcdNiziiroBack(true);
+
+  if (cabinetShell) {
+    cabinetShell.classList.add('shake-burst');
+    setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520);
+  }
+  try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
+
+  if (color === 'rainbow') {
+    setCabinetGlow('rainbow');
+    FxCanvas.burstRainbow(68);
+    FxCanvas.spawnRing('#fef08a', 320, 9);
+  } else if (color === 'gold') {
+    setCabinetGlow('gold');
+    FxCanvas.burstGold(48);
+    FxCanvas.spawnRing('#facc15', 280, 8);
+  } else if (color === 'red') {
+    setCabinetGlow('red');
+    FxCanvas.burstFlames(40);
+    FxCanvas.spawnRing('#ef4444', 260, 8);
+  }
+
+  if (holdMs > 0) {
+    await wait(holdMs, token);
+    resetYakumono(color === 'rainbow' ? 'rainbow' : 'white');
+  }
+}
+
+function setLcdNiziiroBack(on) {
+  if (!lcdNiziiroBackLayer) return;
+  const src = Assets.getVStock('niziiro');
+  if (on && src) {
+    if (!lcdNiziiroBackLayer.querySelector('img')) {
+      lcdNiziiroBackLayer.innerHTML = `<img src="${src}" class="w-full h-full object-cover fx-niziiro-bg opacity-95" alt=""><div class="absolute inset-0 bg-black/18"></div>`;
+    }
+    lcdNiziiroBackLayer.classList.remove('hidden');
+  } else {
+    lcdNiziiroBackLayer.classList.add('hidden');
+  }
+}
+
+function setCabinetGlow(mode = 'idle') {
+  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'cabinet-red-glow', 'cabinet-rem-glow', 'cabinet-rainbow-glow');
+  if (cabinetRemGlow) cabinetRemGlow.className = '';
+  if (cabinetRightGlow) cabinetRightGlow.className = '';
+
+  if (mode === 'off') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-blackout');
+    setYakumonoColor('off');
+  } else if (mode === 'red') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-red-glow');
+    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-red');
+    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-red');
+  } else if (mode === 'gold') {
+    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-gold');
+  } else if (mode === 'rem') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
+    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-rem');
+  } else if (mode === 'rem-slow') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
+    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-slow');
+  } else if (mode === 'rem-strobe') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
+    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-strobe');
+  } else if (mode === 'rainbow') {
+    if (cabinetShell) cabinetShell.classList.add('cabinet-rainbow-glow');
+    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-rainbow');
+    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-rainbow');
+  }
+}
+
+// -------------------------------------------------------------------------
+// 9. 3D図柄レンダラー（zugara.jpg 1〜8 + 0.jpg）
 // -------------------------------------------------------------------------
 let lastNormalVals = [7, 3, 7], lastOniVals = [8, 3, 4], lastRemVals = [3, 4, 7];
 
@@ -1161,7 +1414,7 @@ function setOniReels(a, b, c, { spinning = false, hitLock = false, tenpaiSide = 
   [a, b, c].forEach((v, i) => {
     const el = oniReels[i]; if (!el) return;
     const sizeCls = i === 1 ? 'oni-digit-mid' : 'oni-digit-side';
-    const fb = `text-6xl font-black ${v === 0 || v % 2 === 1 ? 'gold-grad-text' : 'cyan-grad-text'}`;
+    const fb = `text-5xl font-black ${v === 0 || v % 2 === 1 ? 'gold-grad-text' : 'cyan-grad-text'}`;
     renderDigitIntoEl(el, v, 'oni-digit-img', fb);
     const isSpin = spinning || (midSpin && i === 1);
     const isSideLock = tenpaiSide && (i === 0 || i === 2);
@@ -1206,7 +1459,7 @@ function pickRushRuleDigit(bonusType, hadNotice = false) {
 }
 
 // -------------------------------------------------------------------------
-// 9. ボーナス背景(300/1500/niziiro/restart)一体表示＆本物の斜め引き裂き
+// 10. ボーナス背景一体表示＆最前面「本物の画像斜め引き裂き」
 // -------------------------------------------------------------------------
 function ensureBonusBgLayer() {
   const pane = scenePanes.bonus;
@@ -1218,7 +1471,6 @@ function ensureBonusBgLayer() {
     layer.className = 'pointer-events-none absolute inset-0 z-0 overflow-hidden hidden';
     pane.style.position = 'relative';
     pane.insertBefore(layer, pane.firstChild);
-    // 既存テキスト要素を背景より前面に保つ
     Array.from(pane.children).forEach(ch => {
       if (ch !== layer && !ch.classList.contains('absolute')) {
         ch.style.position = 'relative';
@@ -1229,23 +1481,21 @@ function ensureBonusBgLayer() {
   return layer;
 }
 
-// ボーナス画面の背景に 300.jpg / 1500.jpg / niziiro.jpg / restart.jpg を一体敷き
 function setBonusSceneBackdrop(kind = null) {
   const layer = ensureBonusBgLayer();
   if (!layer) return;
   if (!kind) { layer.classList.add('hidden'); layer.innerHTML = ''; return; }
   if (kind === '300' && Assets.getVStock('bg300')) {
-    layer.innerHTML = `<img src="${Assets.getVStock('bg300')}" class="w-full h-full object-cover opacity-85" alt=""><div class="absolute inset-0 bg-black/35"></div>`;
+    layer.innerHTML = `<img src="${Assets.getVStock('bg300')}" class="w-full h-full object-cover opacity-88" alt=""><div class="absolute inset-0 bg-black/32"></div>`;
     layer.classList.remove('hidden');
   } else if (kind === '1500' && Assets.getVStock('bg1500')) {
-    layer.innerHTML = `<img src="${Assets.getVStock('bg1500')}" class="w-full h-full object-cover opacity-85" alt=""><div class="absolute inset-0 bg-black/32"></div>`;
+    layer.innerHTML = `<img src="${Assets.getVStock('bg1500')}" class="w-full h-full object-cover opacity-88" alt=""><div class="absolute inset-0 bg-black/30"></div>`;
     layer.classList.remove('hidden');
   } else if (kind === 'niziiro' && Assets.getVStock('niziiro')) {
-    layer.innerHTML = `<img src="${Assets.getVStock('niziiro')}" class="w-full h-full object-cover fx-niziiro-bg opacity-90" alt=""><div class="absolute inset-0 bg-black/28"></div>`;
+    layer.innerHTML = `<img src="${Assets.getVStock('niziiro')}" class="w-full h-full object-cover fx-niziiro-bg opacity-92" alt=""><div class="absolute inset-0 bg-black/26"></div>`;
     layer.classList.remove('hidden');
   } else if (kind === 'restart' && Assets.getVStock('restart')) {
     const src = Assets.getVStock('restart');
-    // 左右見切れゼロ：背景ブラー拡大＋前面にロゴ全体フィット
     layer.innerHTML = `
       <img src="${src}" class="absolute inset-0 w-full h-full object-cover blur-md scale-115 opacity-75" alt="">
       <img src="${src}" class="relative z-10 w-full h-full object-contain drop-shadow-[0_0_24px_rgba(249,115,22,0.85)]" alt="Re:Start">
@@ -1256,17 +1506,15 @@ function setBonusSceneBackdrop(kind = null) {
   }
 }
 
-// ボーナス中央に青V(v300) / 赤V(v1500) または通常ロゴを一体表示（別カット挟まない）
 function setBonusLogo(logoKey) {
-  let url = null;
-  let isV = false;
+  let url = null, isV = false;
   if (logoKey === 'v300') { url = Assets.getVStock('v300'); isV = true; }
   else if (logoKey === 'v1500') { url = Assets.getVStock('v1500'); isV = true; }
   else if (logoKey) { url = Assets.getLogo(logoKey); }
 
   if (url && bonusLogoWrap && bonusLogoImg) {
     bonusLogoImg.src = url;
-    bonusLogoImg.className = isV ? 'logo-alive-img max-h-[132px] sm:max-h-[150px] object-contain bonus-v-slam' : 'logo-alive-img bonus-logo-img';
+    bonusLogoImg.className = isV ? 'logo-alive-img max-h-[112px] sm:max-h-[136px] object-contain bonus-v-slam' : 'logo-alive-img bonus-logo-img';
     void bonusLogoImg.offsetWidth;
     bonusLogoWrap.classList.remove('hidden');
     return true;
@@ -1275,20 +1523,7 @@ function setBonusLogo(logoKey) {
   return false;
 }
 
-// ★初当たり・確定の瞬間に niziiro.jpg を液晶全面へ閃光展開★
-function fireNiziiroFlashOnLcd() {
-  const nizi = Assets.getVStock('niziiro');
-  if (!nizi || !slashHost) return;
-  const f = document.createElement('div');
-  f.className = 'pointer-events-none absolute inset-0 z-30 overflow-hidden';
-  f.innerHTML = `<img src="${nizi}" class="w-full h-full object-cover fx-niziiro-flash" alt="">`;
-  slashHost.appendChild(f);
-  setTimeout(() => f.remove(), 1000);
-}
-
-// ★本物の画像斜め引き裂き演出（restart.jpg / 300.jpg / 1500.jpg を真っ二つに引きちぎり、奥から niziiro.jpg＋6000 が突き抜ける!!）★
 function fireImageRipSlash(sourceKind = 'restart') {
-  const nizi = Assets.getVStock('niziiro');
   let frontHtml = '';
   if (sourceKind === 'restart' && Assets.getVStock('restart')) {
     const r = Assets.getVStock('restart');
@@ -1305,25 +1540,24 @@ function fireImageRipSlash(sourceKind = 'restart') {
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'pointer-events-none absolute inset-0 z-[38] overflow-hidden';
+  wrap.className = 'pointer-events-none absolute inset-0 z-[90] overflow-hidden';
   wrap.innerHTML = `
-    ${nizi ? `<img src="${nizi}" class="absolute inset-0 w-full h-full object-cover fx-niziiro-bg" style="opacity:0.95;" alt="">` : ''}
     <div class="rip-half-top">${frontHtml}</div>
     <div class="rip-half-bot">${frontHtml}</div>
     <div class="rip-slash-beam"></div>
   `;
-  slashHost.appendChild(wrap);
+  lcdFrame.appendChild(wrap);
   setPageMegaShake(true);
   fireGlobalRainbowFlash();
   FxCanvas.spawnRing('#fef08a', 360, 11);
   FxCanvas.spawnLightning('#fef08a', 6);
-  FxCanvas.burstRainbow(68);
-  FxCanvas.burstFlames(36);
-  setTimeout(() => { wrap.remove(); setPageMegaShake(false); }, 860);
+  FxCanvas.burstRainbow(72);
+  FxCanvas.burstFlames(40);
+  setTimeout(() => { wrap.remove(); setPageMegaShake(false); }, 880);
 }
 
 // -------------------------------------------------------------------------
-// 10. 縁外・LED・プレミア枠・赤ボタン・ステージ一元制御
+// 11. 縁外・LED・プレミア枠・ボタン・ステージ一元制御
 // -------------------------------------------------------------------------
 function setPremiaFrame(on) {
   if (!premiaFrameOverlay) return;
@@ -1332,7 +1566,10 @@ function setPremiaFrame(on) {
 function setAmbientBg(mode = '') { ambientBgLayer.className = 'fixed inset-0 pointer-events-none z-0' + (mode ? ` bg-mode-${mode}` : ''); }
 function setSunburst(on) { sunburstLayer.classList.toggle('hidden', !on); }
 function setGlobalBlackout(on) { globalBlackoutCurtain.classList.toggle('hidden', !on); }
-function hideGlobalCutin() { globalCutinOverlay.classList.add('hidden'); globalCutinOverlay.innerHTML = ''; }
+function hideGlobalCutin() {
+  globalCutinOverlay.classList.add('hidden'); globalCutinOverlay.innerHTML = '';
+  if (lcdOnigakariOverlay) { lcdOnigakariOverlay.classList.add('hidden'); lcdOnigakariOverlay.innerHTML = ''; }
+}
 function setPageMegaShake(on) { pageShakeTargets.forEach(el => el.classList.toggle('page-mega-shake', on)); }
 
 function fireGlobalRainbowFlash() {
@@ -1340,10 +1577,10 @@ function fireGlobalRainbowFlash() {
   void globalRainbowFlash.offsetWidth;
   setTimeout(() => { globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none'; }, 750);
 }
-function setLed(style) { [ledLeft, ledRight].forEach(el => { el.className = 'led-bar shrink-0' + (style ? ` led-${style}` : ''); }); }
+function setLed(style) { [ledLeft, ledRight].forEach(el => { if (el) el.className = 'led-bar' + (style ? ` led-${style}` : ''); }); }
 function setLedSide(l, r) {
-  ledLeft.className = 'led-bar shrink-0' + (l ? ` led-${l}` : '');
-  ledRight.className = 'led-bar shrink-0' + (r ? ` led-${r}` : '');
+  if (ledLeft) ledLeft.className = 'led-bar' + (l ? ` led-${l}` : '');
+  if (ledRight) ledRight.className = 'led-bar' + (r ? ` led-${r}` : '');
 }
 
 function setReachActor(type = null) {
@@ -1384,8 +1621,8 @@ function setBrainButtonState(vibe = 'idle', color = '') {
 function showUniversalBotan({ label = '一撃解放!!', vibe = 'max', color = 'rainbow', drop = false, redChassis = false, interactive = false } = {}) {
   uniBotanLabel.textContent = label;
   uniBotanLabel.className = redChassis
-    ? 'text-base sm:text-lg font-black crimson-grad-text tracking-widest drop-shadow pop-in'
-    : 'text-sm sm:text-base font-black rainbow-grad-text tracking-widest drop-shadow';
+    ? 'text-sm sm:text-base font-black crimson-grad-text tracking-wider drop-shadow pop-in text-center'
+    : 'text-xs sm:text-base font-black rainbow-grad-text tracking-wider drop-shadow text-center';
   universalBotanOverlay.classList.remove('hidden');
   universalBotanOverlay.style.pointerEvents = interactive ? 'auto' : 'none';
   if (uniBotanHint) uniBotanHint.classList.toggle('hidden', !interactive);
@@ -1459,8 +1696,11 @@ function clearGlobalChaosEffects() {
   hideGlobalCutin();
   hideUniversalBotan();
   setPremiaFrame(false);
+  setLcdNiziiroBack(false);
   setPageMegaShake(false);
   setSunburst(false);
+  resetYakumono('white');
+  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'shake-burst', 'iwakan-rempuru');
   if (weddingCinemaOverlay) { weddingCinemaOverlay.classList.add('hidden'); weddingCinemaOverlay.innerHTML = ''; }
   lcdFrame.classList.remove('fx-rgb-glitch');
   slashHost.innerHTML = '';
@@ -1495,7 +1735,6 @@ function setActiveScene(sceneName) {
   syncRushStages();
 }
 
-// ★全画面オーバーレイ（mode === 'rainbow' / '6000' で niziiro.jpg 背景を自動展開!!）★
 function ensureFsNiziiroLayer() {
   let layer = document.getElementById('fsNiziiroBgLayer');
   if (!layer && fullscreenOverlay) {
@@ -1543,18 +1782,18 @@ function showFullscreenOverlay({ mode = 'blackout', sub = '', main = '', extra =
     fsExtra.className = 'relative z-10 mt-2 text-xs sm:text-sm font-bold text-rose-900/90 max-w-md';
   } else if (mode === 'rainbow') {
     fullscreenOverlay.classList.add('overlay-rainbow');
-    fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.22em] text-amber-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] mb-1';
-    fsMain.className = `relative z-10 ${logoUrl ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-5xl'} font-black text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.98)] tracking-wider leading-tight pop-in px-1`;
-    fsExtra.className = 'relative z-10 mt-2 text-xs sm:text-sm font-black text-amber-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] bg-black/45 px-3 py-1 rounded-full max-w-md';
+    fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.20em] text-amber-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] mb-1';
+    fsMain.className = `relative z-10 ${logoUrl ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'} font-black text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.98)] tracking-wider leading-tight pop-in px-1`;
+    fsExtra.className = 'relative z-10 mt-1.5 text-[11px] sm:text-xs font-black text-amber-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] bg-black/50 px-3 py-1 rounded-full max-w-xs';
   } else if (mode === '6000' || mode === 'gold') {
     fullscreenOverlay.classList.add('overlay-6000');
-    fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.22em] text-amber-300 mb-1';
-    fsMain.className = `relative z-10 ${logoUrl ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-5xl'} font-black ${mode === '6000' ? 'rainbow-grad-text' : 'gold-grad-text'} tracking-wider leading-tight pop-in px-1`;
-    fsExtra.className = 'relative z-10 mt-2 text-xs sm:text-sm font-bold text-amber-100/95 max-w-md';
+    fsSub.className = 'relative z-10 text-xs sm:text-sm font-black tracking-[0.20em] text-amber-300 mb-1';
+    fsMain.className = `relative z-10 ${logoUrl ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'} font-black ${mode === '6000' ? 'rainbow-grad-text' : 'gold-grad-text'} tracking-wider leading-tight pop-in px-1`;
+    fsExtra.className = 'relative z-10 mt-1.5 text-[11px] sm:text-xs font-bold text-amber-100/95 max-w-xs';
   } else {
     fullscreenOverlay.classList.add('overlay-blackout');
-    fsSub.className = 'relative z-10 text-xs font-black tracking-[0.22em] text-rose-500/80 mb-2';
-    fsMain.className = 'relative z-10 font-mincho text-2xl sm:text-3xl font-black text-rose-100 tracking-widest';
+    fsSub.className = 'relative z-10 text-xs font-black tracking-[0.20em] text-rose-500/80 mb-2';
+    fsMain.className = 'relative z-10 font-mincho text-xl sm:text-3xl font-black text-rose-100 tracking-widest';
     fsExtra.className = 'relative z-10 mt-2 text-xs text-slate-400';
   }
 
@@ -1579,10 +1818,10 @@ function updateReserveSlots(mode = 'NORMAL', special = null, targetSlotIdx = 0) 
     reserveLabel.textContent = '文字保留';
     ['脳', 'が', '震', 'え', 'る'].forEach((ch, i) => {
       const el = resSlots[i]; el.classList.remove('hidden');
-      if (special === 'HANDS' && i === 0) { el.textContent = '手'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-fuchsia-300 bg-gradient-to-br from-purple-700 to-fuchsia-950 flex items-center justify-center text-xs font-black text-fuchsia-100 shadow-lg shadow-fuchsia-500/80 animate-pulse'; }
-      else if (special === 'HIT') { el.textContent = ch; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-amber-300 bg-gradient-to-br from-rose-600 to-purple-800 flex items-center justify-center text-xs font-black text-amber-200 shadow-lg animate-pulse'; }
-      else if ((special === 'GAZE' || special === 'NOGA') && i < 2) { el.textContent = ch; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-rose-400 bg-rose-950 flex items-center justify-center text-xs font-black text-rose-200 shadow shadow-rose-500/70 animate-pulse'; }
-      else { el.textContent = ch; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-purple-700/80 bg-purple-950/80 flex items-center justify-center text-xs font-black text-purple-300'; }
+      if (special === 'HANDS' && i === 0) { el.textContent = '手'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-fuchsia-300 bg-gradient-to-br from-purple-700 to-fuchsia-950 flex items-center justify-center text-[10px] font-black text-fuchsia-100 shadow-lg shadow-fuchsia-500/80 animate-pulse'; }
+      else if (special === 'HIT') { el.textContent = ch; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-300 bg-gradient-to-br from-rose-600 to-purple-800 flex items-center justify-center text-[10px] font-black text-amber-200 shadow-lg animate-pulse'; }
+      else if ((special === 'GAZE' || special === 'NOGA') && i < 2) { el.textContent = ch; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-rose-400 bg-rose-950 flex items-center justify-center text-[10px] font-black text-rose-200 shadow shadow-rose-500/70 animate-pulse'; }
+      else { el.textContent = ch; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-purple-700/80 bg-purple-950/80 flex items-center justify-center text-[10px] font-black text-purple-300'; }
     });
     return;
   }
@@ -1592,13 +1831,13 @@ function updateReserveSlots(mode = 'NORMAL', special = null, targetSlotIdx = 0) 
   const idx = Math.max(0, Math.min(3, targetSlotIdx));
   for (let i = 0; i < 4; i++) {
     const el = resSlots[i];
-    if (special === 'ALL_ONI') { el.textContent = '鬼'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-amber-200 bg-gradient-to-br from-red-600 to-amber-700 flex items-center justify-center text-xs font-black text-white shadow-lg animate-pulse'; }
-    else if (i === idx && special === 'RED') { el.textContent = '鬼'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-rose-200 bg-gradient-to-br from-red-500 to-rose-900 flex items-center justify-center text-xs font-black text-white shadow-lg shadow-red-600/80 animate-pulse'; }
-    else if (i === idx && special === 'RAINBOW') { el.textContent = '鬼'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white lamp-rainbow flex items-center justify-center text-xs font-black text-slate-950 shadow-lg animate-bounce'; }
-    else if (i === idx && special === 'BLINK') { el.textContent = '●'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-sky-200 bg-sky-500/80 flex items-center justify-center text-xs font-black text-white shadow-lg shadow-sky-400/80 res-blink'; }
-    else if (i === idx && special === 'BLINK_RED') { el.textContent = '鬼'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-amber-200 bg-gradient-to-br from-rose-500 to-red-900 flex items-center justify-center text-xs font-black text-amber-100 shadow-lg shadow-rose-500/90 res-blink-fast'; }
-    else if (i === idx && special === 'REM_CYAN') { el.textContent = '鬼'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-sky-200 bg-gradient-to-br from-sky-400 to-blue-800 flex items-center justify-center text-xs font-black text-white shadow-lg shadow-sky-400/90 animate-pulse'; }
-    else { el.textContent = '○'; el.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60'; }
+    if (special === 'ALL_ONI') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-200 bg-gradient-to-br from-red-600 to-amber-700 flex items-center justify-center text-[10px] font-black text-white shadow-lg animate-pulse'; }
+    else if (i === idx && special === 'RED') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-rose-200 bg-gradient-to-br from-red-500 to-rose-900 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-red-600/80 animate-pulse'; }
+    else if (i === idx && special === 'RAINBOW') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-white bg-gradient-to-r from-yellow-300 via-pink-400 to-sky-400 flex items-center justify-center text-[10px] font-black text-slate-950 shadow-lg animate-bounce'; }
+    else if (i === idx && special === 'BLINK') { el.textContent = '●'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-sky-200 bg-sky-500/80 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-sky-400/80 res-blink'; }
+    else if (i === idx && special === 'BLINK_RED') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-200 bg-gradient-to-br from-rose-500 to-red-900 flex items-center justify-center text-[10px] font-black text-amber-100 shadow-lg shadow-rose-500/90 res-blink-fast'; }
+    else if (i === idx && special === 'REM_CYAN') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-sky-200 bg-gradient-to-br from-sky-400 to-blue-800 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-sky-400/90 animate-pulse'; }
+    else { el.textContent = '○'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60'; }
   }
 }
 
@@ -1611,7 +1850,7 @@ function updateRes4Dots(activeCount) {
 function clearIwakanEffects() {
   lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid', 'fx-rgb-glitch');
   lcdFrame.style.transform = '';
-  oniLamp.classList.remove('iwakan-rempuru', 'lamp-rem-slow', 'lamp-rem-classic');
+  if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru');
   if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain');
   oniReels.forEach(el => { if (el) el.style.transform = ''; });
   remReels.forEach(el => { if (el) el.style.transform = ''; });
@@ -1624,41 +1863,47 @@ function clearVisualEffects() {
   clearIwakanEffects();
   clearGlobalChaosEffects();
   setAmbientBg('');
+  setCabinetGlow('idle');
   lcdFrame.classList.remove('fx-redbare', 'fx-rainbow', 'fx-gold', 'fx-restart', 'fx-glitch', 'shake-intense', 'shake-burst', 'mode-despair-bg', 'bonus-theme-brain', 'bonus-theme-rem');
   setReachBotanState({ vibe: 'idle', color: '' });
-  oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow');
   FxCanvas.clearCracks();
   setLed('');
   const ph = (typeof state !== 'undefined') ? state.phase : 'NORMAL';
   lampStatusText.textContent = ph === 'RUSH' ? 'RUSH中' : '待機中';
-  lampStatusText.className = 'text-[10px] font-black text-amber-200 min-w-[54px] text-right whitespace-nowrap';
+  lampStatusText.className = 'text-[10px] font-black text-amber-200 min-w-[46px] text-right whitespace-nowrap';
   syncRushStages();
 }
 
 function triggerLamp(type, label) {
-  oniLamp.classList.remove('lamp-red', 'lamp-rem', 'lamp-rainbow', 'lamp-rem-slow', 'lamp-rem-classic');
-  void oniLamp.offsetWidth;
-  if (type === 'red') { oniLamp.classList.add('lamp-red'); setLed('red'); }
-  else if (type === 'rem') { oniLamp.classList.add('lamp-rem'); setLed('rem'); }
-  else if (type === 'rainbow') { oniLamp.classList.add('lamp-rainbow'); setLed('rainbow'); }
+  if (type === 'red') {
+    setCabinetGlow('red'); setYakumonoColor('red'); setLed('red');
+  } else if (type === 'rem') {
+    setCabinetGlow('rem'); setYakumonoColor('white'); setLed('rem');
+  } else if (type === 'rainbow') {
+    setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setLed('rainbow');
+  }
 
   lampStatusText.textContent = label;
-  lampStatusText.className = type === 'red' ? 'text-[10px] font-black text-rose-400 min-w-[54px] text-right whitespace-nowrap'
-    : type === 'rem' ? 'text-[10px] font-black text-sky-300 min-w-[54px] text-right whitespace-nowrap'
-    : 'text-[10px] font-black text-amber-300 min-w-[54px] text-right whitespace-nowrap';
+  lampStatusText.className = type === 'red' ? 'text-[10px] font-black text-rose-400 min-w-[46px] text-right whitespace-nowrap'
+    : type === 'rem' ? 'text-[10px] font-black text-sky-300 min-w-[46px] text-right whitespace-nowrap'
+    : 'text-[10px] font-black text-amber-300 min-w-[46px] text-right whitespace-nowrap';
 
   const color = type === 'red' ? '#ef4444' : type === 'rem' ? '#38bdf8' : '#fef08a';
   for (let i = 0; i < 2; i++) {
     setTimeout(() => {
-      const r = document.createElement('div'); r.className = 'lamp-ripple'; r.style.borderColor = color;
-      lampRippleHost.appendChild(r); FxCanvas.spawnRing(color, 250 + i * 70, 8);
-      setTimeout(() => r.remove(), 750);
+      if (lampRippleHost) {
+        const r = document.createElement('div'); r.className = 'lamp-ripple'; r.style.borderColor = color;
+        lampRippleHost.appendChild(r);
+        setTimeout(() => r.remove(), 750);
+      }
+      FxCanvas.spawnRing(color, 250 + i * 70, 8);
     }, i * 130);
   }
 }
 
-function fireRainbowBurst(lampLabel = '大当り!!') {
-  fireGlobalRainbowFlash(); fireNiziiroFlashOnLcd();
+function fireRainbowBurst(lampLabel = '大当り!!', { withBackNiziiro = true } = {}) {
+  fireGlobalRainbowFlash();
+  if (withBackNiziiro) setLcdNiziiroBack(true);
   setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true);
   triggerLamp('rainbow', lampLabel); lcdFrame.classList.add('fx-rainbow', 'shake-burst'); setLed('rainbow');
   FxCanvas.spawnRing('#fef08a', 320, 9); FxCanvas.spawnRing('#7dd3fc', 250, 7); FxCanvas.burstRainbow(72);
@@ -1666,7 +1911,7 @@ function fireRainbowBurst(lampLabel = '大当り!!') {
 }
 
 // -------------------------------------------------------------------------
-// 11. 引き裂き・ガラス割れ・残保留V-STOCK告知（青300 / 赤1500・昇格なし）
+// 12. 引き裂き・ガラス割れ・残保留V-STOCK告知
 // -------------------------------------------------------------------------
 function firePhysicalSplitSlash() {
   const beam = document.createElement('div'); beam.className = 'h-slash-beam';
@@ -1689,7 +1934,6 @@ async function playGlassShatterFail(token) {
   lcdFrame.classList.remove('shake-burst');
 }
 
-// ★残保留V-STOCK告知専用（テンポ良く0.95秒でドスン!! 300=青V / 1500以上=赤V）★
 async function playVStockNotice({ isRed = false, token = seqToken } = {}) {
   const bg = isRed ? Assets.getVStock('bg1500') : Assets.getVStock('bg300');
   const vImg = isRed ? Assets.getVStock('v1500') : Assets.getVStock('v300');
@@ -1698,13 +1942,13 @@ async function playVStockNotice({ isRed = false, token = seqToken } = {}) {
     StudioAudio.playVImpact(isRed);
     triggerLamp(isRed ? 'red' : 'rem', isRed ? '赤V-STOCK!!' : '青V-STOCK!!');
     slashHost.innerHTML = `
-      <div class="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-black/90">
+      <div class="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-black/90 pl-5">
         ${bg ? `<img src="${bg}" class="absolute inset-0 w-full h-full object-cover opacity-92" alt="">` : ''}
         <div class="relative z-10 flex flex-col items-center justify-center">
           ${vImg
-            ? `<img src="${vImg}" class="max-w-[74%] max-h-[210px] object-contain drop-shadow-[0_0_28px_rgba(254,240,138,0.95)] bonus-v-slam" alt="V-STOCK">`
+            ? `<img src="${vImg}" class="max-w-[70%] max-h-[175px] object-contain drop-shadow-[0_0_28px_rgba(254,240,138,0.95)] bonus-v-slam" alt="V-STOCK">`
             : `<div class="text-7xl font-black ${isRed ? 'crimson-grad-text' : 'cyan-grad-text'} bonus-v-slam">V</div>`}
-          <div class="mt-1 px-4 py-0.5 rounded-full bg-black/85 border-2 ${isRed ? 'border-amber-300 text-amber-200' : 'border-sky-300 text-sky-200'} text-xs sm:text-sm font-black tracking-[0.16em] pop-in">
+          <div class="mt-1 px-3.5 py-0.5 rounded-full bg-black/85 border-2 ${isRed ? 'border-amber-300 text-amber-200' : 'border-sky-300 text-sky-200'} text-xs font-black tracking-[0.14em] pop-in">
             ${isRed ? '赤V-STOCK 獲得!!（1,500以上）' : '青V-STOCK 獲得!!（300以上）'}
           </div>
         </div>
@@ -1712,7 +1956,7 @@ async function playVStockNotice({ isRed = false, token = seqToken } = {}) {
     `;
     lcdFrame.classList.add('shake-burst');
     if (isRed) FxCanvas.burstFlames(44); else FxCanvas.spawnRing('#38bdf8', 300, 9);
-    await wait(980, token);
+    await wait(960, token);
     lcdFrame.classList.remove('shake-burst');
   } finally {
     slashHost.innerHTML = '';
@@ -1753,7 +1997,7 @@ function fireMegaQuakeBrainBreak() {
 }
 
 // -------------------------------------------------------------------------
-// 12. 🧠 脳が震えるRUSH / 💙 レム告知 / 🔥 鬼がかりRUSH 演出群
+// 13. 🧠 脳が震えるRUSH / 💙 レム告知 / 🔥 鬼がかりRUSH 演出群
 // -------------------------------------------------------------------------
 function fireBrainEvoFlash() { brainEvoFlash.classList.remove('flash-fire'); void brainEvoFlash.offsetWidth; brainEvoFlash.classList.add('flash-fire'); }
 function setBrainPeteLevel(lv = 0, { withFlash = false } = {}) {
@@ -1775,11 +2019,11 @@ function setBrainTextSwarm(lv = 0, { isGoldButtonGa = false, customWord = null }
   const word = customWord || (isGoldButtonGa ? 'ボタンが' : '脳が');
   const cls = isGoldButtonGa ? 'noga-word noga-gold' : (lv >= 4 ? 'noga-word noga-hot' : 'noga-word');
   const layouts = {
-    1: [{ x: '4%', y: '34%', sz: 28, rot: '-16deg', sc: 1.0 }, { x: '70%', y: '44%', sz: 26, rot: '14deg', sc: 0.95 }],
-    2: [{ x: '3%', y: '30%', sz: 34, rot: '-18deg', sc: 1.0 }, { x: '68%', y: '52%', sz: 38, rot: '16deg', sc: 1.05 }, { x: '8%', y: '62%', sz: 24, rot: '-10deg', sc: 0.95 }],
-    3: [{ x: '4%', y: '24%', sz: 54, rot: '-14deg', sc: 1.05 }, { x: '66%', y: '28%', sz: 38, rot: '18deg', sc: 1.0 }, { x: '64%', y: '60%', sz: 42, rot: '-12deg', sc: 1.0 }, { x: '4%', y: '64%', sz: 32, rot: '12deg', sc: 0.95 }],
-    4: [{ x: '2%', y: '20%', sz: 56, rot: '-18deg', sc: 1.08 }, { x: '62%', y: '22%', sz: 48, rot: '16deg', sc: 1.05 }, { x: '2%', y: '54%', sz: 46, rot: '12deg', sc: 1.05 }, { x: '64%', y: '56%', sz: 54, rot: '-16deg', sc: 1.08 }, { x: '28%', y: '18%', sz: 32, rot: '8deg', sc: 0.95 }, { x: '74%', y: '40%', sz: 30, rot: '-22deg', sc: 0.95 }],
-    5: [{ x: '1%', y: '16%', sz: 62, rot: '-18deg', sc: 1.12 }, { x: '58%', y: '16%', sz: 60, rot: '16deg', sc: 1.12 }, { x: '1%', y: '46%', sz: 56, rot: '14deg', sc: 1.08 }, { x: '62%', y: '48%', sz: 58, rot: '-15deg', sc: 1.10 }, { x: '4%', y: '70%', sz: 44, rot: '-10deg', sc: 1.02 }, { x: '68%', y: '70%', sz: 46, rot: '12deg', sc: 1.04 }, { x: '26%', y: '26%', sz: 34, rot: '10deg', sc: 0.96 }]
+    1: [{ x: '10%', y: '34%', sz: 26, rot: '-16deg', sc: 1.0 }, { x: '68%', y: '44%', sz: 24, rot: '14deg', sc: 0.95 }],
+    2: [{ x: '9%', y: '30%', sz: 32, rot: '-18deg', sc: 1.0 }, { x: '66%', y: '52%', sz: 34, rot: '16deg', sc: 1.05 }, { x: '14%', y: '62%', sz: 22, rot: '-10deg', sc: 0.95 }],
+    3: [{ x: '10%', y: '24%', sz: 46, rot: '-14deg', sc: 1.05 }, { x: '64%', y: '28%', sz: 34, rot: '18deg', sc: 1.0 }, { x: '62%', y: '60%', sz: 38, rot: '-12deg', sc: 1.0 }, { x: '10%', y: '64%', sz: 28, rot: '12deg', sc: 0.95 }],
+    4: [{ x: '8%', y: '20%', sz: 50, rot: '-18deg', sc: 1.08 }, { x: '60%', y: '22%', sz: 44, rot: '16deg', sc: 1.05 }, { x: '8%', y: '54%', sz: 42, rot: '12deg', sc: 1.05 }, { x: '62%', y: '56%', sz: 48, rot: '-16deg', sc: 1.08 }, { x: '30%', y: '18%', sz: 28, rot: '8deg', sc: 0.95 }],
+    5: [{ x: '8%', y: '16%', sz: 54, rot: '-18deg', sc: 1.12 }, { x: '56%', y: '16%', sz: 52, rot: '16deg', sc: 1.12 }, { x: '8%', y: '46%', sz: 50, rot: '14deg', sc: 1.08 }, { x: '60%', y: '48%', sz: 52, rot: '-15deg', sc: 1.10 }, { x: '10%', y: '70%', sz: 38, rot: '-10deg', sc: 1.02 }, { x: '64%', y: '70%', sz: 40, rot: '12deg', sc: 1.04 }]
   };
   const items = layouts[Math.min(5, Math.max(1, lv))] || layouts[3];
   items.forEach((it, idx) => {
@@ -1920,20 +2164,20 @@ async function playRemTougaiBurst({ is6000, bonusType, fromSakibare = false, for
   }
   let note = 'レム突点灯';
   if (pat === 'SLOW_GLOW') {
-    note = 'レム徐々に点灯'; oniLamp.classList.add('lamp-rem-slow'); lampStatusText.textContent = 'じわ〜っ…'; setLed('rem');
+    note = 'レム徐々に点灯'; setCabinetGlow('rem-slow'); lampStatusText.textContent = 'じわ〜っ…'; setLed('rem');
     setRemLampVisual('slow', { bringFront: true }); await wait(1120, token);
     setRemLampVisual('rainbow', { bringFront: true }); triggerLamp('rainbow', '6,000!!'); setPremiaFrame(true);
     StudioAudio.playPokyun(true); setAmbientBg('rainbow'); setSunburst(true); FxCanvas.burstRainbow(62);
   } else if (pat === 'DOUBLE_BLINK') {
-    note = 'レム再点灯'; oniLamp.classList.add('lamp-rem'); lampStatusText.textContent = 'ピッ…'; setRemLampVisual('lit', { bringFront: true }); await wait(180, token);
-    oniLamp.classList.remove('lamp-rem'); lampStatusText.textContent = '……'; setLed('off'); setRemLampVisual('idle', { bringFront: true }); await wait(520, token);
+    note = 'レム再点灯'; setCabinetGlow('rem'); lampStatusText.textContent = 'ピッ…'; setRemLampVisual('lit', { bringFront: true }); await wait(180, token);
+    setCabinetGlow('off'); lampStatusText.textContent = '……'; setLed('off'); setRemLampVisual('idle', { bringFront: true }); await wait(520, token);
     setRemLampVisual('rainbow', { bringFront: true }); triggerLamp('rainbow', '再点灯!!'); setPremiaFrame(true);
     StudioAudio.playPokyun(true); setAmbientBg('rainbow'); setSunburst(true); FxCanvas.burstRainbow(62);
   } else if (pat === 'CLASSIC_FLASH') {
-    note = '旧レム閃光'; setRemLampVisual('strobe', { bringFront: true }); oniLamp.classList.add('lamp-rem-classic'); lampStatusText.textContent = '閃光!!';
+    note = '旧レム閃光'; setRemLampVisual('strobe', { bringFront: true }); setCabinetGlow('rem-strobe'); lampStatusText.textContent = '閃光!!';
     setLed('rainbow'); setPremiaFrame(true); StudioAudio.playPokyun(true); setAmbientBg('rainbow'); setSunburst(true);
     FxCanvas.spawnRing('#4ade80', 320, 9); FxCanvas.spawnLightning('#e0f2fe', 5); await wait(880, token);
-    oniLamp.classList.remove('lamp-rem-classic'); setRemLampVisual('rainbow', { bringFront: true });
+    setCabinetGlow('rainbow'); setRemLampVisual('rainbow', { bringFront: true });
   } else {
     setRemLampVisual('lit', { bringFront: true }); triggerLamp('rem', '突点灯!!');
     StudioAudio.playPokyun(false); FxCanvas.spawnRing('#38bdf8', 260, 8);
@@ -1957,8 +2201,8 @@ async function playOniTenpaiAori({ isHit, is6000, bonusType, fixedDig = null, to
   rushTopBadge.classList.remove('hidden');
   rushTopBadge.textContent = dig === 7 ? '7 テンパイ!!（大当り濃厚）' : dig === 0 ? '0 テンパイ!?（超違和感）' : `${dig} テンパイ煽り!`;
   rushTopBadge.className = isPremDig
-    ? 'pointer-events-none absolute top-[48px] left-1/2 -translate-x-1/2 z-[28] px-3.5 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
-    : 'pointer-events-none absolute top-[48px] left-1/2 -translate-x-1/2 z-[28] px-3.5 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
+    ? 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
+    : 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
 
   FxCanvas.spawnRing(isPremDig ? '#fef08a' : '#ef4444', 250, 7);
   StudioAudio.playSoftHeartbeat();
@@ -1990,7 +2234,7 @@ async function playOniTotsuAtariPause({ is6000, bonusType = null, fixedDig = nul
   await wait(550, token);
 
   if (winDig === 7 || winDig === 3 || winDig === 0) {
-    StudioAudio.playPokyun(true); fireNiziiroFlashOnLcd(); FxCanvas.burstRainbow(64);
+    StudioAudio.playPokyun(true); setLcdNiziiroBack(true); FxCanvas.burstRainbow(64);
   } else if (winDig % 2 === 0 && bType === 'BONUS_300') {
     StudioAudio.play300Sound();
   } else {
@@ -2013,8 +2257,8 @@ async function playOnigakariCountdown({ isHit, is6000, bonusType = null, token }
     rushTopBadge.textContent = `COUNT [ ${seq[i]} ]`;
     const hot = isPrem && i >= 3;
     rushTopBadge.className = hot
-      ? 'pointer-events-none absolute top-[48px] left-1/2 -translate-x-1/2 z-[28] px-3.5 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
-      : 'pointer-events-none absolute top-[48px] left-1/2 -translate-x-1/2 z-[28] px-3.5 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
+      ? 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
+      : 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
     if (hot) setPremiaFrame(true);
     FxCanvas.spawnRing(hot ? '#fef08a' : '#ef4444', 180 + i * 24, 5);
     await wait(isPrem ? 210 : 240, token);
@@ -2047,7 +2291,7 @@ async function playOniRemApproach6000(token) {
 }
 
 // -------------------------------------------------------------------------
-// 13. 本家違和感18種（画像版ひょっこり隠れレム・巻き戻り・77/202/77777等）
+// 14. 本家違和感18種（筐体レムぷる・ロゴ一瞬虹・画像版隠れレム・巻き戻り等）
 // -------------------------------------------------------------------------
 async function playIwakanEffect({ is6000, rushMode, token }) {
   const commonPool = [
@@ -2065,12 +2309,12 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     case 'LED_ALL_OFF': label = 'サイドLED全消灯'; setLed('off'); await wait(880, token); break;
     case 'MONO_SCREEN': label = '液晶モノクロ化'; lcdFrame.classList.add('iwakan-mono'); await wait(860, token); lcdFrame.classList.remove('iwakan-mono'); break;
     case 'FADE_REMAIN': label = '残り回数消失'; if (hudRushRemain) hudRushRemain.classList.add('iwakan-fade-remain'); await wait(900, token); if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain'); break;
-    case 'REM_PURU': label = 'レムぷる'; oniLamp.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); oniLamp.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
+    case 'REM_PURU': label = 'レムぷる(筐体微振動)'; if (cabinetShell) cabinetShell.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
     case 'GLITCH_BLINK': label = '映像ノイズ停止'; rushNoiseVeil.classList.remove('hidden'); lcdFrame.classList.add('fx-glitch'); await wait(260, token); lcdFrame.classList.remove('fx-glitch'); rushNoiseVeil.classList.add('hidden'); await wait(620, token); break;
     case 'HIDDEN_REM': {
       label = 'ひょっこり隠れレム';
       const rUrl = Assets.getRemLamp();
-      hiddenRemBadge.className = 'pointer-events-none absolute bottom-1 right-1 z-[27] opacity-90 transition-opacity';
+      hiddenRemBadge.className = 'pointer-events-none absolute bottom-2 right-3 z-[27] opacity-90 transition-opacity';
       hiddenRemBadge.innerHTML = rUrl
         ? `<img src="${rUrl}" class="w-16 h-16 object-contain drop-shadow-[0_0_12px_rgba(56,189,248,0.85)]" alt="隠れレム">`
         : `<span class="px-2 py-0.5 rounded bg-sky-900/90 text-sky-200 text-xs font-black">レム</span>`;
@@ -2084,17 +2328,19 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     }
     case 'REMAIN_202': {
       label = '残り回数「202」(レム誕生日)';
-      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '202'; hudRushRemain.className = 'text-lg sm:text-xl font-black cyan-grad-text leading-none'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none'; }
+      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '202'; hudRushRemain.className = 'text-lg sm:text-xl font-black cyan-grad-text leading-none num-fixed'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed'; }
       break;
     }
     case 'REMAIN_77': {
       label = '残り回数「77」変化';
-      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '77'; hudRushRemain.className = 'text-lg sm:text-xl font-black rainbow-grad-text leading-none'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none'; }
+      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '77'; hudRushRemain.className = 'text-lg sm:text-xl font-black rainbow-grad-text leading-none num-fixed'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed'; }
       break;
     }
     case 'PT_77777': {
-      label = '獲得pt「77,777pt」変化';
-      if (hudRushPts) { const orig = hudRushPts.textContent; hudRushPts.textContent = '77,777pt'; await wait(960, token); hudRushPts.textContent = orig; }
+      label = '累計払出「77,777個」変化';
+      const dispEl = document.getElementById('rushDispDisplay');
+      if (dispEl) { const orig = dispEl.textContent; dispEl.textContent = '77,777個'; await wait(960, token); dispEl.textContent = orig; }
+      else await wait(600, token);
       break;
     }
     case 'REEL_FLIP': {
@@ -2115,61 +2361,65 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     case 'SCREEN_TILT': label = '液晶わずかに傾き'; lcdFrame.style.transform = 'rotate(-2.4deg)'; await wait(900, token); lcdFrame.style.transform = ''; break;
     case 'COUNT_6000': {
       label = '残り回数「6000」変化';
-      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '6000'; hudRushRemain.className = 'text-lg sm:text-xl font-black rainbow-grad-text leading-none'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none'; }
+      if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '6000'; hudRushRemain.className = 'text-lg sm:text-xl font-black rainbow-grad-text leading-none num-fixed'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed'; }
       break;
     }
-    case 'RAINBOW_GLINT': label = 'ランプ一瞬虹点灯'; oniLamp.classList.add('lamp-rainbow'); await wait(200, token); oniLamp.classList.remove('lamp-rainbow'); await wait(700, token); break;
+    case 'RAINBOW_GLINT': label = 'レム＆役物一瞬虹発光'; setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); await wait(220, token); setCabinetGlow('idle'); setYakumonoColor('white'); await wait(680, token); break;
   }
   return label;
 }
 
 // -------------------------------------------------------------------------
-// 14. 神秘「鬼がかってますね」・カウントアップ・新死に戻り・本物画像引き裂き昇格
+// 15. ★液晶内ブラックアウト「鬼がかってますね」・カウントアップ・死に戻り・昇格★
 // -------------------------------------------------------------------------
 async function playOnigakariImageCutin({
-  caption = '鬼がかってますね', dur = 3800, withPokyun = true, fromBlackout = false, sparklePreStarted = false, token
+  caption = '鬼がかってますね', dur = 3600, withPokyun = true, fromBlackout = false, token
 }) {
   BgmEngine.cut();
   const imgSrc = Assets.getOnigakari();
-  try {
-    if (fromBlackout && !sparklePreStarted) {
-      globalCutinOverlay.className = 'fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden';
-      globalCutinOverlay.innerHTML = ''; globalCutinOverlay.classList.remove('hidden');
-      SoftSparkle.start(); await waitFreeze(680, token);
-    } else if (fromBlackout) SoftSparkle.start();
+  const host = lcdOnigakariOverlay;
+  if (!host) return;
 
-    globalCutinOverlay.className = 'fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden';
-    globalCutinOverlay.innerHTML = `
+  try {
+    if (fromBlackout) {
+      setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
+      host.innerHTML = ''; host.classList.remove('hidden');
+      await waitFreeze(620, token);
+    }
+
+    host.innerHTML = `
       <div id="mysticPrismRays" class="mystic-prism-rays"></div>
-      <div class="relative z-10 w-full max-w-lg flex flex-col items-center gap-3">
-        <div id="cutinFrameBox" class="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-white/20 bg-black transition-all duration-1000 ${fromBlackout ? 'cutin-gentle-fade' : ''}">
+      <div class="relative z-10 w-full flex flex-col items-center gap-2 px-1">
+        <div id="cutinFrameBox" class="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-white/20 bg-black transition-all duration-1000 ${fromBlackout ? 'cutin-gentle-fade' : ''}">
           ${imgSrc ? `<img src="${imgSrc}" alt="鬼がかってますね" class="w-full h-full object-cover">`
-            : `<div class="w-full h-full overlay-rainbow flex items-center justify-center"><span class="font-mincho text-4xl font-black text-white">${caption}</span></div>`}
+            : `<div class="w-full h-full overlay-rainbow flex items-center justify-center"><span class="font-mincho text-2xl font-black text-white">${caption}</span></div>`}
           <div id="cutinShimmerBar" class="hidden prism-shimmer-bar"></div>
         </div>
-        <div id="cutinCapText" class="font-mincho text-2xl sm:text-3xl font-black rainbow-grad-text tracking-widest drop-shadow-[0_2px_18px_rgba(255,255,255,0.6)] transition-opacity duration-1000 ${fromBlackout ? 'opacity-0' : 'opacity-100 pop-in'}">${caption}</div>
+        <div id="cutinCapText" class="font-mincho text-lg sm:text-2xl font-black rainbow-grad-text tracking-widest drop-shadow-[0_2px_16px_rgba(255,255,255,0.6)] transition-opacity duration-1000 ${fromBlackout ? 'opacity-0' : 'opacity-100 pop-in'}">${caption}</div>
       </div>
     `;
-    globalCutinOverlay.classList.remove('hidden');
+    host.classList.remove('hidden');
 
     if (fromBlackout) {
-      await waitFreeze(1450, token);
+      await waitFreeze(1400, token);
       const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox');
       const shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
-      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-4', 'mystic-halo-frame');
+      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-2', 'mystic-halo-frame');
       if (shimmer) shimmer.classList.remove('hidden'); if (cap) cap.classList.replace('opacity-0', 'opacity-100');
       if (withPokyun) StudioAudio.playPokyun(true);
-      setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
-      await waitFreeze(Math.max(2100, dur - 1450), token);
+      setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
+      await waitFreeze(Math.max(1900, dur - 1400), token);
     } else {
       const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox'), shimmer = document.getElementById('cutinShimmerBar');
-      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-4', 'mystic-halo-frame');
+      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-2', 'mystic-halo-frame');
       if (shimmer) shimmer.classList.remove('hidden');
       if (withPokyun) StudioAudio.playPokyun(true);
-      fireGlobalRainbowFlash(); setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
+      fireGlobalRainbowFlash(); setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
       await waitFreeze(dur, token);
     }
-  } finally { SoftSparkle.stop(); hideGlobalCutin(); }
+  } finally {
+    host.classList.add('hidden'); host.innerHTML = '';
+  }
 }
 
 function get6000LogoKey(rushMode) {
@@ -2180,12 +2430,12 @@ function get6000LogoKey(rushMode) {
 
 function applyBonusModeTheme(rushMode, { isDespair = false, is6000 = false } = {}) {
   lcdFrame.classList.remove('mode-despair-bg', 'fx-gold', 'fx-rainbow', 'bonus-theme-brain', 'bonus-theme-rem');
-  if (isDespair) { lcdFrame.classList.add('mode-despair-bg'); return { titleCls: 'text-xl sm:text-2xl font-black text-slate-100 drop-shadow pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.18em] text-sky-200 leading-none' }; }
-  if (is6000) { lcdFrame.classList.add('fx-rainbow'); return { titleCls: 'text-2xl sm:text-3xl font-black rainbow-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.18em] text-amber-300 leading-none' }; }
-  if (rushMode === 'brain') { lcdFrame.classList.add('bonus-theme-brain'); return { titleCls: 'text-xl sm:text-2xl font-black purple-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.18em] text-fuchsia-300 leading-none' }; }
-  if (rushMode === 'rem') { lcdFrame.classList.add('bonus-theme-rem'); return { titleCls: 'text-xl sm:text-2xl font-black cyan-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.18em] text-sky-300 leading-none' }; }
+  if (isDespair) { lcdFrame.classList.add('mode-despair-bg'); return { titleCls: 'text-lg sm:text-2xl font-black text-slate-100 drop-shadow pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-sky-200 leading-none' }; }
+  if (is6000) { lcdFrame.classList.add('fx-rainbow'); return { titleCls: 'text-xl sm:text-3xl font-black rainbow-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-amber-300 leading-none' }; }
+  if (rushMode === 'brain') { lcdFrame.classList.add('bonus-theme-brain'); return { titleCls: 'text-lg sm:text-2xl font-black purple-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-fuchsia-300 leading-none' }; }
+  if (rushMode === 'rem') { lcdFrame.classList.add('bonus-theme-rem'); return { titleCls: 'text-lg sm:text-2xl font-black cyan-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-sky-300 leading-none' }; }
   lcdFrame.classList.add('fx-gold');
-  return { titleCls: 'text-xl sm:text-2xl font-black gold-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.18em] text-amber-300 leading-none' };
+  return { titleCls: 'text-lg sm:text-2xl font-black gold-grad-text pop-in', subCls: 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-amber-300 leading-none' };
 }
 
 async function runCountUpBreak6000({ rushMode = 'onigakari', iwakanAnswer = '', token }) {
@@ -2201,7 +2451,7 @@ async function runCountUpBreak6000({ rushMode = 'onigakari', iwakanAnswer = '', 
     bonusSubLabel.textContent = rushMode === 'brain' ? '脳が震えるRUSH' : rushMode === 'rem' ? 'レム告知モード' : '鬼がかりRUSH';
     bonusMainTitle.className = th.titleCls; bonusMainTitle.textContent = '';
     bonusCountNum.classList.remove('hidden');
-    bonusCountNum.className = 'text-4xl sm:text-5xl font-black gold-grad-text tracking-tight leading-none pop-in drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]';
+    bonusCountNum.className = 'text-4xl sm:text-5xl font-black gold-grad-text tracking-tight leading-none pop-in num-fixed';
     bonusCountNum.textContent = '1,500';
     bonusDesc.textContent = '払出 1,500個…';
     if (iwakanAnswer) showIwakanAnswer(iwakanAnswer, false);
@@ -2217,7 +2467,7 @@ async function runCountUpBreak6000({ rushMode = 'onigakari', iwakanAnswer = '', 
       { val: '4,500', snd: () => StudioAudio.playPokyun(true), desc: 'さらに上乗せ 4,500!!', color: '#7dd3fc' }
     ]) {
       st.snd();
-      bonusCountNum.className = 'text-4xl sm:text-5xl font-black rainbow-grad-text tracking-tight leading-none count-break-pop';
+      bonusCountNum.className = 'text-4xl sm:text-5xl font-black rainbow-grad-text tracking-tight leading-none count-break-pop num-fixed';
       bonusCountNum.textContent = st.val; bonusDesc.textContent = st.desc;
       FxCanvas.spawnRing(st.color, 300, 9); FxCanvas.burstRainbow(52);
       await wait(680, token);
@@ -2236,17 +2486,15 @@ async function runCountUpBreak6000({ rushMode = 'onigakari', iwakanAnswer = '', 
   } finally { bonusCountNum.classList.add('hidden'); setBonusSceneBackdrop(null); clearGlobalChaosEffects(); hideFullscreenOverlay(); }
 }
 
-// ★新・リザルト死に戻り復活（暗転→鼓動→restart.jpg見切れゼロ表示→斜めに真っ二つ引き裂き→奥からniziiro.jpg＋6000!!）★
 async function runResultRevivalSequence(token) {
   try {
     BgmEngine.cut(); StudioAudio.playPuchun(); FxCanvas.setAmbient('none'); FxCanvas.clearAll();
-    setLed('off'); setAmbientBg(''); setSunburst(false);
+    setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
 
     lcdFrame.classList.add('fx-rgb-glitch');
-    setGlobalBlackout(true);
-    await waitFreeze(950, token);
+    showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: true });
+    await waitFreeze(900, token);
     lcdFrame.classList.remove('fx-rgb-glitch');
-    setGlobalBlackout(false);
 
     StudioAudio.playSoftHeartbeat();
     FxCanvas.spawnPurpleHands(34);
@@ -2254,7 +2502,6 @@ async function runResultRevivalSequence(token) {
     await waitFreeze(1150, token);
     hideFullscreenOverlay();
 
-    // restart.jpg を見切れゼロで降臨させ、直後に斜めに引きちぎって奥から niziiro.jpg＋6,000!!
     setActiveScene('bonus'); setBonusLogo(null); setBonusSceneBackdrop('restart');
     bonusSubLabel.textContent = ''; bonusMainTitle.textContent = ''; bonusDesc.textContent = '';
     StudioAudio.playReStart(); FxCanvas.burstFlames(40);
@@ -2275,7 +2522,9 @@ async function runResultRevivalSequence(token) {
 
 async function runWhale3000Direct(token) {
   try {
-    BgmEngine.cut(); setAmbientBg('rainbow'); setSunburst(true); fireGlobalRainbowFlash();
+    BgmEngine.cut();
+    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 920, withNiziiroBack: true, token });
+    setAmbientBg('rainbow'); setSunburst(true); fireGlobalRainbowFlash();
     StudioAudio.playSlash(); firePhysicalSplitSlash();
     showFullscreenOverlay({
       mode: 'rainbow', sub: '白鯨討伐・3,000 BONUS', main: '鬼がかり 3,000 BONUS!!',
@@ -2284,7 +2533,7 @@ async function runWhale3000Direct(token) {
     });
     StudioAudio.play3000Jackpot(); triggerLamp('rainbow', '3,000!!');
     lcdFrame.classList.add('fx-rainbow', 'shake-burst'); setLed('rainbow');
-    await wait(2300, token); lcdFrame.classList.remove('shake-burst');
+    await wait(2200, token); lcdFrame.classList.remove('shake-burst');
   } finally { clearGlobalChaosEffects(); hideFullscreenOverlay(); }
 }
 
@@ -2306,12 +2555,11 @@ async function runSuddenOchiburu6000({ sub = '鬼がかりRUSH', extra = '払出
 async function runSudden3sFreeze6000(token) {
   try {
     BgmEngine.cut(); StudioAudio.playPuchun(); FxCanvas.setAmbient('none'); FxCanvas.clearAll();
-    setLed('off'); setAmbientBg(''); setSunburst(false);
-    setGlobalBlackout(true); await waitFreeze(2300, token);
-    SoftSparkle.start(); await waitFreeze(700, token);
+    setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
+    if (lcdOnigakariOverlay) { lcdOnigakariOverlay.innerHTML = ''; lcdOnigakariOverlay.classList.remove('hidden'); }
+    await waitFreeze(1800, token);
 
-    await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3800, withPokyun: true, fromBlackout: true, sparklePreStarted: true, token });
-    setGlobalBlackout(false);
+    await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3500, withPokyun: true, fromBlackout: true, token });
 
     StudioAudio.playSlash(); StudioAudio.playOchiburu(false); firePhysicalSplitSlash();
     setAmbientBg('rainbow'); setSunburst(true);
@@ -2332,10 +2580,8 @@ async function runGoldenPromotionSequence({
   if (mode === 'auto') {
     if (finalSound === '6000') {
       const r = Math.random();
-      if (fakeRestart || fakeSound === 'restart') {
-        // Re:Start からの昇格は必ず「本物の斜め引き裂き(奥からniziiro.jpg+6000)」または虹ポキュン引き裂き
-        mode = r < 0.45 ? 'pokyun' : 'slash';
-      } else if (r < 0.22) mode = 'pokyun';
+      if (fakeRestart || fakeSound === 'restart') mode = r < 0.45 ? 'pokyun' : 'slash';
+      else if (r < 0.22) mode = 'pokyun';
       else if (r < 0.36) mode = 'freeze3s';
       else {
         const pool = ['slash', 'drop', 'shatter', 'quake', 'botan'];
@@ -2408,7 +2654,6 @@ async function runGoldenPromotionSequence({
     }
 
     if (mode === 'slash' && ripSource) {
-      // ★Re:Start / 300 / 1500 の画像をそのまま真っ二つに引きちぎり、奥から niziiro.jpg＋6,000 が飛び出す!!★
       StudioAudio.playPokyun(true); StudioAudio.playSlash(); StudioAudio.playOchiburu(true);
       fireImageRipSlash(ripSource);
       setAmbientBg('rainbow'); setSunburst(true);
@@ -2440,13 +2685,13 @@ async function runGoldenPromotionSequence({
     }
 
     StudioAudio.playPuchun(); FxCanvas.setAmbient('none'); FxCanvas.clearAll();
-    setLed('off'); setAmbientBg(''); setSunburst(false);
+    setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
     lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'mode-despair-bg', 'bonus-theme-brain', 'bonus-theme-rem');
 
     if (mode === 'freeze3s') {
-      setGlobalBlackout(true); await waitFreeze(2000, token); SoftSparkle.start(); await waitFreeze(650, token);
-      await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3600, withPokyun: true, fromBlackout: true, sparklePreStarted: true, token });
-      setGlobalBlackout(false);
+      if (lcdOnigakariOverlay) { lcdOnigakariOverlay.innerHTML = ''; lcdOnigakariOverlay.classList.remove('hidden'); }
+      await waitFreeze(1600, token);
+      await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3400, withPokyun: true, fromBlackout: true, token });
     } else {
       showFullscreenOverlay({ mode: 'blackout', sub: '', main: '', extra: '', scanlines: false });
       await wait(650, token);
