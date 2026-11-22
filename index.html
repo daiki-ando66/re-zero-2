@@ -115,29 +115,30 @@
 
     /* ロゴ役物（常時表示・待機位置はレール中央／落下で液晶中央へ） */
     #logoPocketShadow {
-      position: absolute; top: 2px; left: 50%; width: 150px; height: 34px; margin-left: -75px;
+      position: absolute; top: 2px; left: 50%; width: 190px; height: 34px; margin-left: -95px;
       border-radius: 12px; background: radial-gradient(ellipse at center, rgba(6, 2, 10, 0.95) 50%, transparent 100%);
       opacity: 0; transition: opacity 0.14s ease; pointer-events: none;
     }
     #logoPocketShadow.pocket-open { opacity: 1; }
     #yakumonoLogoWrap {
-      position: absolute; top: 0; left: 50%; width: 164px; height: 86px;
+      position: absolute; top: 0; left: 50%; width: 200px; height: 102px;
       transform: translateX(-50%); z-index: 36; pointer-events: none;
       display: flex; align-items: center; justify-content: center;
       transition: filter 0.2s ease, opacity 0.22s ease; will-change: transform;
     }
-    #yakumonoLogoImg { height: 78px; width: 156px; display: block; object-fit: fill; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoImg { height: 94px; width: 188px; display: block; object-fit: fill; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-dropped { z-index: 44; }
     #yakumonoLogoWrap.yakumono-red #yakumonoLogoImg { filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-chance #yakumonoLogoImg { filter: drop-shadow(0 0 5px rgba(254, 249, 195, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-gold #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(254, 240, 138, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-rainbow #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(244, 114, 182, 0.85)) drop-shadow(0 0 10px rgba(125, 211, 252, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
-    #yakumonoLogoWrap.yakumono-off { filter: brightness(0.2) saturate(0.25); }
+    #yakumonoLogoWrap.yakumono-off { filter: brightness(0.2) saturate(0.25); opacity: 0.1; }
+    #cabinetShell.cabinet-blackout #railRem { opacity: 0.08; }
 
     /* レム役物（レール左端・顔と角をトリミング） */
-    #railRem { position: absolute; left: 6px; bottom: 6px; width: 50px; height: 50px; z-index: 28; pointer-events: none; }
-    #railRemSlot { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 1.5px solid rgba(250, 204, 21, 0.55); background: #0d0407; }
-    #railRemImg { width: 100%; height: 100%; object-fit: cover; object-position: 47% 32%; transform: scale(2.5); transform-origin: 47% 32%; }
+    #railRem { position: absolute; left: -6px; bottom: -4px; width: 96px; height: 96px; z-index: 28; pointer-events: none; opacity: 0.94; }
+    #railRemSlot { position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 76%); mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 76%); }
+    #railRemImg { width: 100%; height: 100%; object-fit: cover; object-position: 47% 32%; transform: scale(2.3); transform-origin: 47% 32%; }
     #railRemImg:not([src]) { display: none; }
     #cabinetRemGlow { position: absolute; inset: -8px; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.22s ease, background 0.22s ease; }
     #cabinetRemGlow.rem-glow-red     { opacity: 0.7; background: radial-gradient(circle, rgba(239,68,68,0.6) 0%, rgba(185,28,28,0.25) 62%, transparent 74%); }
@@ -158,7 +159,7 @@
     #reserveBar .w-6 { width: 22px; height: 22px; }
 
     /* レールのロゴ背後の呼吸する光（不透明度のみ） */
-    #yakumonoRail::before { content: ""; position: absolute; left: 50%; top: -6px; width: 240px; height: 92px; margin-left: -120px; pointer-events: none;
+    #yakumonoRail::before { content: ""; position: absolute; left: 50%; top: -6px; width: 300px; height: 112px; margin-left: -150px; pointer-events: none;
       background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.28) 0%, transparent 70%); animation: railBreath 3.4s ease-in-out infinite alternate; }
     @keyframes railBreath { from { opacity: 0.35; } to { opacity: 1; } }
 
@@ -702,7 +703,7 @@
           <div id="rushNoiseVeil" class="hidden pointer-events-none absolute inset-0 z-[26] crt-scanlines bg-black/25"></div>
 
           <!-- 中央メインステージ（左端レム避けの左右安全パディング付き） -->
-          <div class="relative z-[16] flex-1 min-h-0 flex items-center justify-center overflow-hidden px-3 pt-8 pb-2">
+          <div class="relative z-[16] flex-1 min-h-0 flex items-center justify-center overflow-hidden px-3 pt-14 pb-2">
             <!-- シーンA：通常時 -->
             <div id="scene-normal" class="scene-pane w-full h-full flex flex-col items-center justify-center text-center gap-1.5">
               <div class="flex items-center justify-center gap-1.5 sm:gap-2.5">
@@ -934,7 +935,7 @@
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=74"></script>
-  <script src="game.js?v=74"></script>
+  <script src="effects.js?v=75"></script>
+  <script src="game.js?v=75"></script>
 </body>
 </html>
