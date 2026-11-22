@@ -649,10 +649,16 @@ async function resolveNormalReach() {
     // ★初当たり：ロゴ役物『Re:ゼロ』がガシャーンと落下し、背面に niziiro.jpg が爆発展開!!★
     // 図柄は見せない：予告画面のまま一拍おいて、ロゴ役物が中央まで落下して当りを知らせる
     await wait(650, tok);
-    fireRainbowBurst('大当り!!', { withBackNiziiro: true });
-    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, token: tok });
+    // 着地の瞬間に虹色背景が同時に開き、一瞬だけ時間が止まる
+    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, timeStop: 650, withSound: false,
+      onImpact: () => {
+        // 鬼がかってますねの締めと同じ：落下音＋衝撃音＋当たり音
+        StudioAudio.playOchiburu(false); StudioAudio.playSlash();
+        setTimeout(() => StudioAudio.play1500Jackpot(false), 140);
+        fireRainbowBurst('大当り!!', { withBackNiziiro: true });
+      }, token: tok });
 
-    StudioAudio.play1500Jackpot(false); setActiveScene('bonus');
+    setActiveScene('bonus');
     setBonusSceneBackdrop('niziiro');
     setBonusLogo('rezeroPurple');
     bonusSubLabel.className = 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-amber-200 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] leading-none';
@@ -1097,17 +1103,10 @@ async function runRush6000Sequence({ forceFake = null, iwakanAnswer = '' } = {})
 
   const rm = state.rushMode;
   const modePrefix = rm === 'brain' ? '脳が震える' : rm === 'rem' ? '鬼化レム' : '鬼がかり';
-  const pick = forceFake || (Math.random() < 0.45 ? '300' : '1500');
+  const pick = (forceFake && forceFake !== '300') ? forceFake : '1500';   // 300フェイク→昇格は廃止
 
   let opts;
-  if (pick === '300') {
-    opts = {
-      fakeSub: '右打ち 6%', fakeTitle: `${modePrefix} 300 BONUS`, fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
-      fakeStyle: 'despair', fakeSound: '300', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
-      iwakanAnswer, finalSub: rm === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH',
-      finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'auto'
-    };
-  } else if (pick === 'restart') {
+  if (pick === 'restart') {
     opts = {
       fakeSub: '死に戻り', fakeTitle: 'Re:Start', fakeDesc: '出玉なし・ST144回へ巻き戻し',
       fakeStyle: 'despair', fakeSound: 'restart', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
@@ -1402,8 +1401,8 @@ document.querySelectorAll('.promo-test-item').forEach(btn => {
       } else {
         const modes = ['slash', 'botan', 'drop', 'shatter', 'quake'];
         await runGoldenPromotionSequence({
-          fakeSub: '右打ち 6%', fakeTitle: '鬼がかり 300 BONUS', fakeDesc: '実質純増 +280発 ＆ ST144回リセット！',
-          fakeStyle: 'despair', fakeSound: '300', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false, rushMode: prevRMode,
+          fakeSub: '右打ち 55%', fakeTitle: '鬼がかり 1,500 BONUS!!', fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
+          fakeStyle: 'gold', fakeSound: '1500', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true, rushMode: prevRMode,
           iwakanAnswer: 'ひょっこり隠れレム', finalSub: '鬼がかりRUSH',
           finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
           finalSound: '6000', crashType: modes[randomCrashIdx++ % modes.length], token: tok
