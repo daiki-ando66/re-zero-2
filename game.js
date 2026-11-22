@@ -1729,3 +1729,445 @@ updateStatsUI();
     }
   });
 })();
+
+// =========================================================================
+// ウェディング12,000 超プレミア完全版パッチ (v5.3)
+//  ・2層滑らかクロスフェード＋カメラワーク＋専用チャペル＆ハープ音響
+//  ・スマホ全画面最優先 × PCワイド空間（上下見切れゼロ・ボタン位置完全固定）
+//  ・ルート直下の実ファイル名（wed space.jpg / pur / kur / mur / bea / ram / rem / emi / wed_botan）完全対応
+// =========================================================================
+(function upgradeWeddingCinemaUltimate() {
+  const SCENE_FILES = [
+    { name: 'wed space.jpg', portrait: true,  dur: 2400, pan: 'zoomIn',  bell: true  },
+    { name: 'pur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 0     },
+    { name: 'kur.jpg',       portrait: true,  dur: 1450, pan: 'zoomOut', harp: 1     },
+    { name: 'mur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 2     },
+    { name: 'bea.jpg',       portrait: true,  dur: 1450, pan: 'zoomIn',  harp: 3     },
+    { name: 'ram.jpg',       portrait: true,  dur: 1550, pan: 'panUp',   harp: 4     },
+    { name: 'rem.jpg',       portrait: true,  dur: 1850, pan: 'zoomIn',  harp: 5     },
+    { name: 'emi.jpg',       portrait: true,  dur: 1950, pan: 'zoomIn',  harp: 6     }
+  ];
+
+  const loadedScenes = new Array(SCENE_FILES.length).fill(null);
+  let directWedBtn = null;
+
+  SCENE_FILES.forEach((item, idx) => {
+    const url = encodeURI(item.name);
+    const im = new Image();
+    im.onload = () => { loadedScenes[idx] = url; };
+    im.src = url;
+  });
+  (() => {
+    const im = new Image();
+    im.onload = () => { directWedBtn = 'wed_botan.jpg'; };
+    im.src = 'wed_botan.jpg';
+  })();
+
+  const WeddingAudio = (() => {
+    let ctx = null;
+    let padNodes = [];
+
+    function getVol() {
+      const muteBtn = document.getElementById('btnMute');
+      if (muteBtn && muteBtn.textContent.includes('OFF')) return 0;
+      const sl = document.getElementById('sliderVolume');
+      const v = sl ? parseInt(sl.value, 10) / 100 : 0.80;
+      return Math.max(0, Math.min(1, v));
+    }
+
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+
+    function startHolyPad() {
+      stopPad();
+      const v = getVol();
+      if (v <= 0.01) return;
+      const c = ensure(); if (!c) return;
+      const now = c.currentTime + 0.02;
+
+      const master = c.createGain();
+      master.gain.setValueAtTime(0.001, now);
+      master.gain.linearRampToValueAtTime(v * 0.22, now + 2.2);
+
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(1150, now);
+      lp.connect(master).connect(c.destination);
+
+      const freqs = [174.61, 220.00, 261.63, 329.63, 392.00];
+      const oscs = freqs.map((hz, i) => {
+        const o = c.createOscillator();
+        o.type = i % 2 === 0 ? 'triangle' : 'sine';
+        o.frequency.setValueAtTime(hz, now);
+        o.detune.value = (i - 2) * 4;
+        const g = c.createGain(); g.gain.value = i === 0 ? 0.30 : 0.16;
+        o.connect(g).connect(lp);
+        o.start(now);
+        return o;
+      });
+      padNodes.push({ master, oscs, ctx: c });
+    }
+
+    function stopPad(fadeSec = 0.8) {
+      padNodes.forEach(p => {
+        try {
+          const now = p.ctx.currentTime;
+          p.master.gain.cancelScheduledValues(now);
+          p.master.gain.setValueAtTime(Math.max(0.001, p.master.gain.value), now);
+          p.master.gain.exponentialRampToValueAtTime(0.0001, now + fadeSec);
+          p.oscs.forEach(o => { try { o.stop(now + fadeSec + 0.05); } catch (e) {} });
+        } catch (e) {}
+      });
+      padNodes = [];
+    }
+
+    function playBell(pitchMul = 1.0) {
+      const v = getVol(); if (v <= 0.01) return;
+      const c = ensure(); if (!c) return;
+      const now = c.currentTime + 0.01;
+      const base = 523.25 * pitchMul;
+      [1, 2, 2.4, 3.0, 4.2].forEach((ratio, idx) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(base * ratio, now);
+        const amp = (v * 0.20) / (idx + 1);
+        const decay = 2.6 / (1 + idx * 0.55);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(amp, now + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+        o.connect(g).connect(c.destination);
+        o.start(now); o.stop(now + decay + 0.05);
+      });
+    }
+
+    function playHarpStep(stepIdx = 0) {
+      const v = getVol(); if (v <= 0.01) return;
+      const c = ensure(); if (!c) return;
+      const now = c.currentTime + 0.01;
+      const roots = [349.23, 392.00, 440.00, 466.16, 523.25, 587.33, 698.46];
+      const root = roots[Math.min(roots.length - 1, Math.max(0, stepIdx))];
+      const chord = [root, root * 1.25, root * 1.5, root * 2.0];
+      chord.forEach((hz, i) => {
+        const st = now + i * 0.065;
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(hz, st);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.linearRampToValueAtTime(v * 0.16, st + 0.014);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + 1.25);
+        o.connect(g).connect(c.destination);
+        o.start(st); o.stop(st + 1.30);
+      });
+    }
+
+    return { startHolyPad, stopPad, playBell, playHarpStep };
+  })();
+
+  if (!document.getElementById('wedding-v53-css')) {
+    const st = document.createElement('style');
+    st.id = 'wedding-v53-css';
+    st.textContent = `
+      @keyframes wedCamZoomIn  { 0% { transform: scale(1.00); } 100% { transform: scale(1.09); } }
+      @keyframes wedCamZoomOut { 0% { transform: scale(1.10); } 100% { transform: scale(1.01); } }
+      @keyframes wedCamPanUp   { 0% { transform: scale(1.08) translateY(2.2%); } 100% { transform: scale(1.08) translateY(-2.2%); } }
+      @keyframes wedHolyFlashSlow {
+        0%   { opacity: 0.92; }
+        35%  { opacity: 0.45; }
+        100% { opacity: 0; }
+      }
+      @keyframes wedFeatherFall {
+        0%   { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 0; }
+        12%  { opacity: 0.95; }
+        88%  { opacity: 0.92; }
+        100% { transform: translate3d(var(--dx), 112vh, 0) rotate(var(--rot)); opacity: 0; }
+      }
+      @keyframes wedGensituIn {
+        0%   { opacity: 0; transform: scale(1.38); filter: brightness(2.2); }
+        40%  { opacity: 1; transform: scale(0.97); filter: brightness(1.25); }
+        100% { opacity: 1; transform: scale(1.00); filter: brightness(1.04); }
+      }
+
+      .wed-cam-zoomIn  { animation: wedCamZoomIn  4.2s ease-out forwards; }
+      .wed-cam-zoomOut { animation: wedCamZoomOut 4.2s ease-out forwards; }
+      .wed-cam-panUp   { animation: wedCamPanUp   4.2s ease-out forwards; }
+      .wed-gensitu-in  { animation: wedGensituIn  0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+      .wed-layer {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        opacity: 0;
+        transition: opacity 0.65s cubic-bezier(0.37, 0, 0.63, 1);
+      }
+      .wed-layer.wed-active { opacity: 1; }
+
+      .wed-img-portrait {
+        position: relative; z-index: 10;
+        width: 100%; height: 100%;
+        object-fit: cover;
+        box-shadow: 0 0 60px rgba(254, 240, 138, 0.55);
+      }
+      @media (min-width: 640px) {
+        .wed-img-portrait {
+          width: auto; height: 96vh; max-width: 92vw;
+          object-fit: contain;
+          border-radius: 14px;
+          border: 1.5px solid rgba(254, 240, 138, 0.55);
+        }
+      }
+
+      .wed-img-landscape {
+        position: relative; z-index: 10;
+        max-width: 100vw; max-height: 92vh;
+        width: auto; height: auto;
+        object-fit: contain;
+        box-shadow: 0 0 60px rgba(254, 240, 138, 0.55);
+      }
+      @media (min-width: 640px) {
+        .wed-img-landscape {
+          max-height: 94vh;
+          border-radius: 14px;
+          border: 1.5px solid rgba(254, 240, 138, 0.5);
+        }
+      }
+
+      .wed-feather {
+        position: absolute; top: -6vh; pointer-events: none; z-index: 22;
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, #ffffff 30%, #fef9c3 85%, transparent 100%);
+        box-shadow: 0 0 12px rgba(254, 240, 138, 0.9);
+        animation: wedFeatherFall var(--dur) linear var(--delay) infinite;
+      }
+
+      .wed-flash-veil {
+        position: absolute; inset: 0; z-index: 35; pointer-events: none;
+        background: radial-gradient(circle at center, #ffffff 0%, #fef9c3 60%, rgba(254,240,138,0.85) 100%);
+        animation: wedHolyFlashSlow 0.85s ease-out forwards;
+      }
+
+      .wedding-btn-exact {
+        position: absolute;
+        bottom: 1%; left: 50%; transform: translateX(-50%);
+        width: 64%; height: 43%;
+        border-radius: 50%;
+        border: 3px solid rgba(254, 249, 195, 0.96);
+        background: radial-gradient(circle, rgba(255,255,255,0.24) 0%, transparent 72%);
+        z-index: 25; cursor: pointer;
+        animation: weddingBtnPulse 0.85s ease-in-out infinite;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function buildFeathersHtml(count = 32) {
+    let html = '';
+    for (let i = 0; i < count; i++) {
+      const left = (Math.random() * 100).toFixed(1);
+      const w = (10 + Math.random() * 14).toFixed(0);
+      const h = (w * 0.34).toFixed(0);
+      const dur = (3.8 + Math.random() * 3.4).toFixed(2);
+      const delay = (-Math.random() * 5.0).toFixed(2);
+      const dx = ((Math.random() - 0.5) * 150).toFixed(0) + 'px';
+      const rot = (160 + Math.random() * 280).toFixed(0) + 'deg';
+      html += `<div class="wed-feather" style="left:${left}%;width:${w}px;height:${h}px;--dur:${dur}s;--delay:${delay}s;--dx:${dx};--rot:${rot};"></div>`;
+    }
+    return html;
+  }
+
+  function buildSlideInnerHtml(src, { portrait = true, pan = 'zoomIn', extraHtml = '' } = {}) {
+    const imgCls = portrait ? 'wed-img-portrait' : 'wed-img-landscape';
+    const camCls = pan ? `wed-cam-${pan}` : '';
+    return `
+      <img src="${src}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
+      <div class="absolute inset-0 bg-gradient-to-b from-amber-200/15 via-transparent to-amber-200/20 pointer-events-none"></div>
+      <img src="${src}" class="${imgCls} ${camCls}" alt="">
+      ${extraHtml}
+    `;
+  }
+
+  window.playWedding12000Cinema = async function (token) {
+    const el = weddingCinemaOverlay;
+    if (!el) return;
+
+    el.className = 'fixed inset-0 z-[1002] bg-black flex items-center justify-center overflow-hidden';
+    el.innerHTML = `
+      <div id="wedAmbientRays" class="mystic-prism-rays"></div>
+      <div id="wedSlot0" class="wed-layer" style="z-index: 10;"></div>
+      <div id="wedSlot1" class="wed-layer" style="z-index: 10;"></div>
+      <div id="wedFeatherHost" class="pointer-events-none absolute inset-0 overflow-hidden z-[22] opacity-0 transition-opacity duration-1000"></div>
+      <div id="wedTopUiHost" class="pointer-events-none absolute inset-0 z-[28] flex items-center justify-center"></div>
+      <div id="wedFlashHost" class="pointer-events-none absolute inset-0 z-[35]"></div>
+    `;
+    el.classList.remove('hidden');
+
+    const slots = [document.getElementById('wedSlot0'), document.getElementById('wedSlot1')];
+    const ambientRays = document.getElementById('wedAmbientRays');
+    const featherHost = document.getElementById('wedFeatherHost');
+    const topUiHost = document.getElementById('wedTopUiHost');
+    const flashHost = document.getElementById('wedFlashHost');
+    let curSlot = 0;
+
+    function fireSoftFlash(strong = false) {
+      const f = document.createElement('div');
+      f.className = 'wed-flash-veil';
+      if (!strong) f.style.opacity = '0.55';
+      flashHost.appendChild(f);
+      setTimeout(() => f.remove(), 900);
+    }
+
+    function crossfadeTo(innerHtml, { flash = true, strongFlash = false } = {}) {
+      const nextSlot = 1 - curSlot;
+      slots[nextSlot].innerHTML = innerHtml;
+      slots[nextSlot].style.zIndex = '12';
+      slots[curSlot].style.zIndex = '10';
+      void slots[nextSlot].offsetWidth;
+      slots[nextSlot].classList.add('wed-active');
+      slots[curSlot].classList.remove('wed-active');
+      if (flash) fireSoftFlash(strongFlash);
+      curSlot = nextSlot;
+    }
+
+    try {
+      BgmEngine.cut();
+      StudioAudio.playPuchun();
+      setLed('off'); setAmbientBg(''); setSunburst(false);
+      await waitFreeze(1450, token);
+
+      SoftSparkle.start();
+      WeddingAudio.startHolyPad();
+      await waitFreeze(950, token);
+
+      const bg1 = Assets.getWedding('bg1');
+      const gensitu = Assets.getWedding('gensitu');
+      WeddingAudio.playBell(1.0);
+      ambientRays.classList.add('rays-on');
+      if (bg1) {
+        crossfadeTo(buildSlideInnerHtml(bg1, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
+      } else {
+        crossfadeTo(`<div class="w-full h-full overlay-wedding"></div>`, { flash: true, strongFlash: true });
+      }
+
+      await waitFreeze(1350, token);
+
+      StudioAudio.playPokyun(true);
+      fireSoftFlash(true);
+      topUiHost.innerHTML = gensitu
+        ? `<div class="logo-alive-wrap wed-gensitu-in px-3"><div class="logo-alive-halo"></div><img src="${gensitu}" class="logo-alive-img max-w-[92vw] sm:max-w-[540px] max-h-[38vh]" alt="言質、取りました"></div>`
+        : `<div class="font-mincho text-3xl sm:text-5xl font-black gold-grad-text wed-gensitu-in text-center px-4">言質、取りました<br>もう引っ込められませんよ？</div>`;
+      await waitFreeze(3350, token);
+
+      topUiHost.innerHTML = '';
+      featherHost.innerHTML = buildFeathersHtml(22);
+      featherHost.style.opacity = '0.85';
+
+      const fallback9 = Assets.getWedding9();
+      for (let i = 0; i < SCENE_FILES.length; i++) {
+        const cfg = SCENE_FILES[i];
+        const src = loadedScenes[i] || encodeURI(cfg.name) || fallback9[i] || null;
+        if (!src) continue;
+
+        if (cfg.bell) WeddingAudio.playBell(1.25);
+        if (typeof cfg.harp === 'number') WeddingAudio.playHarpStep(cfg.harp);
+
+        crossfadeTo(
+          buildSlideInnerHtml(src, { portrait: cfg.portrait, pan: cfg.pan }),
+          { flash: true, strongFlash: i === 0 || i >= SCENE_FILES.length - 2 }
+        );
+        await waitFreeze(cfg.dur, token);
+      }
+
+      const stairs = Assets.getWedding('stairs');
+      if (stairs) {
+        WeddingAudio.playBell(1.12);
+        crossfadeTo(buildSlideInnerHtml(stairs, { portrait: false, pan: 'panUp' }), { flash: true, strongFlash: true });
+        await waitFreeze(2100, token);
+      }
+
+      const arch = Assets.getWedding('arch');
+      if (arch) {
+        WeddingAudio.playHarpStep(6);
+        crossfadeTo(buildSlideInnerHtml(arch, { portrait: false, pan: 'zoomIn' }), { flash: true, strongFlash: true });
+        await waitFreeze(2300, token);
+      }
+
+      WeddingAudio.stopPad(1.2);
+      StudioAudio.playSoftHeartbeat();
+
+      const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
+      const btnStageHtml = `
+        <img src="${wedBtn}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
+        <div class="absolute inset-0 bg-gradient-to-b from-amber-300/15 via-transparent to-amber-300/20 pointer-events-none"></div>
+        <div class="relative z-10 inline-flex items-center justify-center max-w-full max-h-full">
+          <img src="${wedBtn}" class="block max-w-[100vw] max-h-[86vh] w-auto h-auto object-contain shadow-[0_0_65px_rgba(254,240,138,0.65)] sm:rounded-2xl" alt="ウェディングボタン">
+          <button id="weddingTapHotspot" class="wedding-btn-exact" aria-label="ウェディングボタンを押す"></button>
+        </div>
+        <div class="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-5 py-1.5 rounded-full bg-black/78 border border-yellow-200 text-xs sm:text-sm font-black text-amber-200 animate-pulse whitespace-nowrap shadow-xl">
+          ✨ ボタンをタップ / Spaceで誓いを結べ!! ✨
+        </div>
+      `;
+      crossfadeTo(btnStageHtml, { flash: true, strongFlash: true });
+
+      await new Promise((resolve, reject) => {
+        const hs = document.getElementById('weddingTapHotspot');
+        const done = () => {
+          uniBotanTapResolver = null;
+          if (token !== seqToken) reject('CANCELLED');
+          else resolve();
+        };
+        if (hs) hs.addEventListener('click', done, { once: true });
+        uniBotanTapResolver = done;
+      });
+
+      StudioAudio.playOchiburu(true);
+      StudioAudio.playPokyun(true);
+      WeddingAudio.playBell(1.5);
+      setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
+      triggerLamp('rainbow', '12,000!!');
+      featherHost.innerHTML = buildFeathersHtml(34);
+      featherHost.style.opacity = '1';
+
+      const wedOni = Assets.getWedding('onigakari');
+      if (wedOni) {
+        crossfadeTo(buildSlideInnerHtml(wedOni, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
+      } else {
+        crossfadeTo(`<div class="font-mincho text-4xl font-black rainbow-grad-text">鬼がかってますね</div>`, { flash: true, strongFlash: true });
+      }
+      await waitFreeze(4400, token);
+
+      StudioAudio.play6000Fanfare(true);
+      WeddingAudio.playBell(1.0);
+      setTimeout(() => WeddingAudio.playBell(1.25), 420);
+      setTimeout(() => WeddingAudio.playBell(1.50), 860);
+
+      const premiaUrl = Assets.getPremiaFrame();
+      const wedLogo = Assets.getLogo('wedding');
+      const finishHtml = `
+        <div class="relative w-full h-full overlay-wedding flex flex-col items-center justify-center text-center p-4 overflow-hidden">
+          <div class="mystic-prism-rays rays-on"></div>
+          ${premiaUrl ? `<img src="${premiaUrl}" class="pointer-events-none absolute inset-0 w-full h-full object-fill z-20" style="mix-blend-mode:screen;" alt="">` : ''}
+          <div class="relative z-10 text-xs sm:text-base font-black tracking-[0.28em] text-rose-600 mb-2">PREMIUM WEDDING BONUS</div>
+          ${wedLogo
+            ? `<div class="relative z-10 logo-alive-wrap"><div class="logo-alive-halo"></div><img src="${wedLogo}" class="logo-alive-img max-w-[94vw] sm:max-w-[580px] max-h-[48vh]" alt="WEDDING 12000"></div>`
+            : `<div class="relative z-10 font-mincho text-4xl sm:text-6xl font-black text-rose-700 pop-in">WEDDING 12,000 BONUS!!</div>`}
+          <div class="relative z-10 mt-4 text-sm sm:text-base font-black text-rose-900 bg-white/80 px-5 py-2 rounded-full border-2 border-amber-300 shadow-lg">
+            鬼がかり6,000＋6,000 ＝ 計12,000個（実質純増 +11,200発）!!
+          </div>
+        </div>
+      `;
+      crossfadeTo(finishHtml, { flash: true, strongFlash: true });
+      await waitFreeze(5000, token);
+    } finally {
+      WeddingAudio.stopPad(0.6);
+      SoftSparkle.stop();
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      uniBotanTapResolver = null;
+    }
+  };
+})();
