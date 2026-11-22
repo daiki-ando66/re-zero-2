@@ -34,48 +34,72 @@ const ExtraAudioV70 = (() => {
     }
   });
 
-  // ★ロゴ役物「ガシャーン!!」落下SE（色に応じて重厚感・閃光音が変化）★
+  // ★ロゴ役物「ガシャーン!!」落下SE：落下ヒュッ → 着地(290ms)の重低音＋金属音 → バウンド2回 → 残響★
   function playYakumonoDrop(color = 'rainbow') {
     if (muted || vol <= 0.01) return;
     const c = ensure(); if (!c) return;
-    const now = c.currentTime + 0.005;
-    const master = c.createGain(); master.gain.value = vol * 0.72;
+    const now = c.currentTime + 0.005, T = now + 0.29;           // T = 着地の瞬間
+    const master = c.createGain(); master.gain.value = Math.min(1, vol * 0.95);
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 8;
     comp.connect(master).connect(c.destination);
+    // 残響（フィードバックディレイ）
+    const dl = c.createDelay(0.5); dl.delayTime.value = 0.11;
+    const fb = c.createGain(); fb.gain.value = 0.34;
+    const wet = c.createGain(); wet.gain.value = 0.30;
+    comp.connect(dl); dl.connect(fb).connect(dl); dl.connect(wet).connect(master);
 
-    // 1. メカ落下ショック（重低音ドスン）
-    const sub = c.createOscillator(), subG = c.createGain();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(190, now);
-    sub.frequency.exponentialRampToValueAtTime(32, now + 0.38);
-    subG.gain.setValueAtTime(0.001, now);
-    subG.gain.linearRampToValueAtTime(1.35, now + 0.006);
-    subG.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
-    sub.connect(subG).connect(comp); sub.start(now); sub.stop(now + 0.50);
+    const noise = (t, dur, type, hz, q, gain) => {
+      const n = c.createBufferSource(); n.buffer = noiseBuf;
+      const f = c.createBiquadFilter(); f.type = type; f.frequency.value = hz; f.Q.value = q;
+      const g = c.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      n.connect(f).connect(g).connect(comp); n.start(t); n.stop(t + dur + 0.02);
+    };
+    const thud = (t, hz0, hz1, dur, gain, type = 'sine') => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = type;
+      o.frequency.setValueAtTime(hz0, t); o.frequency.exponentialRampToValueAtTime(hz1, t + dur * 0.8);
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(gain, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(comp); o.start(t); o.stop(t + dur + 0.02);
+    };
 
-    // 2. 金属ロック音「ガシャッ!!」
-    const ns = c.createBufferSource(); ns.buffer = noiseBuf;
-    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2850; bp.Q.value = 1.6;
-    const ng = c.createGain(); ng.gain.setValueAtTime(0.85, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
-    ns.connect(bp).connect(ng).connect(comp); ns.start(now); ns.stop(now + 0.30);
+    // 0. 落下中の風切り（ヒュッ→加速）
+    { const n = c.createBufferSource(); n.buffer = noiseBuf;
+      const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.setValueAtTime(500, now); f.frequency.exponentialRampToValueAtTime(5200, T);
+      const g = c.createGain(); g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.55, T - 0.01); g.gain.exponentialRampToValueAtTime(0.001, T + 0.03);
+      n.connect(f).connect(g).connect(comp); n.start(now); n.stop(T + 0.05); }
 
-    // 3. 色別ハーモニー閃光音
+    // 1. 着地の重低音（ドスン！）
+    thud(T, 210, 26, 0.75, 1.9);
+    thud(T, 120, 46, 0.32, 1.0, 'triangle');
+
+    // 2. 金属ロック音「ガシャーン!!」＋きらめく金属の余韻
+    noise(T, 0.30, 'bandpass', 2850, 1.6, 0.95);
+    noise(T, 0.55, 'bandpass', 5200, 3.0, 0.55);
+    // 3. 鎖の跳ね返りジャラジャラ
+    [0.04, 0.075, 0.11, 0.15].forEach((d, i) => noise(T + d, 0.07, 'highpass', 3500, 1.0, 0.32 - i * 0.05));
+
+    // 4. バウンド2回（小さくなる着地音）
+    thud(T + 0.20, 150, 40, 0.20, 0.7); noise(T + 0.20, 0.10, 'bandpass', 2400, 1.4, 0.35);
+    thud(T + 0.34, 160, 44, 0.16, 0.38); noise(T + 0.34, 0.07, 'bandpass', 2600, 1.4, 0.2);
+
+    // 5. 色別ハーモニー閃光音
     const notes = color === 'rainbow'
       ? [587.33, 880.00, 1174.66, 1760.00, 2349.32]
       : color === 'gold'
         ? [523.25, 783.99, 1046.50, 1567.98]
         : [440.00, 659.25, 880.00];
     notes.forEach((hz, idx) => {
-      const st = now + 0.02 + idx * 0.028;
+      const st = T + 0.02 + idx * 0.028;
       const o = c.createOscillator(), g = c.createGain();
       o.type = idx % 2 === 0 ? 'triangle' : 'sawtooth';
       o.frequency.setValueAtTime(hz * 0.94, st);
       o.frequency.exponentialRampToValueAtTime(hz, st + 0.04);
       g.gain.setValueAtTime(0.001, st);
-      g.gain.linearRampToValueAtTime(0.24 - idx * 0.03, st + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.001, st + (color === 'rainbow' ? 0.68 : 0.45));
-      o.connect(g).connect(comp); o.start(st); o.stop(st + 0.72);
+      g.gain.linearRampToValueAtTime(0.26 - idx * 0.03, st + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, st + (color === 'rainbow' ? 0.9 : 0.5));
+      o.connect(g).connect(comp); o.start(st); o.stop(st + 0.95);
     });
+    // 6. 虹だけシンバル風クラッシュ
+    if (color === 'rainbow') noise(T + 0.01, 1.15, 'highpass', 5500, 0.7, 0.5);
   }
 
   function play1500(isRush = false) {
@@ -899,6 +923,27 @@ const StageBg = (() => {
       aura.addColorStop(0, 'rgba(250, 204, 21, 0.34)'); aura.addColorStop(1, 'transparent');
       ctx.fillStyle = aura; ctx.fillRect(0, 0, w, h);
       drawMagicCircle(cx, cy, 114 + pulse * 8, '#facc15', angle * 0.75, 0.24 + pulse * 0.14);
+      // ---- v7.1 通常時の密度アップ ----
+      ctx.save(); ctx.globalAlpha = 0.07 + pulse * 0.03; ctx.fillStyle = '#fef08a';
+      ctx.font = `900 ${Math.round(Math.min(w, h) * 0.80)}px "Shippori Mincho", serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('鬼', cx, cy + 8); ctx.restore();
+      drawMagicCircle(cx, cy, 168 + pulse * 10, '#f59e0b', -angle * 0.55, 0.17 + pulse * 0.08);
+      const maxD = Math.max(w, h) * 0.78;
+      for (let i = 0; i < 9; i++) {
+        const r = rays[i];
+        r.r += r.spd * 0.45 * K; if (r.r > 1.2) { r.r = 0.08; r.a = Math.random() * Math.PI * 2; }
+        const r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
+        ctx.strokeStyle = i % 2 ? '#fef08a' : '#f59e0b'; ctx.globalAlpha = Math.min(0.30, r.r * 0.30); ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(r.a) * r1, cy + Math.sin(r.a) * r1); ctx.lineTo(cx + Math.cos(r.a) * r2, cy + Math.sin(r.a) * r2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      for (let i = 0; i < 16; i++) {
+        const sh = goldShards[i];
+        sh.x += sh.vx * 0.6 * K; sh.y += sh.vy * 0.5 * K; sh.rot += sh.vrot * 0.5 * K;
+        if (sh.y < -0.08) { sh.y = 1.08; sh.x = Math.random(); } if (sh.x < -0.08) sh.x = 1.08; if (sh.x > 1.08) sh.x = -0.08;
+        ctx.save(); ctx.translate(sh.x * w, sh.y * h); ctx.rotate(sh.rot); ctx.fillStyle = sh.color; ctx.globalAlpha = 0.5;
+        ctx.fillRect(-sh.sz * 0.6, -sh.sz * 0.25, sh.sz * 1.2, sh.sz * 0.5); ctx.restore();
+      }
     }
     rafId = requestAnimationFrame(tick);
   }
@@ -1208,7 +1253,7 @@ let remTestOverride = false, brainTestOverride = false, oniTestOverride = false;
 // =========================================================================
 const Yakumono = (() => {
   const REST = 'translateX(-50%) translateY(0px) scale(1)';
-  const IMPACT_MS = 280;                 // 落下開始から着地までの時間
+  const DUR = 760, IMPACT_MS = 290;      // 落下全体 / 着地までの時間（落下SEと同期）
   const geo = { dy: 200, scale: 2.2 };
   let dropAnim = null, backAnim = null, dropped = false;
 
@@ -1221,18 +1266,34 @@ const Yakumono = (() => {
     const lcdCy = lcdBox.offsetTop + lcdBox.offsetHeight / 2;
     const imgW = (yakumonoLogoImg && yakumonoLogoImg.offsetWidth) || 108;
     geo.dy = Math.max(60, lcdCy - logoCy);
-    geo.scale = Math.max(1.0, Math.min(3, (lcdBox.offsetWidth * 0.60) / imgW));
+    geo.scale = Math.max(1.0, Math.min(3.2, (lcdBox.offsetWidth * 0.68) / imgW));
   }
-  function dropFrames() {
-    const { dy, scale } = geo;
+  function dropFrames(g = geo) {
+    const { dy, scale } = g;
     return [
-      { transform: pose(0, 1), offset: 0, easing: 'cubic-bezier(.45,0,.9,.55)' },
-      { transform: pose(dy, scale), offset: 0.40, easing: 'cubic-bezier(.2,.6,.4,1)' },
-      { transform: pose(dy - 26, scale), offset: 0.56, easing: 'cubic-bezier(.5,0,.9,.6)' },
-      { transform: pose(dy, scale), offset: 0.70, easing: 'ease-out' },
-      { transform: pose(dy - 9, scale), offset: 0.82, easing: 'ease-in' },
+      { transform: pose(0, 1), offset: 0, easing: 'cubic-bezier(.5,0,.95,.6)' },
+      { transform: pose(dy, scale * 1.22), offset: 0.38, easing: 'cubic-bezier(.2,.6,.4,1)' },   // 着地：一瞬つぶれて大きく
+      { transform: pose(dy - 34, scale * 1.04), offset: 0.52, easing: 'cubic-bezier(.5,0,.9,.6)' },
+      { transform: pose(dy, scale * 1.10), offset: 0.66, easing: 'ease-out' },
+      { transform: pose(dy - 11, scale), offset: 0.80, easing: 'ease-in' },
       { transform: pose(dy, scale), offset: 1 }
     ];
+  }
+  // 着地の衝撃：フラッシュ(不透明度上限.34)＋衝撃波リング＋筐体シェイク（transform/opacityのみ）
+  function impactFx(color) {
+    if (!lcdBox) return;
+    const col = color === 'rainbow' ? '254,240,138' : color === 'gold' ? '250,204,21' : '239,68,68';
+    const flash = document.createElement('div');
+    flash.style.cssText = `position:absolute;inset:0;z-index:33;pointer-events:none;background:rgb(${col});opacity:0`;
+    const ring = document.createElement('div');
+    ring.style.cssText = `position:absolute;left:50%;top:50%;width:120px;height:120px;margin:-60px 0 0 -60px;z-index:33;pointer-events:none;border-radius:50%;border:5px solid rgba(${col},.95);opacity:0`;
+    lcdBox.appendChild(flash); lcdBox.appendChild(ring);
+    flash.animate([{ opacity: 0.34 }, { opacity: 0 }], { duration: 240, easing: 'ease-out' }).onfinish = () => flash.remove();
+    ring.animate([{ transform: 'scale(.3)', opacity: 0.95 }, { transform: 'scale(3.4)', opacity: 0 }], { duration: 580, easing: 'cubic-bezier(.1,.7,.3,1)' }).onfinish = () => ring.remove();
+    if (cabinetShell) cabinetShell.animate([
+      { transform: 'translate(0,0)' }, { transform: 'translate(-7px,4px)' }, { transform: 'translate(6px,-4px)' },
+      { transform: 'translate(-4px,3px)' }, { transform: 'translate(2px,-1px)' }, { transform: 'translate(0,0)' }
+    ], { duration: 440 });
   }
   function stopAnims() {
     [dropAnim, backAnim].forEach(a => { if (a) { try { a.cancel(); } catch (e) {} } });
@@ -1272,7 +1333,7 @@ const Yakumono = (() => {
     };
   }
 
-  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, token = seqToken } = {}) {
+  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, landOffset = 0, scaleMul = 1, token = seqToken } = {}) {
     if (!yakumonoLogoWrap) return;
     stopAnims();
     setColor(color);
@@ -1280,7 +1341,7 @@ const Yakumono = (() => {
     if (logoPocketShadow) logoPocketShadow.classList.add('pocket-open');
     yakumonoLogoWrap.classList.add('yakumono-dropped');
     dropped = true;
-    dropAnim = yakumonoLogoWrap.animate(dropFrames(), { duration: 700, fill: 'forwards' });
+    dropAnim = yakumonoLogoWrap.animate(dropFrames({ dy: geo.dy + landOffset, scale: Math.max(1, geo.scale * scaleMul) }), { duration: DUR, fill: 'forwards' });
 
     if (withSound) StudioAudio.playYakumonoDrop(color);
     if (withNiziiroBack) setLcdNiziiroBack(true);
@@ -1288,6 +1349,7 @@ const Yakumono = (() => {
     // 着地の瞬間に 発光・パーティクル・筐体の揺れ
     setTimeout(() => {
       if (!dropped) return;
+      impactFx(color);
       if (cabinetShell) { cabinetShell.classList.add('shake-burst'); setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520); }
       try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
       if (color === 'rainbow') { setCabinetGlow('rainbow'); FxCanvas.burstRainbow(68); FxCanvas.spawnRing('#fef08a', 320, 9); }
@@ -1296,7 +1358,7 @@ const Yakumono = (() => {
     }, IMPACT_MS);
 
     if (holdMs > 0) {
-      await wait(Math.max(holdMs, 760), token);     // 最低でもバウンド完了まで見せる
+      await wait(Math.max(holdMs, DUR + 80), token);     // 最低でもバウンド完了まで見せる
       resetYakumono(color === 'rainbow' ? 'rainbow' : 'white');
     }
   }
