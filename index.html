@@ -62,10 +62,10 @@
        ===================================================================== */
     main { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
     #cabinetShell {
-      --shell-h: 500px;
+      --shell-h: 540px;
       --drop-scale: 2.2;
       position: relative; display: flex; flex-direction: column;
-      width: 100%; max-width: 560px; margin: 0 auto;
+      width: 100%; max-width: 680px; margin: 0 auto;
       height: var(--shell-h);
       border-radius: 16px; overflow: hidden;
       background: #0d0407;
@@ -74,14 +74,14 @@
       transition: filter 0.35s ease;
     }
     @supports (height: 100dvh) {
-      #cabinetShell { --shell-h: clamp(440px, calc(100dvh - 244px), 640px); }
+      #cabinetShell { --shell-h: clamp(480px, calc(100dvh - 236px), 760px); }
     }
     /* ロゴの落下距離：レール中央 → 液晶中央 */
     #cabinetShell { --drop-y: calc(32px + (var(--shell-h) - 90px) / 2); }
 
     /* 役物レール（液晶の外・高さ64px） */
     #yakumonoRail {
-      position: relative; flex: none; height: 60px;
+      position: relative; z-index: 40; flex: none; height: 40px;
       background: linear-gradient(180deg, #24100a 0%, #0d0407 100%);
       border-bottom: 1px solid rgba(234, 179, 8, 0.5);
       transition: filter 0.3s ease;
@@ -115,18 +115,18 @@
 
     /* ロゴ役物（常時表示・待機位置はレール中央／落下で液晶中央へ） */
     #logoPocketShadow {
-      position: absolute; top: 2px; left: 50%; width: 124px; height: 56px; margin-left: -62px;
+      position: absolute; top: 2px; left: 50%; width: 150px; height: 34px; margin-left: -75px;
       border-radius: 12px; background: radial-gradient(ellipse at center, rgba(6, 2, 10, 0.95) 50%, transparent 100%);
       opacity: 0; transition: opacity 0.14s ease; pointer-events: none;
     }
     #logoPocketShadow.pocket-open { opacity: 1; }
     #yakumonoLogoWrap {
-      position: absolute; top: 0; left: 50%; width: 120px; height: 60px;
+      position: absolute; top: 0; left: 50%; width: 164px; height: 86px;
       transform: translateX(-50%); z-index: 36; pointer-events: none;
       display: flex; align-items: center; justify-content: center;
       transition: filter 0.2s ease, opacity 0.22s ease; will-change: transform;
     }
-    #yakumonoLogoImg { height: 52px; width: 108px; display: block; object-fit: fill; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoImg { height: 78px; width: 156px; display: block; object-fit: fill; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-dropped { z-index: 44; }
     #yakumonoLogoWrap.yakumono-red #yakumonoLogoImg { filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-chance #yakumonoLogoImg { filter: drop-shadow(0 0 5px rgba(254, 249, 195, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
@@ -157,6 +157,11 @@
     }
     #reserveBar .w-6 { width: 22px; height: 22px; }
 
+    /* レールのロゴ背後の呼吸する光（不透明度のみ） */
+    #yakumonoRail::before { content: ""; position: absolute; left: 50%; top: -6px; width: 240px; height: 92px; margin-left: -120px; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.28) 0%, transparent 70%); animation: railBreath 3.4s ease-in-out infinite alternate; }
+    @keyframes railBreath { from { opacity: 0.35; } to { opacity: 1; } }
+
     /* 虹背景：出現を遅らせてフェードイン（文字と同時に被らないように） */
     #lcdNiziiroBackLayer:not(.hidden) { animation: niziIn 0.9s ease 0.9s both; }
     @keyframes niziIn { from { opacity: 0; } to { opacity: 1; } }
@@ -180,7 +185,7 @@
     /* 下部ドック（操作ボタンを画面下に固定） */
     #controlDock {
       position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 42;
-      width: min(100%, 560px); border-radius: 16px 16px 0 0;
+      width: min(100%, 680px); border-radius: 16px 16px 0 0;
       padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
       backdrop-filter: blur(6px);
     }
@@ -697,16 +702,21 @@
           <div id="rushNoiseVeil" class="hidden pointer-events-none absolute inset-0 z-[26] crt-scanlines bg-black/25"></div>
 
           <!-- 中央メインステージ（左端レム避けの左右安全パディング付き） -->
-          <div class="relative z-[16] flex-1 min-h-0 flex items-center justify-center overflow-hidden px-3 pb-2">
+          <div class="relative z-[16] flex-1 min-h-0 flex items-center justify-center overflow-hidden px-3 pt-8 pb-2">
             <!-- シーンA：通常時 -->
             <div id="scene-normal" class="scene-pane w-full h-full flex flex-col items-center justify-center text-center gap-1.5">
               <div class="flex items-center justify-center gap-1.5 sm:gap-2.5">
-                <div id="reelBox0" class="reel-box w-14 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum0" class="w-full h-full flex items-center justify-center"></div></div>
-                <div id="reelBox1" class="reel-box w-14 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum1" class="w-full h-full flex items-center justify-center"></div></div>
-                <div id="reelBox2" class="reel-box w-14 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum2" class="w-full h-full flex items-center justify-center"></div></div>
+                <div id="reelBox0" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum0" class="w-full h-full flex items-center justify-center"></div></div>
+                <div id="reelBox1" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum1" class="w-full h-full flex items-center justify-center"></div></div>
+                <div id="reelBox2" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum2" class="w-full h-full flex items-center justify-center"></div></div>
               </div>
               <div id="normalTitle" class="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">STANDBY</div>
               <p id="normalSub" class="text-[10px] sm:text-[11px] text-amber-100/85 leading-snug whitespace-nowrap">長押しハンドル・オートで開始！</p>
+              <div class="flex items-center justify-center gap-1.5 mt-1 text-[9px] sm:text-[10px] font-black">
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-amber-500/50 text-amber-200">確率 1/349.9</span>
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-rose-400/50 text-rose-200">RUSH突入 55%</span>
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-fuchsia-400/50 text-fuchsia-200">ST 144回</span>
+              </div>
             </div>
 
             <!-- シーンB：通常時SPリーチ -->
@@ -924,7 +934,7 @@
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=73"></script>
-  <script src="game.js?v=72"></script>
+  <script src="effects.js?v=74"></script>
+  <script src="game.js?v=74"></script>
 </body>
 </html>
