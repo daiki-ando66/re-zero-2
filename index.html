@@ -86,7 +86,9 @@
       border-bottom: 1px solid rgba(234, 179, 8, 0.5);
       transition: filter 0.3s ease;
     }
-    #cabinetShell.cabinet-blackout #yakumonoRail { filter: brightness(0.3) saturate(0.4); }
+    #cabinetShell.cabinet-blackout #yakumonoRail, #cabinetShell.rail-dim #yakumonoRail { filter: brightness(0.3) saturate(0.4); }
+    #railRem { transition: opacity 0.2s ease; }
+    #cabinetShell.rail-rem-off #railRem { opacity: 0.12; }
 
     /* 液晶ボックス：縁フレーム画像（9分割）。画像が無い場合は金のボーダーにフォールバック */
     #lcdBox {
@@ -102,7 +104,7 @@
     #lcdBox::after { border-radius: 4px; }
     #cabinetShell.cabinet-red-glow #lcdBox::after { opacity: 0.5; box-shadow: inset 0 0 22px 3px rgba(239, 68, 68, 0.9); }
     #cabinetShell.cabinet-rem-glow #lcdBox::after { opacity: 0.45; box-shadow: inset 0 0 22px 3px rgba(56, 189, 248, 0.9); }
-    #cabinetShell:has(#cabinetRightGlow.right-glow-gold) #lcdBox::after { opacity: 0.4; box-shadow: inset 0 0 20px 3px rgba(250, 204, 21, 0.85); }
+    #cabinetShell.cabinet-gold-glow #lcdBox::after { opacity: 0.4; box-shadow: inset 0 0 20px 3px rgba(250, 204, 21, 0.85); }
     #cabinetShell.cabinet-rainbow-glow #lcdBox::before {
       padding: 3px; border-radius: 4px; opacity: 0.85;
       background: conic-gradient(#fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #fef08a);
@@ -126,16 +128,9 @@
       transition: filter 0.2s ease, opacity 0.22s ease; will-change: transform;
     }
     #yakumonoLogoImg { height: 58px; width: auto; max-width: 100%; display: block; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
-    @keyframes yakumonoDropSlam {
-      0%   { transform: translateX(-50%) translateY(0) scale(1); }
-      40%  { transform: translateX(-50%) translateY(var(--drop-y)) scale(var(--drop-scale)); }
-      56%  { transform: translateX(-50%) translateY(calc(var(--drop-y) - 26px)) scale(var(--drop-scale)); }
-      70%  { transform: translateX(-50%) translateY(var(--drop-y)) scale(var(--drop-scale)); }
-      82%  { transform: translateX(-50%) translateY(calc(var(--drop-y) - 9px)) scale(var(--drop-scale)); }
-      100% { transform: translateX(-50%) translateY(var(--drop-y)) scale(var(--drop-scale)); }
-    }
-    #yakumonoLogoWrap.yakumono-dropped { animation: yakumonoDropSlam 0.7s ease-in forwards; z-index: 44; }
+    #yakumonoLogoWrap.yakumono-dropped { z-index: 44; }
     #yakumonoLogoWrap.yakumono-red #yakumonoLogoImg { filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-chance #yakumonoLogoImg { filter: drop-shadow(0 0 5px rgba(254, 249, 195, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-gold #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(254, 240, 138, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-rainbow #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(244, 114, 182, 0.85)) drop-shadow(0 0 10px rgba(125, 211, 252, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
     #yakumonoLogoWrap.yakumono-off { filter: brightness(0.2) saturate(0.25); }
@@ -163,8 +158,8 @@
     }
     #reserveBar .w-6 { width: 22px; height: 22px; }
 
-    /* 旧要素（effects.js互換のため残置・非表示。次ステップで撤去） */
-    .led-bar, #ledLeft, #ledRight, #cabinetOverlayLayer, #cabinetRightGlow { display: none !important; }
+    /* バックグラウンド時：CSSアニメ一括停止（発熱対策） */
+    html.is-hidden *, html.is-hidden *::before, html.is-hidden *::after { animation-play-state: paused !important; }
 
     /* 数値パネル（固定枠）＆RUSHスロット */
     #statSlot { position: relative; height: 112px; }
@@ -186,12 +181,6 @@
       padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
       backdrop-filter: blur(6px);
     }
-    .led-red     { background: linear-gradient(180deg, #fecdd3, #ef4444, #991b1b, #ef4444, #fecdd3); background-size: 100% 200%; animation: ledChase 0.35s linear infinite; box-shadow: 0 0 18px 4px rgba(239, 68, 68, 0.95); }
-    .led-rainbow { background: linear-gradient(180deg, #fef9c3, #facc15, #f472b6, #7dd3fc, #c084fc, #fef9c3); background-size: 100% 250%; animation: ledChase 0.55s linear infinite; box-shadow: 0 0 22px 5px rgba(253, 224, 71, 0.95); }
-    .led-rem     { background: linear-gradient(180deg, #4c1d95, #38bdf8, #f0abfc, #38bdf8, #4c1d95); background-size: 100% 200%; animation: ledChase 1.4s ease-in-out infinite; box-shadow: 0 0 18px 4px rgba(56, 189, 248, 0.88); }
-    .led-brain   { background: linear-gradient(180deg, #3b0764, #a855f7, #e11d48, #a855f7, #3b0764); background-size: 100% 200%; animation: ledChase 0.7s linear infinite; box-shadow: 0 0 18px 4px rgba(168, 85, 247, 0.9); }
-    .led-off     { background: #09060c; box-shadow: none; }
-    @keyframes ledChase { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } }
 
     @keyframes remSlowGlow { 0% { opacity: 0.25; } 65% { opacity: 0.85; } 100% { opacity: 1; } }
     @keyframes remClassicFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.22; } }
@@ -803,10 +792,6 @@
           </div>
           <span id="lampStatusText" class="text-[10px] font-black text-amber-200 min-w-[46px] text-right whitespace-nowrap">待機中</span>
         </div>
-        <!-- 旧要素（effects.js互換のため非表示で残置） -->
-        <div id="ledLeft" class="led-bar"></div><div id="ledRight" class="led-bar"></div>
-        <div id="cabinetOverlayLayer"><img id="cabinetOverlayImg" alt=""></div>
-        <div id="cabinetRightGlow"></div>
       </div>
 
       <!-- ② 数値パネル（固定枠 2×2）＋RUSH時スロット -->
@@ -936,7 +921,7 @@
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=71"></script>
-  <script src="game.js?v=71"></script>
+  <script src="effects.js?v=72"></script>
+  <script src="game.js?v=72"></script>
 </body>
 </html>
