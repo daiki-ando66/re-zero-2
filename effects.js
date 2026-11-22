@@ -298,7 +298,7 @@ const Assets = (() => {
     brainRush: null, wedding: null, brain6000: null, oniRush: null, oni6000: null,
     rezeroChain: null, rezeroPurple: null, furueru: null
   };
-  const vstock = { v1500: null, v300: null, bg1500: null, bg300: null, restart: null, niziiro: null };
+  const vstock = { oniHaikei: null, v1500: null, v300: null, bg1500: null, bg300: null, restart: null, niziiro: null };
 
   function applyCleanWhiteCutout(c, w, h, thresh = 230, softFlame = false) {
     const imgData = c.getImageData(0, 0, w, h);
@@ -660,6 +660,7 @@ const Assets = (() => {
     tryLoadList(['300.jpg', '300.png'], (_img, src) => { vstock.bg300 = src; });
     tryLoadList(['restart.jpg', 'restart.png'], (_img, src) => { vstock.restart = src; });
     tryLoadList(['niziiro.jpg', 'niziiro.png'], (_img, src) => { vstock.niziiro = src; });
+    tryLoadList(['oni_haikei.jpg', 'oni_haikei.png'], (_img, src) => { vstock.oniHaikei = src; const el = document.getElementById('oniHaikeiImg'); if (el) el.src = src; });
   }
 
   setTimeout(preloadAll, 10);
@@ -1593,13 +1594,27 @@ function setBonusLogo(logoKey) {
 
   if (url && bonusLogoWrap && bonusLogoImg) {
     bonusLogoImg.src = url;
-    bonusLogoImg.className = isV ? 'logo-alive-img max-h-[112px] sm:max-h-[136px] object-contain bonus-v-slam' : 'logo-alive-img bonus-logo-img';
+    bonusLogoImg.className = isV ? 'bonus-v-big' : 'logo-alive-img bonus-logo-img';
     void bonusLogoImg.offsetWidth;
     bonusLogoWrap.classList.remove('hidden');
+    if (isV) fireVImpactShake();
     return true;
   }
   if (bonusLogoWrap) bonusLogoWrap.classList.add('hidden');
   return false;
+}
+
+// V登場時の迫力：着地で画面と本体がドンと揺れ、リングが走る（transformのみ）
+function fireVImpactShake() {
+  try {
+    setTimeout(() => {
+      if (bonusLogoWrap) bonusLogoWrap.animate([
+        { transform: 'translate(0,0)' }, { transform: 'translate(-9px,5px)' }, { transform: 'translate(8px,-6px)' }, { transform: 'translate(-6px,-3px)' },
+        { transform: 'translate(5px,4px)' }, { transform: 'translate(-3px,2px)' }, { transform: 'translate(0,0)' }], { duration: 520, easing: 'ease-out' });
+      lcdFrame.classList.add('shake-burst'); setTimeout(() => lcdFrame.classList.remove('shake-burst'), 760);
+      FxCanvas.spawnRing('#fef08a', 320, 10);
+    }, 190);
+  } catch (e) { console.error('fireVImpactShake', e); }
 }
 
 function fireImageRipSlash(sourceKind = 'restart') {
@@ -1743,6 +1758,8 @@ function syncRushStages() {
   const showRem = remTestOverride || (isRushIdle && inRush && rm === 'rem');
 
   oniRushStage.classList.toggle('hidden', !showOni);
+  if (showOni) { const hi = document.getElementById('oniHaikeiImg'), hs = Assets.getVStock('oniHaikei'); if (hi && hs && hi.getAttribute('src') !== hs) hi.src = hs; }
+  else oniRushStage.classList.remove('oni-bg-blue', 'oni-bg-dark', 'oni-bg-freeze');
   if (!showOni) oniRemApproachWrap.classList.add('hidden');
 
   brainRushStage.classList.toggle('hidden', !showBrain);
@@ -2022,7 +2039,7 @@ async function playVStockNotice({ isRed = false, token = seqToken } = {}) {
         ${bg ? `<img src="${bg}" class="absolute inset-0 w-full h-full object-cover opacity-92" alt="">` : ''}
         <div class="relative z-10 flex flex-col items-center justify-center">
           ${vImg
-            ? `<img src="${vImg}" class="max-w-[70%] max-h-[175px] object-contain drop-shadow-[0_0_28px_rgba(254,240,138,0.95)] bonus-v-slam" alt="V-STOCK">`
+            ? `<img src="${vImg}" class="bonus-v-big drop-shadow-[0_0_28px_rgba(254,240,138,0.95)]" alt="V-STOCK">`
             : `<div class="text-7xl font-black ${isRed ? 'crimson-grad-text' : 'cyan-grad-text'} bonus-v-slam">V</div>`}
           <div class="mt-1 px-3.5 py-0.5 rounded-full bg-black/85 border-2 ${isRed ? 'border-amber-300 text-amber-200' : 'border-sky-300 text-sky-200'} text-xs font-black tracking-[0.14em] pop-in">
             ${isRed ? '赤V-STOCK 獲得!!（1,500以上）' : '青V-STOCK 獲得!!（300以上）'}
@@ -2030,7 +2047,7 @@ async function playVStockNotice({ isRed = false, token = seqToken } = {}) {
         </div>
       </div>
     `;
-    lcdFrame.classList.add('shake-burst');
+    fireVImpactShake();
     if (isRed) FxCanvas.burstFlames(44); else FxCanvas.spawnRing('#38bdf8', 300, 9);
     await wait(960, token);
     lcdFrame.classList.remove('shake-burst');
@@ -2451,6 +2468,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     'LOGO_SHAKE', 'HEARTBEAT', 'REMAIN_FLOW', 'LOGO_BLINK', 'SCREEN_CRACK'
   ];
   if (typeof Yakumono !== 'undefined' && Yakumono.canFeint()) commonPool.push('LOGO_FEINT');   // 落下フェイントは間隔を空けて
+  if (rushMode === 'onigakari') commonPool.push('ONI_BG_FREEZE', 'ONI_BG_BLUE', 'ONI_BG_DARK', 'ONI_MID_LATE');   // 鬼ラッシュ専用
   const pool = is6000 ? [...commonPool, 'COUNT_6000', 'REMAIN_77', 'PT_77777', 'RAINBOW_GLINT'] : commonPool;
   const pick = pickWeighted(pool);
   const baseLed = rushMode === 'brain' ? 'brain' : rushMode === 'rem' ? 'rem' : 'red';
@@ -2462,6 +2480,31 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     case 'MONO_SCREEN': label = '液晶モノクロ化'; lcdFrame.classList.add('iwakan-mono'); await wait(860, token); lcdFrame.classList.remove('iwakan-mono'); break;
     case 'FADE_REMAIN': label = '残り回数消失'; if (hudRushRemain) hudRushRemain.classList.add('iwakan-fade-remain'); await wait(900, token); if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain'); break;
     case 'REM_PURU': label = 'レムぷる(筐体微振動)'; if (cabinetShell) cabinetShell.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); Yakumono.shake(); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
+    case 'ONI_BG_FREEZE': {
+      label = '背景静止(時が止まる)';
+      oniRushStage.classList.add('oni-bg-freeze'); window.__timeStopUntil = performance.now() + 1000;
+      try { await wait(1000, token); } finally { oniRushStage.classList.remove('oni-bg-freeze'); }
+      break;
+    }
+    case 'ONI_BG_BLUE': {
+      label = '背景が青く変色';
+      oniRushStage.classList.add('oni-bg-blue');
+      try { await wait(900, token); } finally { oniRushStage.classList.remove('oni-bg-blue'); }
+      break;
+    }
+    case 'ONI_BG_DARK': {
+      label = '炎が消えて鬼だけ残る';
+      oniRushStage.classList.add('oni-bg-dark');
+      try { await wait(1000, token); } finally { oniRushStage.classList.remove('oni-bg-dark'); }
+      break;
+    }
+    case 'ONI_MID_LATE': {
+      label = '中図柄だけ変動が遅れる';
+      const v = (typeof lastOniVals !== 'undefined' && lastOniVals) ? lastOniVals.slice() : [7, 1, 7];
+      setOniReels(v[0], v[1], v[2], { midSpin: true });
+      try { await wait(1000, token); } finally { setOniReels(v[0], v[1], v[2]); }
+      break;
+    }
     case 'LOGO_SHAKE': label = 'ロゴ小揺れ'; await Yakumono.shake(); await wait(420, token); break;
     case 'LOGO_FEINT': label = 'ロゴ落下フェイント'; await Yakumono.feint(); await wait(200, token); break;
     case 'HEARTBEAT': label = '心音ドクン'; await playHeartbeatPulse(token); break;
@@ -2525,7 +2568,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     case 'REEL_BIG_MID': {
       label = '中図柄巨大化';
       const mid = rushMode === 'rem' ? remReels[1] : oniReels[1];
-      if (mid) mid.style.transform = 'scale(1.48)'; await wait(900, token); if (mid) mid.style.transform = ''; break;
+      if (mid) mid.style.transform = rushMode === 'onigakari' ? 'scale(1.2)' : 'scale(1.48)'; await wait(900, token); if (mid) mid.style.transform = ''; break;
     }
     case 'ALL_ONI_RES': {
       label = '保留すべて「鬼」変化';
