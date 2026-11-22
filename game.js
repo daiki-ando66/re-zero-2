@@ -1702,9 +1702,9 @@ document.querySelectorAll('.rate-btn, .sim-rate-btn').forEach(btn => btn.addEven
 window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !document.getElementById('sim100Container').classList.contains('hidden')) drawSlumpChart(lastSimPoints); });
 
 // =========================================================================
-// ★ウェディング12,000 超プレミア完全版 (v5.4：全カット虹枠・押しミス防止ボタン)★
+// ★ウェディング12,000 超プレミア完全版 (v5.5：全カットプレミア外枠・静寂導入)★
 // =========================================================================
-(function initWeddingCinemaV54() {
+(function initWeddingCinemaV55() {
   const SCENE_FILES = [
     { name: 'wed space.jpg', portrait: true,  dur: 2400, pan: 'zoomIn',  bell: true  },
     { name: 'pur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 0     },
@@ -1833,9 +1833,9 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
     return { startHolyPad, stopPad, playBell, playHarpStep };
   })();
 
-  if (!document.getElementById('wedding-v54-css')) {
+  if (!document.getElementById('wedding-v55-css')) {
     const st = document.createElement('style');
-    st.id = 'wedding-v54-css';
+    st.id = 'wedding-v55-css';
     st.textContent = `
       @keyframes wedCamZoomIn  { 0% { transform: scale(1.00); } 100% { transform: scale(1.09); } }
       @keyframes wedCamZoomOut { 0% { transform: scale(1.10); } 100% { transform: scale(1.01); } }
@@ -1857,9 +1857,9 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         100% { transform: translate3d(var(--dx), 112vh, 0) rotate(var(--rot)); opacity: 0; }
       }
       @keyframes wedGensituIn {
-        0%   { opacity: 0; transform: scale(1.38); filter: brightness(2.2); }
-        40%  { opacity: 1; transform: scale(0.97); filter: brightness(1.25); }
-        100% { opacity: 1; transform: scale(1.00); filter: brightness(1.04); }
+        0%   { opacity: 0; transform: scale(0.94) translateY(10px); filter: brightness(1.6) blur(3px); }
+        55%  { opacity: 0.85; transform: scale(1.00) translateY(0); filter: brightness(1.18) blur(0px); }
+        100% { opacity: 1; transform: scale(1.02) translateY(0); filter: brightness(1.04) blur(0px); }
       }
       @keyframes wedCrystalPulse {
         0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.92); }
@@ -1877,7 +1877,7 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
       .wed-cam-zoomIn  { animation: wedCamZoomIn  4.2s ease-out forwards; }
       .wed-cam-zoomOut { animation: wedCamZoomOut 4.2s ease-out forwards; }
       .wed-cam-panUp   { animation: wedCamPanUp   4.2s ease-out forwards; }
-      .wed-gensitu-in  { animation: wedGensituIn  0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .wed-gensitu-in  { animation: wedGensituIn  2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
       .wed-layer {
         position: absolute; inset: 0;
@@ -1888,7 +1888,6 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
       }
       .wed-layer.wed-active { opacity: 1; }
 
-      /* ★全カット共通：流れるプリズム虹枠（画像の四角い縁を完全にゴージャス化）★ */
       .wed-rainbow-shell {
         position: relative; z-index: 10;
         padding: 4px;
@@ -1909,7 +1908,6 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         overflow: hidden;
         background: #140804;
       }
-      /* 内側の柔らかい光彩で画像の縁を虹枠へ自然に溶け込ませる */
       .wed-rainbow-inner::after {
         content: '';
         position: absolute; inset: 0;
@@ -1918,7 +1916,6 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         box-shadow: inset 0 0 22px 4px rgba(254, 249, 195, 0.52);
       }
 
-      /* 縦長カット：スマホは画面ほぼいっぱいに虹枠で包む、PCは高さ94vhでノーカット */
       .wed-shell-portrait {
         width: calc(100vw - 12px);
         height: calc(100dvh - 12px);
@@ -1932,7 +1929,6 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         }
       }
 
-      /* 横長カット（階段・アーチ）：元比率を保ったまま虹枠で包む */
       .wed-shell-landscape {
         max-width: calc(100vw - 14px);
         max-height: 86dvh;
@@ -1944,7 +1940,6 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         }
       }
 
-      /* ボタン専用：縦長9:16虹枠＋画面下半分タップ可能で押しミスゼロ */
       .wed-btn-tap-zone {
         position: absolute;
         bottom: 0; left: 0; right: 0; height: 55%;
@@ -2022,6 +2017,13 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
     return html;
   }
 
+  function buildPremiaLayerHtml() {
+    const premiaUrl = Assets.getPremiaFrame();
+    return premiaUrl
+      ? `<img src="${premiaUrl}" class="pointer-events-none absolute inset-0 w-full h-full object-fill z-[16]" style="mix-blend-mode:screen;" alt="">`
+      : '';
+  }
+
   function buildSlideInnerHtml(src, { portrait = true, pan = 'zoomIn' } = {}) {
     const shellCls = portrait ? 'wed-rainbow-shell wed-shell-portrait' : 'wed-rainbow-shell wed-shell-landscape';
     const imgCls = portrait ? 'w-full h-full object-cover' : 'block max-w-full max-h-[84dvh] w-auto h-auto object-contain';
@@ -2032,6 +2034,7 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
       <div class="${shellCls}">
         <div class="wed-rainbow-inner">
           <img src="${src}" class="${imgCls} ${camCls}" alt="">
+          ${buildPremiaLayerHtml()}
         </div>
       </div>
     `;
@@ -2080,7 +2083,7 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
     }
 
     try {
-      // STEP 1：漆黒の静寂 → キラキラ粒子 → wedding1 ＋ 「言質、取りました」
+      // STEP 1：漆黒の静寂 → キラキラ粒子 → wedding1 ＋ 静かに浮かぶ「言質、取りました」
       BgmEngine.cut();
       StudioAudio.playPuchun();
       setLed('off'); setAmbientBg(''); setSunburst(false);
@@ -2099,14 +2102,13 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
 
       await waitFreeze(1350, token);
 
-      StudioAudio.playPokyun(true);
-      fireSoftFlash(true);
+      fireSoftFlash(false);
       topUiHost.innerHTML = gensitu
         ? `<div class="logo-alive-wrap wed-gensitu-in px-3"><div class="logo-alive-halo"></div><img src="${gensitu}" class="logo-alive-img max-w-[90vw] sm:max-w-[540px] max-h-[38vh]" alt="言質、取りました"></div>`
         : `<div class="font-mincho text-3xl sm:text-5xl font-black gold-grad-text wed-gensitu-in text-center px-4">言質、取りました<br>もう引っ込められませんよ？</div>`;
-      await waitFreeze(3350, token);
+      await waitFreeze(3800, token);
 
-      // STEP 2：宇宙バージンロード → 花嫁7人（全カット虹枠＋上昇ハープ）
+      // STEP 2：宇宙バージンロード → 花嫁7人（全カットプレミア外枠＋上昇ハープ）
       topUiHost.innerHTML = '';
       featherHost.innerHTML = buildFeathersHtml(22);
       featherHost.style.opacity = '0.85';
@@ -2147,6 +2149,7 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
         <div class="wed-rainbow-shell wed-shell-portrait">
           <div class="wed-rainbow-inner">
             <img src="${wedBtn}" class="w-full h-full object-cover" alt="ウェディングボタン">
+            ${buildPremiaLayerHtml()}
             <button id="weddingTapHotspot" class="wed-btn-tap-zone" aria-label="ウェディングボタンを押す">
               <div class="wed-btn-visual-anchor">
                 <span class="wed-btn-wave"></span>
@@ -2194,12 +2197,11 @@ window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !docum
       setTimeout(() => WeddingAudio.playBell(1.25), 420);
       setTimeout(() => WeddingAudio.playBell(1.50), 860);
 
-      const premiaUrl = Assets.getPremiaFrame();
       const wedLogo = Assets.getLogo('wedding');
       const finishHtml = `
         <div class="relative w-full h-full overlay-wedding flex flex-col items-center justify-center text-center p-4 overflow-hidden">
           <div class="mystic-prism-rays rays-on"></div>
-          ${premiaUrl ? `<img src="${premiaUrl}" class="pointer-events-none absolute inset-0 w-full h-full object-fill z-20" style="mix-blend-mode:screen;" alt="">` : ''}
+          ${buildPremiaLayerHtml()}
           <div class="relative z-10 text-xs sm:text-base font-black tracking-[0.28em] text-rose-600 mb-2">PREMIUM WEDDING BONUS</div>
           ${wedLogo
             ? `<div class="relative z-10 logo-alive-wrap"><div class="logo-alive-halo"></div><img src="${wedLogo}" class="logo-alive-img max-w-[94vw] sm:max-w-[580px] max-h-[48vh]" alt="WEDDING 12000"></div>`
