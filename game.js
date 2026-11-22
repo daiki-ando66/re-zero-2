@@ -1,5 +1,8 @@
 // =========================================================================
-// game.js (v5.1) : 昇格ネタバレ排除・赤ボタン＆ガラス割れ・全画面ウェディング本番接続
+// game.js (v5.4) : 完全クリーン統合版
+//  ・ウェディング12,000 超プレミア（全カット虹枠・2層クロスフェード・押しミス防止ボタン）
+//  ・鬼がかりチャレンジ「赤ボタン」ド派手演出 / STラスト10回転ヒリつき演出
+//  ・開発者用隠しコマンド（左上「鬼2」5連打）内蔵・連打フリーズ完全ガード
 // =========================================================================
 
 const SPEC = {
@@ -202,7 +205,7 @@ function addLog(spinTxt, tag, tagCls, detail, resTxt, resCls) {
 }
 
 // =========================================================================
-// 通常時抽選＆SPリーチ（ハズレ画面割れ・赤ボタン確定・鬼がかってますね復活）
+// 通常時抽選＆SPリーチ（赤ボタンド派手化・ガラス割れ・鬼がかってますね復活）
 // =========================================================================
 function drawNormalSpin() {
   consumeNormalBall();
@@ -241,7 +244,6 @@ function buildNormalScenario(res) {
   const is3000 = hesoType === '3000_RUSH';
   const ochiburu = is3000 && Math.random() < (state.custOchiburu ? 0.88 : 0.24);
   const isPremier = isHit && state.custPremier && !is3000 && Math.random() < 0.48;
-  // 7揃いは3,000＋RUSH直行濃厚（ハズレ時は絶対に7にしない）
   const tenpaiNum = is3000 ? 7
     : hesoType === '1500_RUSH' ? [1, 3, 5][Math.floor(Math.random() * 3)]
     : [2, 4, 6, 8][Math.floor(Math.random() * 4)];
@@ -476,12 +478,9 @@ async function resolveNormalReach() {
   pushButtonArea.classList.add('hidden');
   updateReserveSlots('NORMAL');
 
-  // ★ハズレ時：実機通りの「バリンッ!!」ガラス画面割れ演出★
   if (!sc.isHit) {
     state.phase = 'ANIMATING';
-    try {
-      await playGlassShatterFail(tok);
-    } catch (e) {}
+    try { await playGlassShatterFail(tok); } catch (e) {}
     setReachActor(null);
     clearVisualEffects();
     state.phase = 'NORMAL';
@@ -512,7 +511,6 @@ async function resolveNormalReach() {
       return;
     }
 
-    // 1,500初当たり → 55% 鬼がかりチャレンジ！
     StudioAudio.play1500Jackpot(false);
     setActiveScene('bonus');
     setBonusLogo('rezeroPurple');
@@ -524,11 +522,20 @@ async function resolveNormalReach() {
     await wait(950, tok);
 
     const isRush = sc.hesoType === '1500_RUSH';
-    // ★赤ボタン（RUSH突入濃厚！）は1500_RUSH当選時の約38%で出現、ハズレ時は絶対に出ない★
     const isRedButton = isRush && Math.random() < 0.38;
 
+    // ★赤ボタン出現時のド派手インパクト演出★
+    if (isRedButton) {
+      StudioAudio.playPokyun(false);
+      setAmbientBg('redbare'); triggerLamp('red', '赤ボタン!!'); setLed('red');
+      lcdFrame.classList.add('fx-redbare', 'shake-burst');
+      FxCanvas.spawnRing('#ef4444', 320, 10); FxCanvas.burstFlames(52);
+      try { if (navigator && navigator.vibrate) navigator.vibrate([70, 35, 110]); } catch (e) {}
+      setTimeout(() => lcdFrame.classList.remove('shake-burst'), 520);
+    }
+
     await waitUniversalBotanTap({
-      label: isRedButton ? '鬼がかりチャレンジ!!【赤ボタン】' : '鬼がかりチャレンジ!!（55% RUSH）',
+      label: isRedButton ? '鬼がかりチャレンジ!!【赤ボタン濃厚!!】' : '鬼がかりチャレンジ!!（55% RUSH）',
       vibe: isRedButton ? 'mid' : 'weak',
       color: isRedButton ? 'red' : 'gold',
       redChassis: isRedButton,
@@ -537,7 +544,6 @@ async function resolveNormalReach() {
     hideUniversalBotan();
 
     if (isRush) {
-      // 赤ボタン時は100%一撃成功！通常ボタン時は45%で一度ハズレ画面割れ→「鬼がかってますね」等による復活！
       const isRevival = !isRedButton && Math.random() < 0.45;
       if (isRevival) {
         await playGlassShatterFail(tok);
@@ -571,7 +577,6 @@ async function resolveNormalReach() {
         enterOnigakariRush(state.currentSpin, false);
       }
     } else {
-      // 通常落ち：ボタン押下直後にガラス画面割れ！
       await playGlassShatterFail(tok);
       setActiveScene('bonus');
       lcdFrame.classList.add('mode-despair-bg');
@@ -602,7 +607,7 @@ async function resolveNormalReach() {
 }
 
 // =========================================================================
-// 鬼がかりRUSH（残保留WEDDING 12,000全画面シネマ・レム先バレ・昇格ネタバレゼロ）
+// 鬼がかりRUSH（残保留WEDDING 12,000・STラスト10回転ヒリつき演出）
 // =========================================================================
 function fillStLookaheadQueue() {
   while (state.stLookaheadQueue.length < 4) {
@@ -653,7 +658,6 @@ async function afterBonusReserveCheck(prevType) {
 
   try {
     if (hitSlot) {
-      // ★真の最高峰プレミアム：全画面ウェディング12,000（実戦専用・テストなし）★
       if (prevType === 'BONUS_6000' && hitSlot.bonusType === 'BONUS_6000') {
         state.rushHoryurenCount++;
         state.phase = 'ANIMATING'; setControlMode('BUSY'); BgmEngine.cut();
@@ -845,9 +849,6 @@ function award6000AndContinue() {
   afterBonusReserveCheck('BONUS_6000');
 }
 
-// =========================================================================
-// RUSH当選シーケンス（揃った図柄と昇格仮表示・音の完全一致）
-// =========================================================================
 async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPat = null } = {}) {
   const tok = ++seqToken;
   const is6000 = bonusType === 'BONUS_6000';
@@ -928,7 +929,6 @@ async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPa
       if (bRes.note) { if (!currentIwakan) currentIwakan = bRes.note; state.rushIwakanNotes.push(bRes.note); }
       if (bRes.triggeredOchiburu || state.pendingRushHit.okRevealed) { direct6000AlreadyAnnounced = true; alarmAlreadyPlaying = true; }
     } else {
-      // 鬼がかりRUSH：揃った図柄と後続の昇格仮表示を100%整合させる
       if (is6000 && Math.random() < 0.28) { updateReserveSlots('NORMAL', 'BLINK_RED', 0); await wait(420, tok); }
       const r = Math.random();
       if (r < 0.38) {
@@ -956,10 +956,8 @@ async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPa
         await runSuddenOchiburu6000({ sub: state.rushMode === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH', rushMode: state.rushMode, skipAlarm: alarmAlreadyPlaying, token: tok });
         award6000AndContinue();
       } else if (alignedDig !== null && alignedDig % 2 === 0 && alignedDig !== 0) {
-        // ★偶数図柄揃いからの昇格 → 必ず300仮表示＆300専用音（ネタバレゼロ!!）★
         await runRush6000Sequence({ forceFake: '300', iwakanAnswer: currentIwakan });
       } else if (alignedDig === 1 || alignedDig === 5) {
-        // ★1・5図柄揃いからの昇格 → 1500仮表示 or カウントアップ突破★
         if (Math.random() < 0.45) {
           await runCountUpBreak6000({ rushMode: state.rushMode, iwakanAnswer: currentIwakan, token: tok });
           award6000AndContinue();
@@ -984,9 +982,16 @@ async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPa
 function handleRushEvent(ev, { fromAuto = false } = {}) {
   if (!ev) return;
   if (ev.type === 'MISS') {
-    hudRushRemain.className = state.stRemaining <= 15
-      ? 'text-lg sm:text-xl font-black crimson-grad-text leading-none'
-      : 'text-lg sm:text-xl font-black gold-grad-text leading-none';
+    // ★STラスト10回転のヒリつき演出★
+    if (!infiniteRushMode && state.stRemaining <= 10) {
+      hudRushRemain.className = 'text-lg sm:text-xl font-black crimson-grad-text leading-none animate-pulse';
+      setAmbientBg('redbare');
+      if (state.stRemaining === 10 || state.stRemaining <= 3) StudioAudio.playSoftHeartbeat();
+    } else if (state.stRemaining <= 15) {
+      hudRushRemain.className = 'text-lg sm:text-xl font-black crimson-grad-text leading-none';
+    } else {
+      hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none';
+    }
     updateStatsUI();
 
     if (ev.teaser) {
@@ -1073,7 +1078,6 @@ async function runNormalRushBonusSequence(type, iwakanAnswer = '') {
       updateStatsUI();
       afterBonusReserveCheck('BONUS_1500');
     } else if (type === 'BONUS_300') {
-      // ★300BONUS専用音（1,500の派手な音を使わない）★
       StudioAudio.play300Sound();
       const th = applyBonusModeTheme(rm, { isDespair: true });
       const hasLogo = setBonusLogo('rezeroPurple');
@@ -1233,7 +1237,7 @@ window.addEventListener('keyup', (e) => { if (e.code === 'Space') endHandlePress
 window.addEventListener('blur', endHandlePress);
 
 // =========================================================================
-// 「🎬 テスト ▾」＆設定モーダル（※ウェディングテストなし）
+// 「🎬 テスト ▾」＆設定モーダル
 // =========================================================================
 const promoTestMenu = document.getElementById('promoTestMenu');
 document.getElementById('btnTestPromo').addEventListener('click', () => promoTestMenu.classList.toggle('hidden'));
@@ -1697,46 +1701,10 @@ function syncExchangeRate(rate) {
 document.querySelectorAll('.rate-btn, .sim-rate-btn').forEach(btn => btn.addEventListener('click', () => syncExchangeRate(btn.dataset.rate)));
 window.addEventListener('resize', () => { if (lastSimPoints.length > 0 && !document.getElementById('sim100Container').classList.contains('hidden')) drawSlumpChart(lastSimPoints); });
 
-// 初期表示
-setActiveScene('normal');
-updateStatsUI();
-// ★開発者用隠しコマンド：左上の「鬼2」アイコンを5回連打でウェディング12,000テスト再生★
-(function initSecretWeddingTest() {
-  const icon = document.querySelector('header .w-7.h-7');
-  if (!icon) return;
-  let taps = 0, tapTimer = null;
-  icon.style.cursor = 'pointer';
-  icon.addEventListener('click', async () => {
-    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
-    taps++;
-    clearTimeout(tapTimer);
-    tapTimer = setTimeout(() => { taps = 0; }, 1200);
-    if (taps < 5) return;
-    taps = 0;
-
-    stopAuto(); stopHandleHold(true);
-    const prevPhase = state.phase, prevScene = state.activeScene;
-    const tok = ++seqToken;
-    state.phase = 'ANIMATING'; setControlMode('BUSY');
-    try {
-      await playWedding12000Cinema(tok);
-    } catch (e) {
-    } finally {
-      state.phase = prevPhase;
-      clearVisualEffects(); setActiveScene(prevScene);
-      if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
-      else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
-    }
-  });
-})();
-
 // =========================================================================
-// ウェディング12,000 超プレミア完全版パッチ (v5.3)
-//  ・2層滑らかクロスフェード＋カメラワーク＋専用チャペル＆ハープ音響
-//  ・スマホ全画面最優先 × PCワイド空間（上下見切れゼロ・ボタン位置完全固定）
-//  ・ルート直下の実ファイル名（wed space.jpg / pur / kur / mur / bea / ram / rem / emi / wed_botan）完全対応
+// ★ウェディング12,000 超プレミア完全版 (v5.4：全カット虹枠・押しミス防止ボタン)★
 // =========================================================================
-(function upgradeWeddingCinemaUltimate() {
+(function initWeddingCinemaV54() {
   const SCENE_FILES = [
     { name: 'wed space.jpg', portrait: true,  dur: 2400, pan: 'zoomIn',  bell: true  },
     { name: 'pur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 0     },
@@ -1787,8 +1755,7 @@ updateStatsUI();
 
     function startHolyPad() {
       stopPad();
-      const v = getVol();
-      if (v <= 0.01) return;
+      const v = getVol(); if (v <= 0.01) return;
       const c = ensure(); if (!c) return;
       const now = c.currentTime + 0.02;
 
@@ -1834,8 +1801,7 @@ updateStatsUI();
       const base = 523.25 * pitchMul;
       [1, 2, 2.4, 3.0, 4.2].forEach((ratio, idx) => {
         const o = c.createOscillator(), g = c.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(base * ratio, now);
+        o.type = 'sine'; o.frequency.setValueAtTime(base * ratio, now);
         const amp = (v * 0.20) / (idx + 1);
         const decay = 2.6 / (1 + idx * 0.55);
         g.gain.setValueAtTime(0.0001, now);
@@ -1852,12 +1818,10 @@ updateStatsUI();
       const now = c.currentTime + 0.01;
       const roots = [349.23, 392.00, 440.00, 466.16, 523.25, 587.33, 698.46];
       const root = roots[Math.min(roots.length - 1, Math.max(0, stepIdx))];
-      const chord = [root, root * 1.25, root * 1.5, root * 2.0];
-      chord.forEach((hz, i) => {
+      [root, root * 1.25, root * 1.5, root * 2.0].forEach((hz, i) => {
         const st = now + i * 0.065;
         const o = c.createOscillator(), g = c.createGain();
-        o.type = 'triangle';
-        o.frequency.setValueAtTime(hz, st);
+        o.type = 'triangle'; o.frequency.setValueAtTime(hz, st);
         g.gain.setValueAtTime(0.0001, st);
         g.gain.linearRampToValueAtTime(v * 0.16, st + 0.014);
         g.gain.exponentialRampToValueAtTime(0.0001, st + 1.25);
@@ -1869,13 +1833,18 @@ updateStatsUI();
     return { startHolyPad, stopPad, playBell, playHarpStep };
   })();
 
-  if (!document.getElementById('wedding-v53-css')) {
+  if (!document.getElementById('wedding-v54-css')) {
     const st = document.createElement('style');
-    st.id = 'wedding-v53-css';
+    st.id = 'wedding-v54-css';
     st.textContent = `
       @keyframes wedCamZoomIn  { 0% { transform: scale(1.00); } 100% { transform: scale(1.09); } }
       @keyframes wedCamZoomOut { 0% { transform: scale(1.10); } 100% { transform: scale(1.01); } }
       @keyframes wedCamPanUp   { 0% { transform: scale(1.08) translateY(2.2%); } 100% { transform: scale(1.08) translateY(-2.2%); } }
+      @keyframes wedRainbowBorderFlow {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
       @keyframes wedHolyFlashSlow {
         0%   { opacity: 0.92; }
         35%  { opacity: 0.45; }
@@ -1892,6 +1861,18 @@ updateStatsUI();
         40%  { opacity: 1; transform: scale(0.97); filter: brightness(1.25); }
         100% { opacity: 1; transform: scale(1.00); filter: brightness(1.04); }
       }
+      @keyframes wedCrystalPulse {
+        0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.92); }
+        50%      { opacity: 0.94; transform: translate(-50%, -50%) scale(1.08); }
+      }
+      @keyframes wedShockRing {
+        0%   { opacity: 0.95; transform: translate(-50%, -50%) scale(0.55); border-width: 3px; }
+        100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.58); border-width: 1px; }
+      }
+      @keyframes wedPushFloat {
+        0%, 100% { transform: translate(-50%, -50%) scale(1.00); }
+        50%      { transform: translate(-50%, -50%) scale(1.09); }
+      }
 
       .wed-cam-zoomIn  { animation: wedCamZoomIn  4.2s ease-out forwards; }
       .wed-cam-zoomOut { animation: wedCamZoomOut 4.2s ease-out forwards; }
@@ -1907,91 +1888,90 @@ updateStatsUI();
       }
       .wed-layer.wed-active { opacity: 1; }
 
-      .wed-img-portrait {
+      /* ★全カット共通：流れるプリズム虹枠（画像の四角い縁を完全にゴージャス化）★ */
+      .wed-rainbow-shell {
         position: relative; z-index: 10;
-        width: 100%; height: 100%;
-        object-fit: cover;
-        box-shadow: 0 0 60px rgba(254, 240, 138, 0.55);
-      }
-      @media (min-width: 640px) {
-        .wed-img-portrait {
-          width: auto; height: 96vh; max-width: 92vw;
-          object-fit: contain;
-          border-radius: 14px;
-          border: 1.5px solid rgba(254, 240, 138, 0.55);
-        }
-      }
-
-      .wed-img-landscape {
-        position: relative; z-index: 10;
-        max-width: 100vw; max-height: 92vh;
-        width: auto; height: auto;
-        object-fit: contain;
-        box-shadow: 0 0 60px rgba(254, 240, 138, 0.55);
-      }
-      @media (min-width: 640px) {
-        .wed-img-landscape {
-          max-height: 94vh;
-          border-radius: 14px;
-          border: 1.5px solid rgba(254, 240, 138, 0.5);
-        }
-      }
-
-      .wed-feather {
-        position: absolute; top: -6vh; pointer-events: none; z-index: 22;
-        border-radius: 50%;
-        background: radial-gradient(ellipse at center, #ffffff 30%, #fef9c3 85%, transparent 100%);
-        box-shadow: 0 0 12px rgba(254, 240, 138, 0.9);
-        animation: wedFeatherFall var(--dur) linear var(--delay) infinite;
-      }
-
-      .wed-flash-veil {
-        position: absolute; inset: 0; z-index: 35; pointer-events: none;
-        background: radial-gradient(circle at center, #ffffff 0%, #fef9c3 60%, rgba(254,240,138,0.85) 100%);
-        animation: wedHolyFlashSlow 0.85s ease-out forwards;
-      }
-
-     .wed-btn-frame {
-        position: relative; z-index: 10;
-        aspect-ratio: 9 / 16;
-        height: min(100dvh, calc(100vw * 16 / 9));
-        max-height: 100dvh; max-width: 100vw;
+        padding: 4px;
+        border-radius: 18px;
+        background: linear-gradient(125deg, #fffbeb, #fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #facc15, #fffbeb);
+        background-size: 300% 300%;
+        animation: wedRainbowBorderFlow 2.2s linear infinite;
+        box-shadow:
+          0 0 28px rgba(254, 240, 138, 0.85),
+          0 0 60px rgba(244, 114, 182, 0.55),
+          0 0 90px rgba(125, 211, 252, 0.45);
         display: flex; align-items: center; justify-content: center;
       }
-      @media (min-width: 640px) {
-        .wed-btn-frame { height: min(96vh, calc(92vw * 16 / 9)); }
+      .wed-rainbow-inner {
+        position: relative;
+        width: 100%; height: 100%;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #140804;
       }
-      .wed-btn-hotspot {
+      /* 内側の柔らかい光彩で画像の縁を虹枠へ自然に溶け込ませる */
+      .wed-rainbow-inner::after {
+        content: '';
+        position: absolute; inset: 0;
+        border-radius: 14px;
+        pointer-events: none; z-index: 15;
+        box-shadow: inset 0 0 22px 4px rgba(254, 249, 195, 0.52);
+      }
+
+      /* 縦長カット：スマホは画面ほぼいっぱいに虹枠で包む、PCは高さ94vhでノーカット */
+      .wed-shell-portrait {
+        width: calc(100vw - 12px);
+        height: calc(100dvh - 12px);
+        max-width: 100vw; max-height: 100dvh;
+      }
+      @media (min-width: 640px) {
+        .wed-shell-portrait {
+          width: auto; height: 94vh;
+          aspect-ratio: 9 / 16;
+          max-width: 92vw;
+        }
+      }
+
+      /* 横長カット（階段・アーチ）：元比率を保ったまま虹枠で包む */
+      .wed-shell-landscape {
+        max-width: calc(100vw - 14px);
+        max-height: 86dvh;
+      }
+      @media (min-width: 640px) {
+        .wed-shell-landscape {
+          max-width: 88vw;
+          max-height: 90vh;
+        }
+      }
+
+      /* ボタン専用：縦長9:16虹枠＋画面下半分タップ可能で押しミスゼロ */
+      .wed-btn-tap-zone {
         position: absolute;
-        top: 68%; left: 50%; transform: translate(-50%, -50%);
-        width: 72%; aspect-ratio: 1.15 / 1;
+        bottom: 0; left: 0; right: 0; height: 55%;
         border: none; background: transparent; padding: 0;
         z-index: 25; cursor: pointer; outline: none;
         -webkit-tap-highlight-color: transparent;
       }
-      .wed-btn-hotspot:active { transform: translate(-50%, -50%) scale(0.95); }
-      @keyframes wedCrystalPulse {
-        0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.92); }
-        50%      { opacity: 0.92; transform: translate(-50%, -50%) scale(1.08); }
+      .wed-btn-visual-anchor {
+        position: absolute;
+        top: 44%; left: 50%; transform: translate(-50%, -50%);
+        width: 72%; aspect-ratio: 1.25 / 1;
+        pointer-events: none;
+        transition: transform 0.08s ease;
       }
-      @keyframes wedShockRing {
-        0%   { opacity: 0.92; transform: translate(-50%, -50%) scale(0.55); border-width: 3px; }
-        100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.55); border-width: 1px; }
-      }
-      @keyframes wedPushFloat {
-        0%, 100% { transform: translate(-50%, -50%) scale(1.00); }
-        50%      { transform: translate(-50%, -50%) scale(1.09); }
+      .wed-btn-tap-zone:active .wed-btn-visual-anchor {
+        transform: translate(-50%, -50%) scale(0.94);
       }
       .wed-btn-crystal-glow {
-        position: absolute; top: 35%; left: 50%;
-        width: 70%; aspect-ratio: 1.45 / 1; border-radius: 50%;
+        position: absolute; top: 50%; left: 50%;
+        width: 72%; aspect-ratio: 1.45 / 1; border-radius: 50%;
         background: radial-gradient(ellipse at center, rgba(255,255,255,0.95) 0%, rgba(254,249,195,0.62) 45%, rgba(250,204,21,0.18) 72%, transparent 100%);
         mix-blend-mode: screen; pointer-events: none;
         animation: wedCrystalPulse 1.1s ease-in-out infinite;
       }
       .wed-btn-wave {
-        position: absolute; top: 35%; left: 50%;
-        width: 76%; aspect-ratio: 1.35 / 1; border-radius: 50%;
+        position: absolute; top: 50%; left: 50%;
+        width: 78%; aspect-ratio: 1.35 / 1; border-radius: 50%;
         border: 3px solid rgba(254, 249, 195, 0.95);
         box-shadow: 0 0 18px rgba(253, 224, 71, 0.85), inset 0 0 12px rgba(255, 255, 255, 0.6);
         pointer-events: none;
@@ -1999,7 +1979,7 @@ updateStatsUI();
       }
       .wed-btn-wave-2 { animation-delay: 0.67s; }
       .wed-btn-push-text {
-        position: absolute; top: 35%; left: 50%;
+        position: absolute; top: 50%; left: 50%;
         font-family: 'Inter', 'Noto Sans JP', sans-serif;
         font-size: clamp(22px, 6.8vw, 34px);
         font-weight: 900; letter-spacing: 0.14em;
@@ -2009,6 +1989,19 @@ updateStatsUI();
           0 0 16px rgba(245, 158, 11, 1), 0 4px 12px rgba(0, 0, 0, 0.78);
         pointer-events: none;
         animation: wedPushFloat 1.1s ease-in-out infinite;
+      }
+
+      .wed-feather {
+        position: absolute; top: -6vh; pointer-events: none; z-index: 22;
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, #ffffff 30%, #fef9c3 85%, transparent 100%);
+        box-shadow: 0 0 12px rgba(254, 240, 138, 0.9);
+        animation: wedFeatherFall var(--dur) linear var(--delay) infinite;
+      }
+      .wed-flash-veil {
+        position: absolute; inset: 0; z-index: 35; pointer-events: none;
+        background: radial-gradient(circle at center, #ffffff 0%, #fef9c3 60%, rgba(254,240,138,0.85) 100%);
+        animation: wedHolyFlashSlow 0.85s ease-out forwards;
       }
     `;
     document.head.appendChild(st);
@@ -2029,14 +2022,18 @@ updateStatsUI();
     return html;
   }
 
-  function buildSlideInnerHtml(src, { portrait = true, pan = 'zoomIn', extraHtml = '' } = {}) {
-    const imgCls = portrait ? 'wed-img-portrait' : 'wed-img-landscape';
+  function buildSlideInnerHtml(src, { portrait = true, pan = 'zoomIn' } = {}) {
+    const shellCls = portrait ? 'wed-rainbow-shell wed-shell-portrait' : 'wed-rainbow-shell wed-shell-landscape';
+    const imgCls = portrait ? 'w-full h-full object-cover' : 'block max-w-full max-h-[84dvh] w-auto h-auto object-contain';
     const camCls = pan ? `wed-cam-${pan}` : '';
     return `
       <img src="${src}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
       <div class="absolute inset-0 bg-gradient-to-b from-amber-200/15 via-transparent to-amber-200/20 pointer-events-none"></div>
-      <img src="${src}" class="${imgCls} ${camCls}" alt="">
-      ${extraHtml}
+      <div class="${shellCls}">
+        <div class="wed-rainbow-inner">
+          <img src="${src}" class="${imgCls} ${camCls}" alt="">
+        </div>
+      </div>
     `;
   }
 
@@ -2083,6 +2080,7 @@ updateStatsUI();
     }
 
     try {
+      // STEP 1：漆黒の静寂 → キラキラ粒子 → wedding1 ＋ 「言質、取りました」
       BgmEngine.cut();
       StudioAudio.playPuchun();
       setLed('off'); setAmbientBg(''); setSunburst(false);
@@ -2096,21 +2094,19 @@ updateStatsUI();
       const gensitu = Assets.getWedding('gensitu');
       WeddingAudio.playBell(1.0);
       ambientRays.classList.add('rays-on');
-      if (bg1) {
-        crossfadeTo(buildSlideInnerHtml(bg1, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
-      } else {
-        crossfadeTo(`<div class="w-full h-full overlay-wedding"></div>`, { flash: true, strongFlash: true });
-      }
+      if (bg1) crossfadeTo(buildSlideInnerHtml(bg1, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
+      else crossfadeTo(`<div class="w-full h-full overlay-wedding"></div>`, { flash: true, strongFlash: true });
 
       await waitFreeze(1350, token);
 
       StudioAudio.playPokyun(true);
       fireSoftFlash(true);
       topUiHost.innerHTML = gensitu
-        ? `<div class="logo-alive-wrap wed-gensitu-in px-3"><div class="logo-alive-halo"></div><img src="${gensitu}" class="logo-alive-img max-w-[92vw] sm:max-w-[540px] max-h-[38vh]" alt="言質、取りました"></div>`
+        ? `<div class="logo-alive-wrap wed-gensitu-in px-3"><div class="logo-alive-halo"></div><img src="${gensitu}" class="logo-alive-img max-w-[90vw] sm:max-w-[540px] max-h-[38vh]" alt="言質、取りました"></div>`
         : `<div class="font-mincho text-3xl sm:text-5xl font-black gold-grad-text wed-gensitu-in text-center px-4">言質、取りました<br>もう引っ込められませんよ？</div>`;
       await waitFreeze(3350, token);
 
+      // STEP 2：宇宙バージンロード → 花嫁7人（全カット虹枠＋上昇ハープ）
       topUiHost.innerHTML = '';
       featherHost.innerHTML = buildFeathersHtml(22);
       featherHost.style.opacity = '0.85';
@@ -2120,17 +2116,13 @@ updateStatsUI();
         const cfg = SCENE_FILES[i];
         const src = loadedScenes[i] || encodeURI(cfg.name) || fallback9[i] || null;
         if (!src) continue;
-
         if (cfg.bell) WeddingAudio.playBell(1.25);
         if (typeof cfg.harp === 'number') WeddingAudio.playHarpStep(cfg.harp);
-
-        crossfadeTo(
-          buildSlideInnerHtml(src, { portrait: cfg.portrait, pan: cfg.pan }),
-          { flash: true, strongFlash: i === 0 || i >= SCENE_FILES.length - 2 }
-        );
+        crossfadeTo(buildSlideInnerHtml(src, { portrait: cfg.portrait, pan: cfg.pan }), { flash: true, strongFlash: i === 0 || i >= SCENE_FILES.length - 2 });
         await waitFreeze(cfg.dur, token);
       }
 
+      // STEP 3：黄金の階段 → 花のアーチ → エミリア＆レム運命のボタン
       const stairs = Assets.getWedding('stairs');
       if (stairs) {
         WeddingAudio.playBell(1.12);
@@ -2149,20 +2141,23 @@ updateStatsUI();
       StudioAudio.playSoftHeartbeat();
 
       const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
-      const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
       const btnStageHtml = `
         <img src="${wedBtn}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
         <div class="absolute inset-0 bg-gradient-to-b from-amber-300/15 via-transparent to-amber-300/20 pointer-events-none"></div>
-        <div class="wed-btn-frame">
-          <img src="${wedBtn}" class="w-full h-full object-cover shadow-[0_0_65px_rgba(254,240,138,0.65)] sm:rounded-2xl sm:border sm:border-yellow-200/50" alt="ウェディングボタン">
-          <button id="weddingTapHotspot" class="wed-btn-hotspot" aria-label="ウェディングボタンを押す">
-            <span class="wed-btn-wave"></span>
-            <span class="wed-btn-wave wed-btn-wave-2"></span>
-            <span class="wed-btn-crystal-glow"></span>
-            <span class="wed-btn-push-text">PUSH</span>
-          </button>
+        <div class="wed-rainbow-shell wed-shell-portrait">
+          <div class="wed-rainbow-inner">
+            <img src="${wedBtn}" class="w-full h-full object-cover" alt="ウェディングボタン">
+            <button id="weddingTapHotspot" class="wed-btn-tap-zone" aria-label="ウェディングボタンを押す">
+              <div class="wed-btn-visual-anchor">
+                <span class="wed-btn-wave"></span>
+                <span class="wed-btn-wave wed-btn-wave-2"></span>
+                <span class="wed-btn-crystal-glow"></span>
+                <span class="wed-btn-push-text">PUSH</span>
+              </div>
+            </button>
+          </div>
         </div>
-        <div class="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-4 py-1 rounded-full bg-black/72 border border-yellow-200/80 text-[11px] sm:text-xs font-black text-amber-200 whitespace-nowrap shadow-xl">
+        <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-1 rounded-full bg-black/75 border border-yellow-200/90 text-[11px] sm:text-xs font-black text-amber-200 whitespace-nowrap shadow-xl">
           ボタンをタップ / Spaceで誓いを結べ!!
         </div>
       `;
@@ -2179,6 +2174,7 @@ updateStatsUI();
         uniBotanTapResolver = done;
       });
 
+      // STEP 4：ボタン押下 → 落ちブル＋虹ポキュ↑ーン↓ → 鬼がかってますね（ウェディング版）
       StudioAudio.playOchiburu(true);
       StudioAudio.playPokyun(true);
       WeddingAudio.playBell(1.5);
@@ -2188,13 +2184,11 @@ updateStatsUI();
       featherHost.style.opacity = '1';
 
       const wedOni = Assets.getWedding('onigakari');
-      if (wedOni) {
-        crossfadeTo(buildSlideInnerHtml(wedOni, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
-      } else {
-        crossfadeTo(`<div class="font-mincho text-4xl font-black rainbow-grad-text">鬼がかってますね</div>`, { flash: true, strongFlash: true });
-      }
+      if (wedOni) crossfadeTo(buildSlideInnerHtml(wedOni, { portrait: true, pan: 'zoomIn' }), { flash: true, strongFlash: true });
+      else crossfadeTo(`<div class="font-mincho text-4xl font-black rainbow-grad-text">鬼がかってますね</div>`, { flash: true, strongFlash: true });
       await waitFreeze(4400, token);
 
+      // STEP 5：フィニッシュ（premia虹外枠＋白い羽根＋特大12,000ロゴ爆発!!）
       StudioAudio.play6000Fanfare(true);
       WeddingAudio.playBell(1.0);
       setTimeout(() => WeddingAudio.playBell(1.25), 420);
@@ -2226,3 +2220,38 @@ updateStatsUI();
     }
   };
 })();
+
+// ★開発者用隠しコマンド：左上の「鬼2」アイコンを5回連打でウェディング12,000テスト再生★
+(function initSecretWeddingTest() {
+  const icon = document.querySelector('header .w-7.h-7');
+  if (!icon) return;
+  let taps = 0, tapTimer = null, running = false;
+  icon.style.cursor = 'pointer';
+  icon.addEventListener('click', async () => {
+    if (running || state.phase === 'ANIMATING' || state.phase === 'REACH') return;
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => { taps = 0; }, 1200);
+    if (taps < 5) return;
+    taps = 0; running = true;
+
+    stopAuto(); stopHandleHold(true);
+    const prevPhase = state.phase, prevScene = state.activeScene;
+    const tok = ++seqToken;
+    state.phase = 'ANIMATING'; setControlMode('BUSY');
+    try {
+      await playWedding12000Cinema(tok);
+    } catch (e) {
+    } finally {
+      running = false;
+      state.phase = prevPhase;
+      clearVisualEffects(); setActiveScene(prevScene);
+      if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
+      else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
+    }
+  });
+})();
+
+// 初期表示
+setActiveScene('normal');
+updateStatsUI();
