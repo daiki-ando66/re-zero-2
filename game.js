@@ -647,13 +647,10 @@ async function resolveNormalReach() {
     }
 
     // ★初当たり：ロゴ役物『Re:ゼロ』がガシャーンと落下し、背面に niziiro.jpg が爆発展開!!★
-    setActiveScene('normal');
-    setReels(sc.tenpaiNum, sc.tenpaiNum, sc.tenpaiNum, { tenpai: true });
-    normalTitle.textContent = '大当り!!'; normalTitle.className = 'text-2xl sm:text-3xl font-black rainbow-grad-text pop-in';
-    normalSub.textContent = '';
-    await wait(1100, tok);                       // ボタン後に少し間：図柄揃いを見せてからロゴ落下
+    // 図柄は見せない：予告画面のまま一拍おいて、ロゴ役物が中央まで落下して当りを知らせる
+    await wait(650, tok);
     fireRainbowBurst('大当り!!', { withBackNiziiro: true });
-    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1000, withNiziiroBack: true, landOffset: -70, scaleMul: 0.8, token: tok });   // 図柄より上に・少し小さめに着地
+    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, token: tok });
 
     StudioAudio.play1500Jackpot(false); setActiveScene('bonus');
     setBonusSceneBackdrop('niziiro');
