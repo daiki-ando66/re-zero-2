@@ -39,8 +39,8 @@ const ExtraAudioV70 = (() => {
     if (muted || vol <= 0.01) return;
     const c = ensure(); if (!c) return;
     const now = c.currentTime + 0.005, T = now + 0.29;           // T = 着地の瞬間
-    const master = c.createGain(); master.gain.value = Math.min(1, vol * 0.95);
-    const comp = c.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 8;
+    const master = c.createGain(); master.gain.value = Math.min(1.7, vol * 1.55);
+    const comp = c.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 14; comp.knee.value = 6;
     comp.connect(master).connect(c.destination);
     // 残響（フィードバックディレイ）
     const dl = c.createDelay(0.5); dl.delayTime.value = 0.11;
@@ -68,18 +68,20 @@ const ExtraAudioV70 = (() => {
       n.connect(f).connect(g).connect(comp); n.start(now); n.stop(T + 0.05); }
 
     // 1. 着地の重低音（ドスン！）
-    thud(T, 210, 26, 0.75, 1.9);
-    thud(T, 120, 46, 0.32, 1.0, 'triangle');
+    thud(T, 210, 24, 0.85, 2.8);
+    thud(T, 120, 44, 0.36, 1.5, 'triangle');
+    thud(T, 70, 30, 0.6, 1.8);
 
     // 2. 金属ロック音「ガシャーン!!」＋きらめく金属の余韻
-    noise(T, 0.30, 'bandpass', 2850, 1.6, 0.95);
-    noise(T, 0.55, 'bandpass', 5200, 3.0, 0.55);
+    noise(T, 0.34, 'bandpass', 2850, 1.6, 1.4);
+    noise(T, 0.60, 'bandpass', 5200, 3.0, 0.8);
+    noise(T, 0.22, 'lowpass', 900, 0.8, 1.1);
     // 3. 鎖の跳ね返りジャラジャラ
     [0.04, 0.075, 0.11, 0.15].forEach((d, i) => noise(T + d, 0.07, 'highpass', 3500, 1.0, 0.32 - i * 0.05));
 
     // 4. バウンド2回（小さくなる着地音）
-    thud(T + 0.20, 150, 40, 0.20, 0.7); noise(T + 0.20, 0.10, 'bandpass', 2400, 1.4, 0.35);
-    thud(T + 0.34, 160, 44, 0.16, 0.38); noise(T + 0.34, 0.07, 'bandpass', 2600, 1.4, 0.2);
+    thud(T + 0.20, 150, 38, 0.22, 1.0); noise(T + 0.20, 0.10, 'bandpass', 2400, 1.4, 0.35);
+    thud(T + 0.34, 160, 42, 0.18, 0.55); noise(T + 0.34, 0.07, 'bandpass', 2600, 1.4, 0.2);
 
     // 5. 色別ハーモニー閃光音
     const notes = color === 'rainbow'
@@ -99,7 +101,7 @@ const ExtraAudioV70 = (() => {
       o.connect(g).connect(comp); o.start(st); o.stop(st + 0.95);
     });
     // 6. 虹だけシンバル風クラッシュ
-    if (color === 'rainbow') noise(T + 0.01, 1.15, 'highpass', 5500, 0.7, 0.5);
+    if (color === 'rainbow') noise(T + 0.01, 1.3, 'highpass', 5500, 0.7, 0.75);
   }
 
   function play1500(isRush = false) {
@@ -2427,44 +2429,65 @@ async function playOnigakariImageCutin({
   const imgSrc = Assets.getOnigakari();
   const host = lcdOnigakariOverlay;
   if (!host) return;
+  const rnd = (a, b) => a + Math.random() * (b - a);
 
   try {
-    if (fromBlackout) {
-      setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
-      host.innerHTML = ''; host.classList.remove('hidden');
-      await waitFreeze(620, token);
-    }
+    // ① 暗転（液晶内のみ）。役物・レム・背景の光も落とす
+    setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
+    host.innerHTML = ''; host.classList.remove('hidden');
+    if (!fromBlackout) host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'ease-out' });
+    await waitFreeze(fromBlackout ? 700 : 560, token);
 
-    host.innerHTML = `
+    // ② キラキラ（暗闇に星が瞬く）
+    const sp = document.createElement('div');
+    sp.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:20';
+    host.appendChild(sp);
+    for (let i = 0; i < 34; i++) {
+      const sz = rnd(3, 9), st = document.createElement('div');
+      st.style.cssText = `position:absolute;left:${rnd(4, 96)}%;top:${rnd(6, 94)}%;width:${sz}px;height:${sz}px;border-radius:50%;background:#fff;box-shadow:0 0 ${sz * 2}px ${sz / 2}px rgba(254,240,138,.85);opacity:0`;
+      sp.appendChild(st);
+      st.animate([{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.4)' }, { opacity: 0, transform: 'scale(.3)' }],
+        { duration: rnd(650, 1250), delay: rnd(0, 1100), easing: 'ease-in-out' });
+    }
+    await waitFreeze(1400, token);
+
+    // ③ フェードイン（カットイン画像がゆっくり浮かび上がる）
+    host.insertAdjacentHTML('afterbegin', `
       <div id="mysticPrismRays" class="mystic-prism-rays"></div>
       <div class="relative z-10 w-full flex flex-col items-center gap-2 px-1">
-        <div id="cutinFrameBox" class="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-white/20 bg-black transition-all duration-1000 ${fromBlackout ? 'cutin-gentle-fade' : ''}">
+        <div id="cutinFrameBox" class="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-white/20 bg-black" style="opacity:0">
           ${imgSrc ? `<img src="${imgSrc}" alt="鬼がかってますね" class="w-full h-full object-cover">`
             : `<div class="w-full h-full overlay-rainbow flex items-center justify-center"><span class="font-mincho text-2xl font-black text-white">${caption}</span></div>`}
           <div id="cutinShimmerBar" class="hidden prism-shimmer-bar"></div>
         </div>
-        <div id="cutinCapText" class="font-mincho text-lg sm:text-2xl font-black rainbow-grad-text tracking-widest drop-shadow-[0_2px_16px_rgba(255,255,255,0.6)] transition-opacity duration-1000 ${fromBlackout ? 'opacity-0' : 'opacity-100 pop-in'}">${caption}</div>
-      </div>
-    `;
-    host.classList.remove('hidden');
+        <div id="cutinCapText" class="font-mincho text-xl sm:text-3xl font-black tracking-widest whitespace-nowrap" style="color:#fef9c3;text-shadow:0 0 14px rgba(254,240,138,.85),0 2px 12px rgba(0,0,0,.9);min-height:1.4em"></div>
+      </div>`);
+    const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox');
+    const shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
+    if (rays) rays.classList.add('rays-on');
+    if (withPokyun) StudioAudio.playPokyun(true);
+    if (box) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1200, easing: 'ease-out', fill: 'forwards' });
+    sp.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1200, fill: 'forwards' });
+    await waitFreeze(1200, token);
 
-    if (fromBlackout) {
-      await waitFreeze(1400, token);
-      const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox');
-      const shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
-      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-2', 'mystic-halo-frame');
-      if (shimmer) shimmer.classList.remove('hidden'); if (cap) cap.classList.replace('opacity-0', 'opacity-100');
-      if (withPokyun) StudioAudio.playPokyun(true);
-      setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
-      await waitFreeze(Math.max(1900, dur - 1400), token);
-    } else {
-      const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox'), shimmer = document.getElementById('cutinShimmerBar');
-      if (rays) rays.classList.add('rays-on'); if (box) box.classList.add('border-2', 'mystic-halo-frame');
-      if (shimmer) shimmer.classList.remove('hidden');
-      if (withPokyun) StudioAudio.playPokyun(true);
-      fireGlobalRainbowFlash(); setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow');
-      await waitFreeze(dur, token);
+    // ④ 画面表示（枠が脈打ち、虹の光が戻る）
+    if (box) box.classList.add('mystic-halo-frame');
+    if (shimmer) shimmer.classList.remove('hidden');
+    setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true);
+    await waitFreeze(700, token);
+
+    // ⑤ セリフを左から1文字ずつ、ゆっくり
+    const chars = Array.from(caption);
+    if (cap) {
+      chars.forEach((ch, i) => {
+        const sp2 = document.createElement('span'); sp2.textContent = ch;
+        sp2.style.cssText = 'display:inline-block;opacity:0';
+        cap.appendChild(sp2);
+        sp2.animate([{ opacity: 0, transform: 'translateX(-14px)' }, { opacity: 1, transform: 'translateX(0)' }],
+          { duration: 560, delay: i * 320, easing: 'ease-out', fill: 'forwards' });
+      });
     }
+    await waitFreeze(chars.length * 320 + 560 + 900, token);
   } finally {
     host.classList.add('hidden'); host.innerHTML = '';
   }
