@@ -857,7 +857,7 @@ const StageBg = (() => {
     const ph = (typeof state !== 'undefined') ? state.phase : 'NORMAL';
     const sc = (typeof state !== 'undefined') ? state.activeScene : 'normal';
     const rm = (typeof state !== 'undefined') ? state.rushMode : 'onigakari';
-    const frozen = isCut && ph === 'ANIMATING';
+    const frozen = (isCut && ph === 'ANIMATING') || ((window.__timeStopUntil || 0) > performance.now());
     if (!frozen) angle += (0.006 + pulse * 0.012) * K;
 
     const cx = w * 0.52, cy = h * 0.50;
@@ -1041,6 +1041,7 @@ const FxCanvas = (() => {
 
   function tick() {
     if (document.hidden) { rafId = null; return; }
+    if ((window.__timeStopUntil || 0) > performance.now()) { rafId = requestAnimationFrame(tick); return; }
     ctx.clearRect(0, 0, w, h);
 
     if (ambientMode === 'ember' && particles.length < 22 && Math.random() < 0.34) {
@@ -1297,6 +1298,16 @@ const Yakumono = (() => {
       { transform: 'translate(-4px,3px)' }, { transform: 'translate(2px,-1px)' }, { transform: 'translate(0,0)' }
     ], { duration: 440 });
   }
+  // 時間停止：ロゴ・CSSアニメ・背景/パーティクルのCanvasを一瞬止める（着地の余韻）
+  function holdTime(ms) {
+    window.__timeStopUntil = performance.now() + ms;
+    document.documentElement.classList.add('time-stop');
+    const a = dropAnim; if (a) { try { a.pause(); } catch (e) {} }
+    setTimeout(() => {
+      document.documentElement.classList.remove('time-stop');
+      if (a && dropAnim === a) { try { a.play(); } catch (e) {} }
+    }, ms);
+  }
   function stopAnims() {
     [dropAnim, backAnim].forEach(a => { if (a) { try { a.cancel(); } catch (e) {} } });
     dropAnim = backAnim = null;
@@ -1335,7 +1346,7 @@ const Yakumono = (() => {
     };
   }
 
-  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, landOffset = 0, scaleMul = 1, token = seqToken } = {}) {
+  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, landOffset = 0, scaleMul = 1, onImpact = null, timeStop = 0, token = seqToken } = {}) {
     if (!yakumonoLogoWrap) return;
     stopAnims();
     setColor(color);
@@ -1346,11 +1357,13 @@ const Yakumono = (() => {
     dropAnim = yakumonoLogoWrap.animate(dropFrames({ dy: geo.dy + landOffset, scale: Math.max(1, geo.scale * scaleMul) }), { duration: DUR, fill: 'forwards' });
 
     if (withSound) StudioAudio.playYakumonoDrop(color);
-    if (withNiziiroBack) setLcdNiziiroBack(true);
 
-    // 着地の瞬間に 発光・パーティクル・筐体の揺れ
+    // 着地の瞬間に 発光・パーティクル・筐体の揺れ・虹背景(同時)・時間停止
     setTimeout(() => {
       if (!dropped) return;
+      if (withNiziiroBack) setLcdNiziiroBack(true, { instant: true });
+      if (onImpact) { try { onImpact(); } catch (e) { console.error('onImpact', e); } }
+      if (timeStop > 0) setTimeout(() => holdTime(timeStop), 90);
       impactFx(color);
       if (cabinetShell) { cabinetShell.classList.add('shake-burst'); setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520); }
       try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
@@ -1360,7 +1373,7 @@ const Yakumono = (() => {
     }, IMPACT_MS);
 
     if (holdMs > 0) {
-      await wait(Math.max(holdMs, DUR + 80), token);     // 最低でもバウンド完了まで見せる
+      await wait(Math.max(holdMs, DUR + 80) + timeStop, token);     // 最低でもバウンド完了まで見せる
       resetYakumono(color === 'rainbow' ? 'rainbow' : 'white');
     }
   }
@@ -1375,6 +1388,18 @@ const Yakumono = (() => {
     return a.finished.then(() => {}, () => {});
   }
 
+  // 落下フェイント：全体を少しだけ下げて戻す（落ちかけて戻る。音・揺れなし）
+  let lastFeintAt = 0;
+  function canFeint() { return !dropped && yakumonoLogoWrap && (performance.now() - lastFeintAt) > 22000; }
+  function feint() {
+    if (!canFeint()) return Promise.resolve(false);
+    lastFeintAt = performance.now();
+    const f = (y, sc) => ({ transform: `translateX(calc(-50% + 0px)) translateY(${y}px) scale(${sc})` });
+    const a = yakumonoLogoWrap.animate([f(0, 1), f(20, 1.03), f(20, 1.03), f(0, 1)],
+      { duration: 900, offset: [0, .38, .55, 1], easing: 'cubic-bezier(.4,0,.3,1)' });
+    return a.finished.then(() => true, () => true);
+  }
+
   // 統一入口： 'idle' | 'chance' | 'iwakan' | 'hit' | 'premium' | 'off'
   function fire(kind, opts = {}) {
     switch (kind) {
@@ -1386,7 +1411,7 @@ const Yakumono = (() => {
       case 'off':     setCabinetGlow('off'); return;
     }
   }
-  return { measure, setColor, setRemGlow, drop, release, shake, fire, isDropped: () => dropped };
+  return { measure, setColor, setRemGlow, drop, release, shake, feint, canFeint, fire, isDropped: () => dropped };
 })();
 
 // 既存の呼び出し名を維持（game.js / effects.js の呼び出しは無変更）
@@ -1394,8 +1419,9 @@ function setYakumonoColor(color = 'white') { Yakumono.setColor(color); }
 function resetYakumono(color = 'white') { Yakumono.release(); Yakumono.setColor(color); }
 async function triggerYakumonoDrop(opts = {}) { return Yakumono.drop(opts); }
 
-function setLcdNiziiroBack(on) {
+function setLcdNiziiroBack(on, { instant = false } = {}) {
   if (!lcdNiziiroBackLayer) return;
+  lcdNiziiroBackLayer.classList.toggle('niziiro-instant', !!(on && instant));
   const src = Assets.getVStock('niziiro');
   if (on && src) {
     if (!lcdNiziiroBackLayer.querySelector('img')) {
@@ -1898,7 +1924,7 @@ function updateRes4Dots(activeCount) {
 }
 
 function clearIwakanEffects() {
-  lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid', 'fx-rgb-glitch');
+  lcdFrame.style.filter = ''; lcdFrame.classList.remove('iwakan-mono', 'iwakan-rempuru', 'shake-weak', 'shake-mid', 'fx-rgb-glitch');
   lcdFrame.style.transform = '';
   if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru');
   if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain');
@@ -1953,7 +1979,7 @@ function triggerLamp(type, label) {
 
 function fireRainbowBurst(lampLabel = '大当り!!', { withBackNiziiro = true } = {}) {
   fireGlobalRainbowFlash();
-  if (withBackNiziiro) setLcdNiziiroBack(true);
+  if (withBackNiziiro) setLcdNiziiroBack(true, { instant: true });
   setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true);
   triggerLamp('rainbow', lampLabel); lcdFrame.classList.add('fx-rainbow', 'shake-burst'); setLed('rainbow');
   FxCanvas.spawnRing('#fef08a', 320, 9); FxCanvas.spawnRing('#7dd3fc', 250, 7); FxCanvas.burstRainbow(72);
@@ -2343,14 +2369,90 @@ async function playOniRemApproach6000(token) {
 // -------------------------------------------------------------------------
 // 14. 本家違和感18種（筐体レムぷる・ロゴ一瞬虹・画像版隠れレム・巻き戻り等）
 // -------------------------------------------------------------------------
+// 液晶が一瞬モザイク状になる（点滅3回）。SVGフィルタ非対応のSafariは、ブロックのノイズで代替
+async function playMosaicGlitch(token) {
+  const safari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+  let veil = null;
+  try {
+    for (let i = 0; i < 3; i++) {
+      if (!safari) lcdFrame.style.filter = 'url(#fxMosaic)';
+      else {
+        veil = document.createElement('div');
+        veil.style.cssText = 'position:absolute;inset:0;z-index:58;pointer-events:none;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(16,1fr);opacity:.9';
+        for (let c = 0; c < 160; c++) { const d = document.createElement('div'); d.style.background = `hsl(${Math.random() * 40},55%,${6 + Math.random() * 26}%)`; veil.appendChild(d); }
+        lcdFrame.appendChild(veil);
+      }
+      await wait(i === 2 ? 340 : 170, token);
+      lcdFrame.style.filter = ''; if (veil) { veil.remove(); veil = null; }
+      await wait(110, token);
+    }
+  } finally { lcdFrame.style.filter = ''; if (veil) veil.remove(); }
+}
+
+// 心音ドクン：暗くなり、縁が赤く2回脈打つ
+async function playHeartbeatPulse(token) {
+  const v = document.createElement('div');
+  v.style.cssText = 'position:absolute;inset:0;z-index:57;pointer-events:none;background:rgba(0,0,0,.55);box-shadow:inset 0 0 46px 10px rgba(220,20,40,.85);opacity:0';
+  lcdFrame.appendChild(v);
+  try {
+    try { StudioAudio.playSoftHeartbeat(); } catch (e) {}
+    v.animate([{ opacity: 0 }, { opacity: 1, offset: .12 }, { opacity: .25, offset: .3 }, { opacity: .9, offset: .5 }, { opacity: 0 }],
+      { duration: 1000, easing: 'ease-out', fill: 'forwards' });
+    await wait(1050, token);
+  } finally { v.remove(); }
+}
+
+// 画面のひび：液晶にヒビが走って消える
+async function playCrackOverlay(token) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 160'); svg.setAttribute('preserveAspectRatio', 'none');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:57;pointer-events:none';
+  const r = (a, b) => a + Math.random() * (b - a);
+  const branch = (x, y, ang, len, depth) => {
+    let d = `M${x} ${y}`; const n = 5;
+    for (let i = 0; i < n; i++) {
+      ang += r(-.5, .5); x += Math.cos(ang) * len / n; y += Math.sin(ang) * len / n; d += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
+      if (depth > 0 && Math.random() < .35) paths.push(branch(x, y, ang + r(-1, 1), len * .5, depth - 1));
+    }
+    return d;
+  };
+  const paths = [], cx = r(30, 70), cy = r(40, 110);
+  for (let k = 0; k < 4; k++) paths.push(branch(cx, cy, r(0, 6.28), r(40, 70), 1));
+  paths.forEach(d => {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'rgba(255,255,255,.9)');
+    p.setAttribute('stroke-width', '.7'); p.setAttribute('vector-effect', 'non-scaling-stroke');
+    p.style.filter = 'drop-shadow(0 0 2px rgba(180,220,255,.9))';
+    svg.appendChild(p);
+  });
+  lcdFrame.appendChild(svg);
+  try {
+    try { StudioAudio.playCrackNoise(); } catch (e) {}
+    svg.animate([{ opacity: 0 }, { opacity: 1, offset: .1 }, { opacity: 1, offset: .75 }, { opacity: 0 }], { duration: 1100, fill: 'forwards' });
+    await wait(1150, token);
+  } finally { svg.remove(); }
+}
+
+// 抽選の重み：通常=1 / モザイク=少なめ / プレミア=低頻度
+const IWAKAN_WEIGHTS = { MOSAIC: 0.5, LOGO_BLINK: 0.25, SCREEN_CRACK: 0.25, COUNT_6000: 0.25, REMAIN_77: 0.25, PT_77777: 0.25, RAINBOW_GLINT: 0.25 };
+function pickWeighted(pool) {
+  const w = pool.map(k => (k in IWAKAN_WEIGHTS ? IWAKAN_WEIGHTS[k] : 1));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+  return pool[pool.length - 1];
+}
+
 async function playIwakanEffect({ is6000, rushMode, token }) {
   const commonPool = [
     'LED_ONE_OFF', 'LED_ALL_OFF', 'MONO_SCREEN', 'FADE_REMAIN', 'REM_PURU',
     'GLITCH_BLINK', 'HIDDEN_REM', 'BGM_SILENT', 'REMAIN_REWIND', 'REMAIN_202',
-    'REEL_FLIP', 'REEL_BIG_MID', 'ALL_ONI_RES', 'MINI_POKYUN', 'SCREEN_TILT'
+    'REEL_FLIP', 'REEL_BIG_MID', 'ALL_ONI_RES', 'MINI_POKYUN', 'SCREEN_TILT', 'MOSAIC',
+    'LOGO_SHAKE', 'HEARTBEAT', 'REMAIN_FLOW', 'LOGO_BLINK', 'SCREEN_CRACK'
   ];
+  if (typeof Yakumono !== 'undefined' && Yakumono.canFeint()) commonPool.push('LOGO_FEINT');   // 落下フェイントは間隔を空けて
   const pool = is6000 ? [...commonPool, 'COUNT_6000', 'REMAIN_77', 'PT_77777', 'RAINBOW_GLINT'] : commonPool;
-  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const pick = pickWeighted(pool);
   const baseLed = rushMode === 'brain' ? 'brain' : rushMode === 'rem' ? 'rem' : 'red';
   let label = '';
 
@@ -2359,7 +2461,29 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
     case 'LED_ALL_OFF': label = '役物全消灯'; if (cabinetShell) cabinetShell.classList.add('rail-dim'); await wait(880, token); if (cabinetShell) cabinetShell.classList.remove('rail-dim'); break;
     case 'MONO_SCREEN': label = '液晶モノクロ化'; lcdFrame.classList.add('iwakan-mono'); await wait(860, token); lcdFrame.classList.remove('iwakan-mono'); break;
     case 'FADE_REMAIN': label = '残り回数消失'; if (hudRushRemain) hudRushRemain.classList.add('iwakan-fade-remain'); await wait(900, token); if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain'); break;
-    case 'REM_PURU': label = 'レムぷる(筐体微振動)'; if (cabinetShell) cabinetShell.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
+    case 'REM_PURU': label = 'レムぷる(筐体微振動)'; if (cabinetShell) cabinetShell.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); Yakumono.shake(); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
+    case 'LOGO_SHAKE': label = 'ロゴ小揺れ'; await Yakumono.shake(); await wait(420, token); break;
+    case 'LOGO_FEINT': label = 'ロゴ落下フェイント'; await Yakumono.feint(); await wait(200, token); break;
+    case 'HEARTBEAT': label = '心音ドクン'; await playHeartbeatPulse(token); break;
+    case 'SCREEN_CRACK': label = '画面のひび'; await playCrackOverlay(token); break;
+    case 'LOGO_BLINK': {
+      label = '無音＋ロゴ一瞬点灯';
+      BgmEngine.cut(); Yakumono.setColor('off'); await wait(620, token);
+      Yakumono.setColor('chance'); await wait(240, token);
+      Yakumono.setColor('white'); await wait(300, token); break;
+    }
+    case 'REMAIN_FLOW': {
+      label = '残り回数が逆に流れる';
+      if (hudRushRemain) {
+        const orig = hudRushRemain.textContent, n = parseInt(orig, 10);
+        try {
+          if (Number.isFinite(n)) for (let i = 1; i <= 4; i++) { hudRushRemain.textContent = String(n + i); await wait(110, token); }
+          await wait(380, token);
+        } finally { hudRushRemain.textContent = orig; }
+      } else await wait(900, token);
+      break;
+    }
+    case 'MOSAIC': label = '画面モザイク'; await playMosaicGlitch(token); break;
     case 'GLITCH_BLINK': label = '映像ノイズ停止'; rushNoiseVeil.classList.remove('hidden'); lcdFrame.classList.add('fx-glitch'); await wait(260, token); lcdFrame.classList.remove('fx-glitch'); rushNoiseVeil.classList.add('hidden'); await wait(620, token); break;
     case 'HIDDEN_REM': {
       label = 'ひょっこり隠れレム';
@@ -2408,7 +2532,7 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
       if (rushMode !== 'brain') updateReserveSlots('NORMAL', 'ALL_ONI'); await wait(920, token); if (rushMode !== 'brain') updateReserveSlots('NORMAL', null); break;
     }
     case 'MINI_POKYUN': label = '極小ポキュン音'; StudioAudio.playMiniPokyun(); await wait(840, token); break;
-    case 'SCREEN_TILT': label = '液晶わずかに傾き'; lcdFrame.style.transform = 'rotate(-2.4deg)'; await wait(900, token); lcdFrame.style.transform = ''; break;
+    case 'SCREEN_TILT': label = '液晶わずかに傾き'; Yakumono.shake(); lcdFrame.style.transform = 'rotate(-2.4deg)'; await wait(900, token); lcdFrame.style.transform = ''; break;
     case 'COUNT_6000': {
       label = '残り回数「6000」変化';
       if (hudRushRemain) { const orig = hudRushRemain.textContent; hudRushRemain.textContent = '6000'; hudRushRemain.className = 'text-lg sm:text-xl font-black rainbow-grad-text leading-none num-fixed'; await wait(960, token); hudRushRemain.textContent = orig; hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed'; }
@@ -2432,56 +2556,53 @@ async function playOnigakariImageCutin({
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   try {
-    // ① 暗転（液晶内のみ）。役物・レム・背景の光も落とす
+    // ① 暗転（液晶内のみ・背景は黒のまま）。役物・レム・背景の光も落とす
     setCabinetGlow('off'); setLed('off'); setAmbientBg(''); setSunburst(false);
     host.innerHTML = ''; host.classList.remove('hidden');
     if (!fromBlackout) host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'ease-out' });
     await waitFreeze(fromBlackout ? 700 : 560, token);
 
-    // ② キラキラ（暗闇に星が瞬く）
+    // ② キラキラ（暗闇に星が瞬く。長めに続く）
     const sp = document.createElement('div');
     sp.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:20';
     host.appendChild(sp);
-    for (let i = 0; i < 34; i++) {
+    for (let i = 0; i < 46; i++) {
       const sz = rnd(3, 9), st = document.createElement('div');
       st.style.cssText = `position:absolute;left:${rnd(4, 96)}%;top:${rnd(6, 94)}%;width:${sz}px;height:${sz}px;border-radius:50%;background:#fff;box-shadow:0 0 ${sz * 2}px ${sz / 2}px rgba(254,240,138,.85);opacity:0`;
       sp.appendChild(st);
       st.animate([{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.4)' }, { opacity: 0, transform: 'scale(.3)' }],
-        { duration: rnd(650, 1250), delay: rnd(0, 1100), easing: 'ease-in-out' });
+        { duration: rnd(800, 1500), delay: rnd(0, 3000), easing: 'ease-in-out' });
     }
-    await waitFreeze(1400, token);
+    await waitFreeze(1000, token);                         // キラキラが始まってから
 
-    // ③ フェードイン（カットイン画像がゆっくり浮かび上がる）
+    // ③ キラキラの途中で、画像をとても緩やかにフェードイン
     host.insertAdjacentHTML('afterbegin', `
-      <div id="mysticPrismRays" class="mystic-prism-rays"></div>
       <div class="relative z-10 w-full flex flex-col items-center gap-2 px-1">
         <div id="cutinFrameBox" class="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-white/20 bg-black" style="opacity:0">
           ${imgSrc ? `<img src="${imgSrc}" alt="鬼がかってますね" class="w-full h-full object-cover">`
-            : `<div class="w-full h-full overlay-rainbow flex items-center justify-center"><span class="font-mincho text-2xl font-black text-white">${caption}</span></div>`}
+            : `<div class="w-full h-full flex items-center justify-center"><span class="font-mincho text-2xl font-black text-white">${caption}</span></div>`}
           <div id="cutinShimmerBar" class="hidden prism-shimmer-bar"></div>
         </div>
-        <div id="cutinCapText" class="font-mincho text-xl sm:text-3xl font-black tracking-widest whitespace-nowrap" style="color:#fef9c3;text-shadow:0 0 14px rgba(254,240,138,.85),0 2px 12px rgba(0,0,0,.9);min-height:1.4em"></div>
+        <div id="cutinCapText" class="font-mincho text-xl sm:text-3xl font-black tracking-widest whitespace-nowrap" style="min-height:1.4em"></div>
       </div>`);
-    const rays = document.getElementById('mysticPrismRays'), box = document.getElementById('cutinFrameBox');
-    const shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
-    if (rays) rays.classList.add('rays-on');
+    const box = document.getElementById('cutinFrameBox'), shimmer = document.getElementById('cutinShimmerBar'), cap = document.getElementById('cutinCapText');
     if (withPokyun) StudioAudio.playPokyun(true);
-    if (box) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1200, easing: 'ease-out', fill: 'forwards' });
-    sp.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1200, fill: 'forwards' });
-    await waitFreeze(1200, token);
+    if (box) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 3000, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
+    sp.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, delay: 2000, fill: 'forwards' });
+    await waitFreeze(3000, token);
 
-    // ④ 画面表示（枠が脈打ち、虹の光が戻る）
+    // ④ 画面表示（枠が脈打つ。背景は黒のまま、縁だけ虹）
     if (box) box.classList.add('mystic-halo-frame');
     if (shimmer) shimmer.classList.remove('hidden');
-    setCabinetGlow('rainbow'); setYakumonoColor('rainbow'); setAmbientBg('rainbow'); setSunburst(true);
-    await waitFreeze(700, token);
+    setCabinetGlow('rainbow'); setYakumonoColor('rainbow');
+    await waitFreeze(600, token);
 
-    // ⑤ セリフを左から1文字ずつ、ゆっくり
+    // ⑤ 「鬼がかってますね」を左から1文字ずつ、虹色でゆっくり
     const chars = Array.from(caption);
     if (cap) {
       chars.forEach((ch, i) => {
-        const sp2 = document.createElement('span'); sp2.textContent = ch;
-        sp2.style.cssText = 'display:inline-block;opacity:0';
+        const hue = (i * 47) % 360, sp2 = document.createElement('span'); sp2.textContent = ch;
+        sp2.style.cssText = `display:inline-block;opacity:0;color:hsl(${hue},96%,72%);text-shadow:0 0 14px hsl(${hue},96%,62%),0 2px 10px rgba(0,0,0,.9)`;
         cap.appendChild(sp2);
         sp2.animate([{ opacity: 0, transform: 'translateX(-14px)' }, { opacity: 1, transform: 'translateX(0)' }],
           { duration: 560, delay: i * 320, easing: 'ease-out', fill: 'forwards' });
