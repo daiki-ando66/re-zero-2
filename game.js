@@ -455,6 +455,12 @@ function buildNormalScenario(res) {
   return { isHit, hesoType, bareType, is3000, isWhale, isPremier, ochiburu, tenpaiNum, titleColor, cutinColor, badge, category, title, sub, actor, doGiji, secretRevealed: false };
 }
 
+// 演出用：役物落下で例外が出ても通常リーチを止めない（キャンセルは再送出）
+async function dropSafe(opts) {
+  try { await triggerYakumonoDrop(opts); }
+  catch (e) { if (e === 'CANCELLED') throw e; console.error('yakumono drop failed', e); }
+}
+
 async function startNormalReach(res) {
   stopAuto(); stopHandleHold(true); LiveSlump.record(true);
   const tok = ++seqToken;
@@ -499,15 +505,15 @@ async function startNormalReach(res) {
 
     if (sc.isWhale) {
       StudioAudio.playWhaleSiren(); setAmbientBg('rainbow'); setPremiaFrame(true);
-      await triggerYakumonoDrop({ color: 'rainbow', holdMs: 680, withNiziiroBack: false, token: tok });
+      await dropSafe({ color: 'rainbow', holdMs: 680, withNiziiroBack: false, token: tok });
       lcdFrame.classList.add('fx-rainbow', 'shake-burst'); triggerLamp('rainbow', '白鯨襲来!!'); FxCanvas.spawnLightning('#7dd3fc', 6);
     } else if (sc.isPremier) {
       await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3200, withPokyun: false, fromBlackout: false, token: tok });
       setPremiaFrame(true); lcdFrame.classList.add('fx-rainbow'); triggerLamp('rainbow', 'プレミア!!'); FxCanvas.burstRainbow(56);
     } else if (sc.titleColor === 'gold') {
-      await triggerYakumonoDrop({ color: 'gold', holdMs: 560, withNiziiroBack: false, token: tok });
+      await dropSafe({ color: 'gold', holdMs: 560, withNiziiroBack: false, token: tok });
     } else if (sc.titleColor === 'red') {
-      await triggerYakumonoDrop({ color: 'red', holdMs: 500, withNiziiroBack: false, token: tok });
+      await dropSafe({ color: 'red', holdMs: 500, withNiziiroBack: false, token: tok });
     } else {
       Yakumono.fire('chance');
       FxCanvas.burstFlames(28);
@@ -559,7 +565,16 @@ async function startNormalReach(res) {
       reachYokokuBadge.textContent = '鬼がかり3,000濃厚!!';
       reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow pop-in';
     }
-  } catch (e) {}
+  } catch (e) {
+    if (e === 'CANCELLED') return;                       // 別の演出に切り替わった場合のみ中断
+    console.error('startNormalReach failed', e);
+    try {                                                // それ以外の失敗でも、PUSHは必ず出して進行を止めない
+      reachSub.textContent = '演出エラー: ' + ((e && e.message) || e);
+      reachStepBadge.classList.add('hidden');
+      pushButtonArea.classList.remove('hidden'); reachBotanText.textContent = 'PUSH';
+      pushHintText.textContent = 'タップでジャッジ';
+    } catch (_) {}
+  }
 }
 
 btnOniPush.addEventListener('click', () => { if (state.phase === 'REACH') resolveNormalReach(); });
