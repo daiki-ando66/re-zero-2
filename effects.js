@@ -263,7 +263,6 @@ const Assets = (() => {
   let remLampUrl = null;
   let botanUrl = null;
   let premiaFrameUrl = null;
-  let cabinetOverlayUrl = null;
   const yakumono = { white: null, red: null, gold: null, rainbow: null };
   const peteFrames = new Array(6).fill(null);
   const wedding9Frames = new Array(9).fill(null);
@@ -351,80 +350,15 @@ const Assets = (() => {
     c.putImageData(imgData, 0, 0);
   }
 
-  // ★kyoutai.jpg：盤面ズーム（下部スマパチ枠カット）＋中央の白い液晶窓だけ自動透過★
-  function processCabinetOverlay(img) {
-    try {
-      const W = img.naturalWidth, H = img.naturalHeight;
-      const sx = Math.round(W * 0.03), sy = Math.round(H * 0.07);
-      const sw = Math.round(W * 0.94), sh = Math.round(H * 0.54);
-      const scale = Math.min(1, 900 / Math.max(sw, sh));
-      const w = Math.max(10, Math.round(sw * scale)), h = Math.max(10, Math.round(sh * scale));
-
-      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-      const c = cv.getContext('2d');
-      c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
-      c.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-
-      const imgData = c.getImageData(0, 0, w, h);
-      const d = imgData.data;
-      const total = w * h;
-      const visited = new Uint8Array(total);
-      const isWhiteWin = (idx) => {
-        const p = idx * 4;
-        const r = d[p], g = d[p + 1], b = d[p + 2];
-        return r > 232 && g > 232 && b > 232 && (Math.max(r, g, b) - Math.min(r, g, b)) < 24;
-      };
-
-      const queue = new Int32Array(total);
-      let head = 0, tail = 0;
-      const push = (idx) => { if (!visited[idx]) { visited[idx] = 1; queue[tail++] = idx; } };
-      // 液晶窓の中央付近からシードして、レムの服などを誤透過せず液晶窓だけを綺麗に抜く
-      for (let ry = 0.42; ry <= 0.68; ry += 0.06) {
-        for (let rx = 0.36; rx <= 0.62; rx += 0.06) {
-          const idx = Math.round(h * ry) * w + Math.round(w * rx);
-          if (idx >= 0 && idx < total && isWhiteWin(idx)) push(idx);
-        }
-      }
-      while (head < tail) {
-        const idx = queue[head++];
-        if (!isWhiteWin(idx)) continue;
-        d[idx * 4 + 3] = 0;
-        const x = idx % w, y = (idx - x) / w;
-        if (x > 0) push(idx - 1);
-        if (x < w - 1) push(idx + 1);
-        if (y > 0) push(idx - w);
-        if (y < h - 1) push(idx + w);
-      }
-
-      // 境界の白いジャギーを1px柔らかく馴染ませる
-      const snapA = new Uint8Array(total);
-      for (let i = 0; i < total; i++) snapA[i] = d[i * 4 + 3];
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-          const idx = y * w + x;
-          if (snapA[idx] === 0) continue;
-          const nT = (snapA[idx - 1] === 0 ? 1 : 0) + (snapA[idx + 1] === 0 ? 1 : 0) + (snapA[idx - w] === 0 ? 1 : 0) + (snapA[idx + w] === 0 ? 1 : 0);
-          if (nT > 0) {
-            const p = idx * 4;
-            const lum = (d[p] + d[p + 1] + d[p + 2]) / 3;
-            if (lum > 205) d[p + 3] = 0;
-            else d[p + 3] = Math.round(d[p + 3] * 0.65);
-          }
-        }
-      }
-      c.putImageData(imgData, 0, 0);
-      cabinetOverlayUrl = cv.toDataURL('image/png');
-      const el = document.getElementById('cabinetOverlayImg');
-      if (el) el.src = cabinetOverlayUrl;
-    } catch (e) {}
-  }
 
   // ★rezero_logo.jpg / rezero.jpg：金フチを残して白文字内部だけ 赤/金/虹 へ着色生成★
-  function processYakumonoLogo(img) {
+  function processYakumonoLogo(img0) {
     try {
-      const scale = Math.min(1, 860 / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.max(10, Math.round(img.naturalWidth * scale));
-      const h = Math.max(10, Math.round(img.naturalHeight * scale));
+      const img = img0;
+      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+      const scale = Math.min(1, 1200 / Math.max(iw, ih));
+      const w = Math.max(10, Math.round(iw * scale));
+      const h = Math.max(10, Math.round(ih * scale));
       const baseCv = document.createElement('canvas'); baseCv.width = w; baseCv.height = h;
       const bc = baseCv.getContext('2d');
       bc.imageSmoothingEnabled = true; bc.imageSmoothingQuality = 'high';
@@ -648,8 +582,7 @@ const Assets = (() => {
   }
 
   function preloadAll() {
-    // ★v7.0 新筐体＆ロゴ役物（ファイル名ゆれ両対応）★
-    tryLoadList(['kyoutai.jpg', 'kyoutai.png'], processCabinetOverlay);
+    // ★v7.1 ロゴ役物（ファイル名ゆれ両対応）★
     tryLoadList(['rezero_logo.jpg', 'rezero_logo.png', 'rezero.jpg', 'rezero.png'], processYakumonoLogo);
 
     tryLoadList(['onigakari.jpg', 'onigakari.png'], (_img, src) => { onigakariSrc = src; });
@@ -706,7 +639,6 @@ const Assets = (() => {
   setTimeout(preloadAll, 10);
 
   return {
-    getCabinetOverlay: () => cabinetOverlayUrl,
     getYakumono: (col = 'white') => yakumono[col] || yakumono.white,
     getOnigakari: () => onigakariSrc,
     getRemLamp: () => remLampUrl,
@@ -849,15 +781,16 @@ const SoftSparkle = (() => {
 const StageBg = (() => {
   const cv = document.getElementById('stageBgCanvas');
   const ctx = cv.getContext('2d');
-  let w = 360, h = 360, angle = 0, rafId = null;
+  let w = 360, h = 360, angle = 0, rafId = null, lastT = 0;
+  const K = 2;   // 30fps化に伴う動き補正
 
-  const goldShards = Array.from({ length: 54 }, (_, i) => ({ x: Math.random(), y: Math.random(), vx: (Math.random() - 0.5) * 0.009, vy: -(0.004 + Math.random() * 0.011), sz: 4 + Math.random() * 8.5, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.16, isKanji: i % 6 === 0, color: i % 3 === 0 ? '#fef9c3' : i % 3 === 1 ? '#facc15' : '#f59e0b' }));
-  const rays = Array.from({ length: 42 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), spd: 0.018 + Math.random() * 0.026, len: 0.14 + Math.random() * 0.24 }));
-  const remShards = Array.from({ length: 48 }, (_, i) => ({ x: Math.random(), y: Math.random(), vx: (Math.random() - 0.5) * 0.006, vy: (Math.random() - 0.5) * 0.007, sz: 3.5 + Math.random() * 9, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.11, color: ['#e879f9', '#d946ef', '#38bdf8', '#f472b6', '#ffffff', '#a855f7'][i % 6] }));
+  const goldShards = Array.from({ length: 26 }, (_, i) => ({ x: Math.random(), y: Math.random(), vx: (Math.random() - 0.5) * 0.009, vy: -(0.004 + Math.random() * 0.011), sz: 4 + Math.random() * 8.5, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.16, isKanji: i % 6 === 0, color: i % 3 === 0 ? '#fef9c3' : i % 3 === 1 ? '#facc15' : '#f59e0b' }));
+  const rays = Array.from({ length: 20 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), spd: 0.018 + Math.random() * 0.026, len: 0.14 + Math.random() * 0.24 }));
+  const remShards = Array.from({ length: 22 }, (_, i) => ({ x: Math.random(), y: Math.random(), vx: (Math.random() - 0.5) * 0.006, vy: (Math.random() - 0.5) * 0.007, sz: 3.5 + Math.random() * 9, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.11, color: ['#e879f9', '#d946ef', '#38bdf8', '#f472b6', '#ffffff', '#a855f7'][i % 6] }));
 
   function resize() {
     const rect = cv.parentElement.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     w = Math.max(100, rect.width); h = Math.max(100, rect.height);
     cv.width = w * dpr; cv.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -883,21 +816,23 @@ const StageBg = (() => {
       const dir = left ? 1 : -1, reach = w * (0.28 + Math.sin(t * 2.1 + i) * 0.08 + pulse * 0.06);
       ctx.bezierCurveTo(startX + dir * reach * 0.45, baseY + Math.sin(t * 3.0 + i * 1.4) * 38, startX + dir * reach * 0.85, baseY + Math.cos(t * 2.5 + i) * 44, startX + dir * reach, baseY + Math.sin(t * 1.9 + i * 2) * 28);
       ctx.strokeStyle = i % 2 === 0 ? 'rgba(232, 121, 249, 0.44)' : 'rgba(147, 51, 234, 0.56)';
-      ctx.shadowColor = '#d946ef'; ctx.shadowBlur = 14;
+      ctx.shadowColor = '#d946ef'; ctx.shadowBlur = 8;
       ctx.lineWidth = 10 + pulse * 5; ctx.stroke();
     }
     ctx.restore();
   }
 
-  function tick() {
+  function tick(ts) {
     if (document.hidden) { rafId = null; return; }
+    if (ts && ts - lastT < 30) { rafId = requestAnimationFrame(tick); return; }   // 約30fps
+    lastT = ts || 0;
     const pulse = (typeof BgmEngine !== 'undefined') ? BgmEngine.consumePulse() : 0;
     const isCut = (typeof BgmEngine !== 'undefined') ? BgmEngine.isCut() : false;
     const ph = (typeof state !== 'undefined') ? state.phase : 'NORMAL';
     const sc = (typeof state !== 'undefined') ? state.activeScene : 'normal';
     const rm = (typeof state !== 'undefined') ? state.rushMode : 'onigakari';
     const frozen = isCut && ph === 'ANIMATING';
-    if (!frozen) angle += 0.006 + pulse * 0.012;
+    if (!frozen) angle += (0.006 + pulse * 0.012) * K;
 
     const cx = w * 0.52, cy = h * 0.50;
     ctx.clearRect(0, 0, w, h);
@@ -914,15 +849,15 @@ const StageBg = (() => {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('鬼', cx, cy + 8); ctx.restore();
         drawMagicCircle(cx, cy, 122 + pulse * 14, '#fde047', angle * 1.4, 0.26 + pulse * 0.14);
         rays.forEach((r, idx) => {
-          if (!frozen) { r.r += r.spd * (1 + pulse * 0.95); if (r.r > 1.25) { r.r = 0.05; r.a = Math.random() * Math.PI * 2; } }
+          if (!frozen) { r.r += r.spd * (1 + pulse * 0.95) * K; if (r.r > 1.25) { r.r = 0.05; r.a = Math.random() * Math.PI * 2; } }
           const maxD = Math.max(w, h) * 0.80, r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
           ctx.strokeStyle = idx % 2 === 0 ? '#fef08a' : '#f59e0b'; ctx.globalAlpha = Math.min(0.88, r.r * 0.88); ctx.lineWidth = idx % 3 === 0 ? 3.0 : 1.6;
           ctx.beginPath(); ctx.moveTo(cx + Math.cos(r.a) * r1, cy + Math.sin(r.a) * r1); ctx.lineTo(cx + Math.cos(r.a) * r2, cy + Math.sin(r.a) * r2); ctx.stroke();
         });
         ctx.globalAlpha = 1;
         goldShards.forEach(s => {
-          if (!frozen) { s.x += s.vx; s.y += s.vy * (1 + pulse * 0.7); s.rot += s.vrot; if (s.y < -0.08) { s.y = 1.08; s.x = Math.random(); } if (s.x < -0.08) s.x = 1.08; if (s.x > 1.08) s.x = -0.08; }
-          ctx.save(); ctx.translate(s.x * w, s.y * h); ctx.rotate(s.rot); ctx.fillStyle = s.color; ctx.shadowColor = '#facc15'; ctx.shadowBlur = 7;
+          if (!frozen) { s.x += s.vx * K; s.y += s.vy * (1 + pulse * 0.7) * K; s.rot += s.vrot * K; if (s.y < -0.08) { s.y = 1.08; s.x = Math.random(); } if (s.x < -0.08) s.x = 1.08; if (s.x > 1.08) s.x = -0.08; }
+          ctx.save(); ctx.translate(s.x * w, s.y * h); ctx.rotate(s.rot); ctx.fillStyle = s.color; ctx.shadowColor = '#facc15'; ctx.shadowBlur = 0;
           if (s.isKanji) { ctx.globalAlpha = 0.66; ctx.font = `900 ${Math.round(s.sz * 2.2)}px "Shippori Mincho", serif`; ctx.fillText('鬼', -s.sz, s.sz); }
           else { ctx.globalAlpha = 0.86; ctx.fillRect(-s.sz, -s.sz * 0.45, s.sz * 2, s.sz * 0.9); }
           ctx.restore();
@@ -932,7 +867,7 @@ const StageBg = (() => {
         bg.addColorStop(0, `rgba(192, 38, 211, ${0.46 + pulse * 0.30})`); bg.addColorStop(0.48, `rgba(88, 28, 135, ${0.76 + pulse * 0.14})`); bg.addColorStop(1, 'rgba(14, 3, 24, 0.98)');
         ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
         rays.forEach((r, idx) => {
-          if (!frozen) { r.r += r.spd * (1.2 + pulse); if (r.r > 1.2) { r.r = 0.08; r.a = Math.random() * Math.PI * 2; } }
+          if (!frozen) { r.r += r.spd * (1.2 + pulse) * K; if (r.r > 1.2) { r.r = 0.08; r.a = Math.random() * Math.PI * 2; } }
           const maxD = Math.max(w, h) * 0.78, r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
           ctx.strokeStyle = idx % 3 === 0 ? '#f0abfc' : idx % 3 === 1 ? '#e11d48' : '#a855f7'; ctx.globalAlpha = Math.min(0.75, r.r * 0.75); ctx.lineWidth = idx % 2 === 0 ? 2.2 : 1.3;
           ctx.beginPath(); ctx.moveTo(cx + Math.cos(r.a) * r1, cy + Math.sin(r.a) * r1); ctx.lineTo(cx + Math.cos(r.a) * r2, cy + Math.sin(r.a) * r2); ctx.stroke();
@@ -944,15 +879,15 @@ const StageBg = (() => {
         ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
         drawMagicCircle(cx, cy * 0.88, 122 + pulse * 14, '#e879f9', -angle * 1.1, 0.24 + pulse * 0.14);
         rays.forEach((r, idx) => {
-          if (!frozen) { r.r += r.spd * 0.95; if (r.r > 1.25) { r.r = 0.06; r.a = Math.random() * Math.PI * 2; } }
+          if (!frozen) { r.r += r.spd * 0.95 * K; if (r.r > 1.25) { r.r = 0.06; r.a = Math.random() * Math.PI * 2; } }
           const maxD = Math.max(w, h) * 0.82, r1 = r.r * maxD, r2 = (r.r + r.len) * maxD;
           ctx.strokeStyle = idx % 3 === 0 ? '#38bdf8' : idx % 3 === 1 ? '#f0abfc' : '#f472b6'; ctx.globalAlpha = Math.min(0.74, r.r * 0.74); ctx.lineWidth = idx % 3 === 0 ? 2.4 : 1.5;
           ctx.beginPath(); ctx.moveTo(cx + Math.cos(r.a) * r1, cy + Math.sin(r.a) * r1); ctx.lineTo(cx + Math.cos(r.a) * r2, cy + Math.sin(r.a) * r2); ctx.stroke();
         });
         ctx.globalAlpha = 1;
         remShards.forEach(s => {
-          if (!frozen) { s.x += s.vx; s.y += s.vy; s.rot += s.vrot; if (s.y < -0.05) s.y = 1.05; if (s.y > 1.05) s.y = -0.05; if (s.x < -0.05) s.x = 1.05; if (s.x > 1.05) s.x = -0.05; }
-          ctx.save(); ctx.translate(s.x * w, s.y * h); ctx.rotate(s.rot); ctx.fillStyle = s.color; ctx.shadowColor = s.color; ctx.shadowBlur = 7; ctx.globalAlpha = 0.78;
+          if (!frozen) { s.x += s.vx * K; s.y += s.vy * K; s.rot += s.vrot * K; if (s.y < -0.05) s.y = 1.05; if (s.y > 1.05) s.y = -0.05; if (s.x < -0.05) s.x = 1.05; if (s.x > 1.05) s.x = -0.05; }
+          ctx.save(); ctx.translate(s.x * w, s.y * h); ctx.rotate(s.rot); ctx.fillStyle = s.color; ctx.shadowColor = s.color; ctx.shadowBlur = 0; ctx.globalAlpha = 0.78;
           ctx.beginPath(); ctx.moveTo(0, -s.sz); ctx.lineTo(s.sz * 0.65, 0); ctx.lineTo(0, s.sz); ctx.lineTo(-s.sz * 0.65, 0); ctx.closePath(); ctx.fill(); ctx.restore();
         });
       }
@@ -1172,16 +1107,16 @@ const pageShakeTargets = [document.querySelector('header'), document.querySelect
 
 const cabinetShell = document.getElementById('cabinetShell');
 const cabinetRemGlow = document.getElementById('cabinetRemGlow');
-const cabinetRightGlow = document.getElementById('cabinetRightGlow');
 const logoPocketShadow = document.getElementById('logoPocketShadow');
 const yakumonoLogoWrap = document.getElementById('yakumonoLogoWrap');
 const yakumonoLogoImg = document.getElementById('yakumonoLogoImg');
+const yakumonoRail = document.getElementById('yakumonoRail');
+const lcdBox = document.getElementById('lcdBox');
+const railRemEl = document.getElementById('railRem');
 const lcdNiziiroBackLayer = document.getElementById('lcdNiziiroBackLayer');
 const lcdOnigakariOverlay = document.getElementById('lcdOnigakariOverlay');
 
 const lcdFrame = document.getElementById('lcdFrame');
-const ledLeft = document.getElementById('ledLeft');
-const ledRight = document.getElementById('ledRight');
 const slashHost = document.getElementById('slashHost');
 const premiaFrameOverlay = document.getElementById('premiaFrameOverlay');
 const fullscreenOverlay = document.getElementById('fullscreenOverlay');
@@ -1267,71 +1202,140 @@ let remTestOverride = false, brainTestOverride = false, oniTestOverride = false;
 // -------------------------------------------------------------------------
 // 8. ★v7.0 役物落下・色変化・背面niziiro・筐体イルミネーション制御★
 // -------------------------------------------------------------------------
-let yakumonoReturnTimer = null;
+// =========================================================================
+// 8. 役物モジュール（ロゴ＝レール常時表示→液晶中央へ落下／レム＝レール内発光）
+//    発光の強さ上限は index.html の CSS で制御（chance .25 / hit .40 / premium .50）
+// =========================================================================
+const Yakumono = (() => {
+  const REST = 'translateX(-50%) translateY(0px) scale(1)';
+  const IMPACT_MS = 280;                 // 落下開始から着地までの時間
+  const geo = { dy: 200, scale: 2.2 };
+  let dropAnim = null, backAnim = null, dropped = false;
 
-function setYakumonoColor(color = 'white') {
-  if (!yakumonoLogoWrap || !yakumonoLogoImg) return;
-  const src = Assets.getYakumono(color);
-  if (src) yakumonoLogoImg.src = src;
-  yakumonoLogoWrap.classList.remove('yakumono-red', 'yakumono-gold', 'yakumono-rainbow', 'yakumono-off');
-  if (color === 'red') yakumonoLogoWrap.classList.add('yakumono-red');
-  else if (color === 'gold') yakumonoLogoWrap.classList.add('yakumono-gold');
-  else if (color === 'rainbow') yakumonoLogoWrap.classList.add('yakumono-rainbow');
-  else if (color === 'off') yakumonoLogoWrap.classList.add('yakumono-off');
-}
+  const pose = (y, s) => `translateX(-50%) translateY(${y}px) scale(${s})`;
 
-function resetYakumono(color = 'white') {
-  if (yakumonoReturnTimer) { clearTimeout(yakumonoReturnTimer); yakumonoReturnTimer = null; }
-  if (yakumonoLogoWrap) yakumonoLogoWrap.classList.remove('yakumono-dropped');
-  if (logoPocketShadow) logoPocketShadow.classList.remove('pocket-open');
-  setYakumonoColor(color);
-}
-
-async function triggerYakumonoDrop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, token = seqToken } = {}) {
-  if (!yakumonoLogoWrap) return;
-  if (yakumonoReturnTimer) { clearTimeout(yakumonoReturnTimer); yakumonoReturnTimer = null; }
-
-  setYakumonoColor(color);
-  if (logoPocketShadow) logoPocketShadow.classList.add('pocket-open');
-  yakumonoLogoWrap.classList.remove('yakumono-dropped');
-  void yakumonoLogoWrap.offsetWidth;
-  yakumonoLogoWrap.classList.add('yakumono-dropped');
-
-  if (withSound) StudioAudio.playYakumonoDrop(color);
-  if (withNiziiroBack) setLcdNiziiroBack(true);
-
-  if (cabinetShell) {
-    cabinetShell.classList.add('shake-burst');
-    setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520);
+  // レール上のロゴ中心 → 液晶中心 までの距離と、液晶幅の約55%になる拡大率を実測
+  function measure() {
+    if (!yakumonoLogoWrap || !lcdBox || !yakumonoRail) return;
+    const logoCy = yakumonoRail.offsetTop + yakumonoLogoWrap.offsetTop + yakumonoLogoWrap.offsetHeight / 2;
+    const lcdCy = lcdBox.offsetTop + lcdBox.offsetHeight / 2;
+    const imgW = (yakumonoLogoImg && yakumonoLogoImg.offsetWidth) || 108;
+    geo.dy = Math.max(60, lcdCy - logoCy);
+    geo.scale = Math.max(1.0, Math.min(3, (lcdBox.offsetWidth * 0.60) / imgW));
   }
-  try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
+  function dropFrames() {
+    const { dy, scale } = geo;
+    return [
+      { transform: pose(0, 1), offset: 0, easing: 'cubic-bezier(.45,0,.9,.55)' },
+      { transform: pose(dy, scale), offset: 0.40, easing: 'cubic-bezier(.2,.6,.4,1)' },
+      { transform: pose(dy - 26, scale), offset: 0.56, easing: 'cubic-bezier(.5,0,.9,.6)' },
+      { transform: pose(dy, scale), offset: 0.70, easing: 'ease-out' },
+      { transform: pose(dy - 9, scale), offset: 0.82, easing: 'ease-in' },
+      { transform: pose(dy, scale), offset: 1 }
+    ];
+  }
+  function stopAnims() {
+    [dropAnim, backAnim].forEach(a => { if (a) { try { a.cancel(); } catch (e) {} } });
+    dropAnim = backAnim = null;
+  }
+  function setRemGlow(cls = '') { if (cabinetRemGlow) cabinetRemGlow.className = cls; }
 
-  if (color === 'rainbow') {
-    setCabinetGlow('rainbow');
-    FxCanvas.burstRainbow(68);
-    FxCanvas.spawnRing('#fef08a', 320, 9);
-  } else if (color === 'gold') {
-    setCabinetGlow('gold');
-    FxCanvas.burstGold(48);
-    FxCanvas.spawnRing('#facc15', 280, 8);
-  } else if (color === 'red') {
-    setCabinetGlow('red');
-    FxCanvas.burstFlames(40);
-    FxCanvas.spawnRing('#ef4444', 260, 8);
+  function setColor(color = 'white') {
+    if (!yakumonoLogoWrap || !yakumonoLogoImg) return;
+    const src = Assets.getYakumono(color === 'chance' ? 'white' : color);
+    if (src && yakumonoLogoImg.src !== src) yakumonoLogoImg.src = src;
+    yakumonoLogoWrap.classList.remove('yakumono-red', 'yakumono-gold', 'yakumono-rainbow', 'yakumono-off', 'yakumono-chance');
+    if (color === 'red') yakumonoLogoWrap.classList.add('yakumono-red');
+    else if (color === 'gold') yakumonoLogoWrap.classList.add('yakumono-gold');
+    else if (color === 'rainbow') yakumonoLogoWrap.classList.add('yakumono-rainbow');
+    else if (color === 'off') yakumonoLogoWrap.classList.add('yakumono-off');
+    else if (color === 'chance') yakumonoLogoWrap.classList.add('yakumono-chance');
   }
 
-  if (holdMs > 0) {
-    await wait(holdMs, token);
-    resetYakumono(color === 'rainbow' ? 'rainbow' : 'white');
+  // 落下→着地(バウンド)→保持→レールへ滑らかに戻る
+  function release() {
+    if (!yakumonoLogoWrap) return;
+    if (!dropped) { if (logoPocketShadow) logoPocketShadow.classList.remove('pocket-open'); return; }
+    dropped = false;
+    const from = getComputedStyle(yakumonoLogoWrap).transform;       // 現在位置から戻す
+    stopAnims();
+    backAnim = yakumonoLogoWrap.animate(
+      [{ transform: (from && from !== 'none') ? from : pose(geo.dy, geo.scale) }, { transform: REST }],
+      { duration: 480, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+    const me = backAnim;
+    me.onfinish = () => {
+      if (backAnim !== me) return;
+      try { me.cancel(); } catch (e) {}
+      backAnim = null;
+      yakumonoLogoWrap.classList.remove('yakumono-dropped');
+      if (logoPocketShadow) logoPocketShadow.classList.remove('pocket-open');
+    };
   }
-}
+
+  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, token = seqToken } = {}) {
+    if (!yakumonoLogoWrap) return;
+    stopAnims();
+    setColor(color);
+    measure();
+    if (logoPocketShadow) logoPocketShadow.classList.add('pocket-open');
+    yakumonoLogoWrap.classList.add('yakumono-dropped');
+    dropped = true;
+    dropAnim = yakumonoLogoWrap.animate(dropFrames(), { duration: 700, fill: 'forwards' });
+
+    if (withSound) StudioAudio.playYakumonoDrop(color);
+    if (withNiziiroBack) setLcdNiziiroBack(true);
+
+    // 着地の瞬間に 発光・パーティクル・筐体の揺れ
+    setTimeout(() => {
+      if (!dropped) return;
+      if (cabinetShell) { cabinetShell.classList.add('shake-burst'); setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520); }
+      try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
+      if (color === 'rainbow') { setCabinetGlow('rainbow'); FxCanvas.burstRainbow(68); FxCanvas.spawnRing('#fef08a', 320, 9); }
+      else if (color === 'gold') { setCabinetGlow('gold'); FxCanvas.burstGold(48); FxCanvas.spawnRing('#facc15', 280, 8); }
+      else if (color === 'red') { setCabinetGlow('red'); FxCanvas.burstFlames(40); FxCanvas.spawnRing('#ef4444', 260, 8); }
+    }, IMPACT_MS);
+
+    if (holdMs > 0) {
+      await wait(Math.max(holdMs, 760), token);     // 最低でもバウンド完了まで見せる
+      resetYakumono(color === 'rainbow' ? 'rainbow' : 'white');
+    }
+  }
+
+  // 違和感：ロゴとレムが小さく揺れる
+  function shake() {
+    if (!yakumonoLogoWrap || dropped) return Promise.resolve();
+    const j = x => ({ transform: `translateX(calc(-50% + ${x}px)) translateY(0px) scale(1)` });
+    const a = yakumonoLogoWrap.animate([j(0), j(-3), j(3), j(-2), j(2), j(0)], { duration: 380, easing: 'linear' });
+    if (railRemEl) railRemEl.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-6deg)' }, { transform: 'rotate(6deg)' }, { transform: 'rotate(-3deg)' }, { transform: 'rotate(0deg)' }], { duration: 380 });
+    setRemGlow('rem-glow-strobe'); setTimeout(() => setRemGlow(''), 380);
+    return a.finished.then(() => {}, () => {});
+  }
+
+  // 統一入口： 'idle' | 'chance' | 'iwakan' | 'hit' | 'premium' | 'off'
+  function fire(kind, opts = {}) {
+    switch (kind) {
+      case 'idle':    release(); setColor('white'); setCabinetGlow('idle'); return;
+      case 'chance':  setColor('chance'); setRemGlow('rem-glow-slow'); return;
+      case 'iwakan':  return shake();
+      case 'hit':     return drop({ color: 'gold', holdMs: 900, ...opts });
+      case 'premium': return drop({ color: 'rainbow', holdMs: 1100, withNiziiroBack: true, ...opts });
+      case 'off':     setCabinetGlow('off'); return;
+    }
+  }
+  return { measure, setColor, setRemGlow, drop, release, shake, fire, isDropped: () => dropped };
+})();
+
+// 既存の呼び出し名を維持（game.js / effects.js の呼び出しは無変更）
+function setYakumonoColor(color = 'white') { Yakumono.setColor(color); }
+function resetYakumono(color = 'white') { Yakumono.release(); Yakumono.setColor(color); }
+async function triggerYakumonoDrop(opts = {}) { return Yakumono.drop(opts); }
 
 function setLcdNiziiroBack(on) {
   if (!lcdNiziiroBackLayer) return;
   const src = Assets.getVStock('niziiro');
   if (on && src) {
     if (!lcdNiziiroBackLayer.querySelector('img')) {
-      lcdNiziiroBackLayer.innerHTML = `<img src="${src}" class="w-full h-full object-cover fx-niziiro-bg opacity-95" alt=""><div class="absolute inset-0 bg-black/18"></div>`;
+      lcdNiziiroBackLayer.innerHTML = `<img src="${src}" class="w-full h-full object-cover fx-niziiro-bg opacity-75" alt=""><div class="absolute inset-0" style="background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.66) 0%,rgba(0,0,0,.46) 48%,rgba(0,0,0,.12) 100%)"></div>`;
     }
     lcdNiziiroBackLayer.classList.remove('hidden');
   } else {
@@ -1339,34 +1343,18 @@ function setLcdNiziiroBack(on) {
   }
 }
 
+// 発光：液晶の縁（CSS側で上限）＋レール内レムの丸い光のみ。液晶面には被せない
 function setCabinetGlow(mode = 'idle') {
-  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'cabinet-red-glow', 'cabinet-rem-glow', 'cabinet-rainbow-glow');
-  if (cabinetRemGlow) cabinetRemGlow.className = '';
-  if (cabinetRightGlow) cabinetRightGlow.className = '';
-
-  if (mode === 'off') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-blackout');
-    setYakumonoColor('off');
-  } else if (mode === 'red') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-red-glow');
-    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-red');
-    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-red');
-  } else if (mode === 'gold') {
-    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-gold');
-  } else if (mode === 'rem') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
-    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-rem');
-  } else if (mode === 'rem-slow') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
-    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-slow');
-  } else if (mode === 'rem-strobe') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-rem-glow');
-    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-strobe');
-  } else if (mode === 'rainbow') {
-    if (cabinetShell) cabinetShell.classList.add('cabinet-rainbow-glow');
-    if (cabinetRemGlow) cabinetRemGlow.classList.add('rem-glow-rainbow');
-    if (cabinetRightGlow) cabinetRightGlow.classList.add('right-glow-rainbow');
-  }
+  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'cabinet-red-glow', 'cabinet-rem-glow', 'cabinet-rainbow-glow', 'cabinet-gold-glow');
+  Yakumono.setRemGlow('');
+  const add = c => { if (cabinetShell) cabinetShell.classList.add(c); };
+  if (mode === 'off')            { add('cabinet-blackout'); Yakumono.setColor('off'); }
+  else if (mode === 'red')       { add('cabinet-red-glow'); Yakumono.setRemGlow('rem-glow-red'); }
+  else if (mode === 'gold')      { add('cabinet-gold-glow'); }
+  else if (mode === 'rem')       { add('cabinet-rem-glow'); Yakumono.setRemGlow('rem-glow-rem'); }
+  else if (mode === 'rem-slow')  { add('cabinet-rem-glow'); Yakumono.setRemGlow('rem-glow-slow'); }
+  else if (mode === 'rem-strobe'){ add('cabinet-rem-glow'); Yakumono.setRemGlow('rem-glow-strobe'); }
+  else if (mode === 'rainbow')   { add('cabinet-rainbow-glow'); Yakumono.setRemGlow('rem-glow-rainbow'); }
 }
 
 // -------------------------------------------------------------------------
@@ -1578,11 +1566,8 @@ function fireGlobalRainbowFlash() {
   void globalRainbowFlash.offsetWidth;
   setTimeout(() => { globalRainbowFlash.className = 'hidden fixed inset-0 z-[998] pointer-events-none'; }, 750);
 }
-function setLed(style) { [ledLeft, ledRight].forEach(el => { if (el) el.className = 'led-bar' + (style ? ` led-${style}` : ''); }); }
-function setLedSide(l, r) {
-  if (ledLeft) ledLeft.className = 'led-bar' + (l ? ` led-${l}` : '');
-  if (ledRight) ledRight.className = 'led-bar' + (r ? ` led-${r}` : '');
-}
+function setLed() {}          // 旧サイドLED（v7.1で廃止・互換のため空関数）
+function setLedSide() {}
 
 function setReachActor(type = null) {
   if (!reachActorBg || !reachActorImg) return;
@@ -1701,7 +1686,7 @@ function clearGlobalChaosEffects() {
   setPageMegaShake(false);
   setSunburst(false);
   resetYakumono('white');
-  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'shake-burst', 'iwakan-rempuru');
+  if (cabinetShell) cabinetShell.classList.remove('cabinet-blackout', 'rail-dim', 'rail-rem-off', 'shake-burst', 'iwakan-rempuru');
   if (weddingCinemaOverlay) { weddingCinemaOverlay.classList.add('hidden'); weddingCinemaOverlay.innerHTML = ''; }
   lcdFrame.classList.remove('fx-rgb-glitch');
   slashHost.innerHTML = '';
@@ -2306,8 +2291,8 @@ async function playIwakanEffect({ is6000, rushMode, token }) {
   let label = '';
 
   switch (pick) {
-    case 'LED_ONE_OFF': label = 'サイドLED片側消灯'; Math.random() < 0.5 ? setLedSide('off', baseLed) : setLedSide(baseLed, 'off'); await wait(880, token); break;
-    case 'LED_ALL_OFF': label = 'サイドLED全消灯'; setLed('off'); await wait(880, token); break;
+    case 'LED_ONE_OFF': label = '役物レム消灯'; if (cabinetShell) cabinetShell.classList.add('rail-rem-off'); await wait(880, token); if (cabinetShell) cabinetShell.classList.remove('rail-rem-off'); break;
+    case 'LED_ALL_OFF': label = '役物全消灯'; if (cabinetShell) cabinetShell.classList.add('rail-dim'); await wait(880, token); if (cabinetShell) cabinetShell.classList.remove('rail-dim'); break;
     case 'MONO_SCREEN': label = '液晶モノクロ化'; lcdFrame.classList.add('iwakan-mono'); await wait(860, token); lcdFrame.classList.remove('iwakan-mono'); break;
     case 'FADE_REMAIN': label = '残り回数消失'; if (hudRushRemain) hudRushRemain.classList.add('iwakan-fade-remain'); await wait(900, token); if (hudRushRemain) hudRushRemain.classList.remove('iwakan-fade-remain'); break;
     case 'REM_PURU': label = 'レムぷる(筐体微振動)'; if (cabinetShell) cabinetShell.classList.add('iwakan-rempuru'); lcdFrame.classList.add('iwakan-rempuru'); try { if (navigator && navigator.vibrate) navigator.vibrate([30,40,30,40,30]); } catch (e) {} await wait(860, token); if (cabinetShell) cabinetShell.classList.remove('iwakan-rempuru'); lcdFrame.classList.remove('iwakan-rempuru'); break;
