@@ -167,6 +167,30 @@
     #lcdNiziiroBackLayer:not(.hidden) { animation: niziIn 0.9s ease 0.9s both; }
     @keyframes niziIn { from { opacity: 0; } to { opacity: 1; } }
 
+    /* ===== 鬼ラッシュ専用：背景(oni_haikei.jpg) + 図柄を液晶幅に比例して大型化 ===== */
+    #oniRushStage { container-type: size; padding: 18px 2px 0 2px; }
+    #oniHaikeiLayer { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: #120300; }
+    #oniHaikeiImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 50% 50%; animation: oniHaikeiBreath 5.5s ease-in-out infinite; will-change: transform; }
+    #oniHaikeiImg:not([src]) { display: none; }
+    @keyframes oniHaikeiBreath { 0%,100% { transform: scale(1.04); } 50% { transform: scale(1.11); } }
+    #oniHaikeiScrim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 54%, rgba(0,0,0,.40) 0%, rgba(0,0,0,.16) 58%, rgba(0,0,0,0) 100%); }
+    #oniHaikeiTint { position: absolute; inset: 0; background: #2563eb; mix-blend-mode: color; opacity: 0; transition: opacity .14s linear; }
+    #oniHaikeiDark { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0, rgba(0,0,0,0) 12%, rgba(0,0,0,.96) 44%); opacity: 0; transition: opacity .28s ease-out; }
+    #oniRushStage.oni-bg-blue #oniHaikeiTint { opacity: .88; }
+    #oniRushStage.oni-bg-dark #oniHaikeiDark { opacity: 1; }
+    #oniRushStage.oni-bg-dark .oni-digit-slot { opacity: .16; }
+    #oniRushStage.oni-bg-freeze #oniHaikeiImg { animation-play-state: paused; }
+    #oniRushStage .oni-digit-slot { margin: 0 -1.6cqw; transition: transform .12s cubic-bezier(0.16,1,0.3,1), filter .14s ease, opacity .28s ease-out; }
+    #oniRushStage .oni-digit-side { width: 32cqw; height: min(45cqw, 56cqh); }
+    #oniRushStage .oni-digit-mid  { width: 37cqw; height: min(52cqw, 64cqh); transform: translateY(4cqw); }
+    #oniRushStage .oni-digit-img { filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 4px rgba(0,0,0,.95)) drop-shadow(0 8px 14px rgba(0,0,0,.92)) drop-shadow(0 0 14px rgba(250,204,21,.5)); }
+
+    /* ===== 当たり時のV：大きく・叩きつけ・揺れ ===== */
+    .bonus-v-big { max-height: clamp(150px, 27dvh, 270px); max-width: 94%; object-fit: contain; position: relative; z-index: 2;
+      animation: vSlamBig .62s cubic-bezier(.16,1,.3,1) forwards, vBigPulse 1.8s ease-in-out .62s infinite; will-change: transform; }
+    @keyframes vSlamBig { 0% { transform: scale(2.7); opacity: 0; } 35% { transform: scale(.9); opacity: 1; } 58% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes vBigPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+
     /* 初当たり：虹背景は着地と同時に即表示／時間停止中はCSSアニメを止める */
     #lcdNiziiroBackLayer.niziiro-instant:not(.hidden) { animation: niziIn 0.12s ease 0s both; }
     html.time-stop *, html.time-stop *::before, html.time-stop *::after { animation-play-state: paused !important; }
@@ -673,6 +697,7 @@
 
           <!-- RUSH 3モード専用レイヤー -->
           <div id="oniRushStage" class="hidden">
+            <div id="oniHaikeiLayer"><img id="oniHaikeiImg" alt=""><div id="oniHaikeiScrim"></div><div id="oniHaikeiTint"></div><div id="oniHaikeiDark"></div></div>
             <div id="oniRemApproachWrap" class="hidden absolute inset-0 z-[2] flex items-center justify-center pointer-events-none"><img id="oniRemApproachImg" class="max-h-[92%] max-w-[92%] object-contain" alt="鬼レム接近"></div>
             <div class="relative z-[5] flex items-center justify-center gap-0.5 sm:gap-2">
               <div id="oniReel0" class="oni-digit-slot oni-digit-side"></div>
@@ -941,7 +966,7 @@
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=77"></script>
-  <script src="game.js?v=77"></script>
+  <script src="effects.js?v=78"></script>
+  <script src="game.js?v=78"></script>
 </body>
 </html>
