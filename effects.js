@@ -657,6 +657,7 @@ const Assets = (() => {
       remLampUrl = processSingleImage(img, 920);
       const r1 = document.getElementById('remLampImg'), r2 = document.getElementById('oniRemApproachImg');
       if (r1) r1.src = remLampUrl; if (r2) r2.src = remLampUrl;
+      const r3 = document.getElementById('railRemImg'); if (r3) r3.src = remLampUrl;
       if (typeof syncRushStages === 'function') syncRushStages();
     });
     tryLoadList(['botan.jpg', 'botan.png'], (img) => {
