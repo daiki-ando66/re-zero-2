@@ -1,5 +1,5 @@
 // =========================================================================
-// game.js (v7.1) : 筐体デザイン・ロゴ役物落下・固定枠ステータス完全統合版
+// game.js (v8.1) : 筐体デザイン・ロゴ役物落下・固定枠ステータス完全統合版＋テストモード／台データ／ウェディング判定窓
 // =========================================================================
 
 const SPEC = {
@@ -11,6 +11,7 @@ const SPEC = {
 
   ST_TOTAL: 144,
   ST_RESERVE: 4,
+  WEDDING_WINDOW: 10,   // ウェディング判定窓：6000獲得直後に限り5〜10回転目も前倒し抽選して判定（各回転の確率・振分・出玉は不変）
   ST_DENSA: 140,
   ST_PROB: 1 / 99.9,
   HORYUREN_NOTICE_RATE: 0.48,
@@ -36,8 +37,9 @@ function drawRushBonusType() {
 
 function drawReserve4Slots() {
   const slots = [];
+  const clean = TestMode.active && DevForce.cleanReserve;      // テスト専用：残保留を必ずハズレにする
   for (let i = 1; i <= SPEC.ST_RESERVE; i++) {
-    if (Math.random() < SPEC.ST_PROB) {
+    if (!clean && Math.random() < SPEC.ST_PROB) {
       slots.push({ hit: true, hitIndex: i, bonusType: drawRushBonusType(), isReserve: true, remSakibare: false, remPat: 'NORMAL' });
       break;
     } else {
@@ -52,6 +54,19 @@ function drawReserve4() {
     if (Math.random() < SPEC.ST_PROB) return { hit: true, hitIndex: i, bonusType: drawRushBonusType() };
   }
   return { hit: false, hitIndex: 0, bonusType: null };
+}
+
+// ★ウェディング判定窓：残保留4個の「先」（5〜WEDDING_WINDOW回転目）を前倒しで抽選する。
+//   各回転の当選確率(1/99.9)・ボーナス振分は通常のST消化と完全に同じ。抽選のタイミングを前倒ししているだけで、
+//   最初の当選までで打ち切る（当選後はSTが仕切り直されるため）。結果は呼び出し側が通常のST消化キューへそのまま載せる。
+function drawWeddingWindowExt() {
+  const out = [];
+  for (let i = SPEC.ST_RESERVE + 1; i <= SPEC.WEDDING_WINDOW; i++) {
+    const isHit = Math.random() < SPEC.ST_PROB;
+    out.push({ hit: isHit, hitIndex: i, bonusType: isHit ? drawRushBonusType() : null, isReserve: false, remSakibare: false, remPat: 'NORMAL' });
+    if (isHit) break;
+  }
+  return out;
 }
 
 // =========================================================================
@@ -114,6 +129,7 @@ const state = {
 
 const resultModal = document.getElementById('resultModal');
 const settingsModal = document.getElementById('settingsModal');
+const dataModal = document.getElementById('dataModal');
 const normalTitle = document.getElementById('normalTitle');
 const normalSub = document.getElementById('normalSub');
 const reachYokokuBadge = document.getElementById('reachYokokuBadge');
@@ -154,10 +170,7 @@ const LiveSlump = (() => {
 
   function mount() {
     if (document.getElementById('liveSlumpCard')) return;
-    const histBody = document.getElementById('historyTableBody');
-    const histSection = histBody ? (histBody.closest('section') || histBody.closest('div.rounded-2xl') || histBody.closest('div')) : null;
-    const playWrap = document.getElementById('playModeContainer');
-    const hostParent = (histSection && histSection.parentElement) || playWrap;
+    const hostParent = document.getElementById('playModeContainer');   // 差玉グラフはプレイ画面の一番下に常設
     if (!hostParent) return;
 
     const card = document.createElement('div');
@@ -179,8 +192,7 @@ const LiveSlump = (() => {
         <span id="liveSlumpPeak" class="num-fixed">最高: 0 / 最低: 0</span>
       </div>
     `;
-    if (histSection && histSection.parentElement === hostParent) hostParent.insertBefore(card, histSection);
-    else hostParent.appendChild(card);
+    hostParent.appendChild(card);
 
     canvas = document.getElementById('liveSlumpCanvas');
     diffEl = document.getElementById('liveSlumpDiff');
@@ -350,10 +362,6 @@ function flushStatsUI() {
   UiBatch.text('dashBalance', balTxt); UiBatch.tone('dashBalance', tone, BAL_TONES);
   UiBatch.text('rushBalanceDisplay', balTxt); UiBatch.tone('rushBalanceDisplay', tone, BAL_TONES);
 
-  UiBatch.text('statHits', `${state.rushHits} / ${state.firstHits}`);
-  const sbPct = state.sakibareTotal > 0 ? Math.round((state.sakibareWins / state.sakibareTotal) * 100) : '-';
-  UiBatch.text('statSakibare', `${state.sakibareWins}/${state.sakibareTotal} (${sbPct}%)`);
-
   UiBatch.text('rushChainDisplay', `${state.rushChains}連`);
   UiBatch.text('rushDispDisplay', `${state.rushDisp.toLocaleString()}個`);
   UiBatch.text('rushNetDisplay', `${state.rushNet.toLocaleString()}発`);
@@ -363,7 +371,13 @@ function flushStatsUI() {
 let logRenderQueued = false;
 function renderHistoryTable() {
   logRenderQueued = false;
-  document.getElementById('historyTableBody').innerHTML = state.history.map(h => `
+  const body = document.getElementById('historyTableBody');
+  if (!body) return;
+  if (state.history.length === 0) {
+    body.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-amber-200/50">まだ履歴はありません。</td></tr>';
+    return;
+  }
+  body.innerHTML = state.history.map(h => `
     <tr class="hover:bg-amber-950/30">
       <td class="py-1.5 px-1.5 font-bold text-slate-300 whitespace-nowrap num-fixed">${h.spinTxt}</td>
       <td class="py-1.5 px-1.5 whitespace-nowrap"><span class="px-1.5 py-0.5 rounded text-[10px] font-black ${h.tagCls}">${h.tag}</span></td>
@@ -373,9 +387,10 @@ function renderHistoryTable() {
   `).join('');
 }
 function addLog(spinTxt, tag, tagCls, detail, resTxt, resCls) {
+  if (TestMode.active) return;                          // テストモード中は履歴にも残さない
   state.history.unshift({ spinTxt, tag, tagCls, detail, resTxt, resCls });
-  if (state.history.length > 60) state.history.pop();
-  if (!logRenderQueued) {
+  if (state.history.length > 50) state.history.pop();
+  if (DataPanel.isOpen('history') && !logRenderQueued) {   // 台データ「履歴」を開いている時だけ描画（軽量化）
     logRenderQueued = true;
     requestAnimationFrame(renderHistoryTable);
   }
@@ -390,7 +405,8 @@ function drawNormalSpin() {
   state.totalNormalSpins++;
 
   const p = SPEC.NORMAL_PROB;
-  const isHit = Math.random() < p;
+  const forced = (TestMode.active && DevForce.normalHit) ? DevForce.normalHit : null;   // テスト専用：初当たりを強制
+  const isHit = forced ? true : Math.random() < p;
 
   let hesoType = null;
   if (isHit) {
@@ -398,6 +414,7 @@ function drawNormalSpin() {
     if (r < SPEC.H_3000_RUSH) hesoType = '3000_RUSH';
     else if (r < SPEC.RUSH_ENTRY) hesoType = '1500_RUSH';
     else hesoType = '1500_NORM';
+    if (forced) { hesoType = forced === '3000' ? '3000_RUSH' : forced === '1500R' ? '1500_RUSH' : '1500_NORM'; DevForce.normalHit = null; }
   }
 
   let bareType = null;
@@ -769,7 +786,21 @@ function enterOnigakariRush(hitSpin, is3000) {
 async function afterBonusReserveCheck(prevType) {
   const tok = ++seqToken;
   const slots = drawReserve4Slots();
-  const hitSlot = slots.find(s => s.hit) || null;
+  let hitSlot = slots.find(s => s.hit) || null;
+
+  // ★ウェディング判定窓：6000獲得直後だけ、残保留4個の先（5〜WEDDING_WINDOW回転目）も前倒しで抽選して判定する。
+  //   ・6000が当たっていればウェディング（払出は通常の6000と同じ1回分）
+  //   ・6000以外の当選は、そのまま通常のST消化キュー(extSlots)に載せて5回転目以降に消化＝内部確率・出玉は不変
+  let extSlots = [];
+  if (prevType === 'BONUS_6000' && !hitSlot) {
+    extSlots = drawWeddingWindowExt();
+    const extHit = extSlots.find(s => s.hit);
+    if (extHit && extHit.bonusType === 'BONUS_6000') { hitSlot = extHit; extSlots = []; }
+  }
+  if (TestMode.active && DevForce.wedding && prevType === 'BONUS_6000') {   // テスト専用：ウェディング強制
+    DevForce.wedding = false; extSlots = [];
+    hitSlot = { hit: true, hitIndex: 1, bonusType: 'BONUS_6000', isReserve: true, remSakibare: false, remPat: 'NORMAL' };
+  }
   updateRes4Dots(SPEC.ST_RESERVE);
   state.hasVStock = false; state.hasVStockRed = false; state.remSakibareActive = false; state.stLookaheadQueue = [];
   setVStockBadge(false);
@@ -833,6 +864,7 @@ async function afterBonusReserveCheck(prevType) {
     }
 
     state.reserveQueue = slots; updateRes4Dots(SPEC.ST_RESERVE);
+    state.stLookaheadQueue = extSlots;      // 判定窓で前倒し抽選した5回転目以降（6000以外の当選を含む）をそのまま消化
     state.stRemaining = SPEC.ST_TOTAL; state.phase = 'RUSH';
     clearVisualEffects(); setActiveScene('rush-idle'); applyRushModeVisuals(); setControlMode('RUSH'); updateStatsUI();
   } catch (e) {}
@@ -878,6 +910,12 @@ function spinRushOnce() {
     fillStLookaheadQueue();
     slot = state.stLookaheadQueue.shift();
     if (state.stRemaining > 0) fillStLookaheadQueue();
+  }
+
+  if (TestMode.active && DevForce.nextRushHit) {            // テスト専用：次の当選を強制（隠しコマンド用）
+    slot = { hit: true, bonusType: DevForce.nextRushHit, isReserve: false, remSakibare: false, remPat: 'NORMAL' };
+    DevForce.nextRushHit = null; state.reserveQueue = []; state.stLookaheadQueue = [];
+    if (state.hasVStock) { state.hasVStock = false; state.hasVStockRed = false; setVStockBadge(false); }
   }
 
   if (state.rushMode === 'rem' && state.remSakibareActive && !slot.hit) {
@@ -1241,7 +1279,7 @@ function stopHandleHold(lockUntilRelease = false) {
   }
 }
 function stepHandleSpin(isContinuous) {
-  if (!resultModal.classList.contains('hidden') || !settingsModal.classList.contains('hidden')) { stopHandleHold(true); return; }
+  if (!resultModal.classList.contains('hidden') || !settingsModal.classList.contains('hidden') || !dataModal.classList.contains('hidden')) { stopHandleHold(true); return; }
   if (state.phase === 'NORMAL') {
     stopAuto();
     const res = drawNormalSpin();
@@ -1309,37 +1347,171 @@ window.addEventListener('keyup', (e) => { if (e.code === 'Space') endHandlePress
 window.addEventListener('blur', endHandlePress);
 
 // =========================================================================
-// 「🎬 テスト ▾」＆設定モーダル
+// 🧪 テストモード（記録されない別枠）＆設定モーダル
+//   ・通常時（待機中）にだけ入れる。入った瞬間の遊技データをスナップショット保存し、終了時に完全復元する
+//   ・テスト中の出玉・履歴・差玉グラフ・ランキング記録は一切残さない（records.js 側も TestMode.active を見て書き込みを拒否）
+//   ・無限ST／強制当選などの開発用機能は、テストモード中だけ有効
 // =========================================================================
 const promoTestMenu = document.getElementById('promoTestMenu');
-document.getElementById('btnTestPromo').addEventListener('click', () => promoTestMenu.classList.toggle('hidden'));
-document.getElementById('btnClosePromoMenu').addEventListener('click', () => promoTestMenu.classList.add('hidden'));
+
+const DevForce = { nextRushHit: null, wedding: false, cleanReserve: false, normalHit: null };
+function resetDevForce() { DevForce.nextRushHit = null; DevForce.wedding = false; DevForce.cleanReserve = false; DevForce.normalHit = null; }
+
+const TEST_DATA_KEYS = [
+  'phase', 'activeScene', 'currentSpin', 'totalNormalSpins', 'firstHits', 'rushHits', 'sakibareTotal', 'sakibareWins',
+  'totalInvestYen', 'balls', 'unspentFrac', 'pendingReach', 'pendingRushHit', 'pendingResultRevival', 'hasVStock', 'hasVStockRed',
+  'reserveQueue', 'stLookaheadQueue', 'remSakibareActive', 'stRemaining', 'rushChains', 'rushDisp', 'rushNet', 'rush6000Count',
+  'rushWeddingCount', 'rushHoryurenCount', 'rushRestartCount', 'rushIwakanNotes', 'rushStartSpin', 'sessionGraphPoints',
+  'sessionMaxChains', 'sessionMaxOneShot', '_spinsSinceGraphSample', 'history'
+];
+
+function showToast(msg, ms = 2300) {
+  let el = document.getElementById('appToast');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'appToast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:16%;transform:translateX(-50%);z-index:1100;padding:8px 14px;border-radius:999px;'
+      + 'font-size:11px;font-weight:900;background:rgba(0,0,0,.92);border:1px solid rgba(251,191,36,.8);color:#fef3c7;'
+      + 'box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:none;opacity:0;transition:opacity .3s;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg; el.style.opacity = '1';
+  clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, ms);
+}
+
+// 通常時の画面へ強制的に戻す（テストモード専用の内部処理。実戦データには触れない）
+function devReturnToNormal() {
+  seqToken++; stopAuto(); stopHandleHold(false); resetDevForce();
+  hideFullscreenOverlay(); resultModal.classList.add('hidden');
+  state.phase = 'NORMAL'; state.pendingReach = null; state.pendingRushHit = null; state.pendingResultRevival = false;
+  state.reserveQueue = []; state.stLookaheadQueue = []; state.remSakibareActive = false; state.hasVStock = false; state.hasVStockRed = false; state.stRemaining = 0;
+  clearVisualEffects(); FxCanvas.clearAll(); FxCanvas.setAmbient('ember'); updateReserveSlots('NORMAL');
+  if (rushMetaHud) rushMetaHud.classList.add('hidden');
+  if (rushModeBar) rushModeBar.classList.add('hidden');
+  if (rushStatusBar) rushStatusBar.classList.add('hidden');
+  if (rushTopBadge) rushTopBadge.classList.add('hidden');
+  pushButtonArea.classList.add('hidden');
+  setVStockBadge(false); setActiveScene('normal'); setReels(7, 3, 7);
+  normalTitle.textContent = 'STANDBY'; normalTitle.className = 'text-lg sm:text-2xl font-black text-white';
+  normalSub.textContent = '長押しハンドル・オートで開始！';
+  setControlMode('NORMAL'); BgmEngine.resume('normal'); updateStatsUI();
+}
+
+const TestMode = (() => {
+  let active = false, snapJson = null;
+
+  function paint() {
+    document.documentElement.classList.toggle('is-test-mode', active);
+    const pill = document.getElementById('testPill'); if (pill) pill.classList.toggle('hidden', !active);
+    const btn = document.getElementById('btnToggleTestMode');
+    if (btn) {
+      btn.textContent = active ? '🧪 テストモードを終了して元に戻す' : '🧪 テストモードに入る';
+      btn.className = active
+        ? 'w-full py-2.5 rounded-xl text-[11px] font-black bg-emerald-600 border border-emerald-200 text-white shadow active:scale-95 transition'
+        : 'w-full py-2.5 rounded-xl text-[11px] font-black bg-slate-900 border border-emerald-500/70 text-emerald-300 active:scale-95 transition';
+    }
+    const st = document.getElementById('testModeState');
+    if (st) st.textContent = active ? '🟢 テスト中：出玉・履歴・ランキングには一切記録されません' : '⚪ 通常：実戦データを記録しています';
+    const tools = document.getElementById('btnOpenTestTools'); if (tools) tools.classList.toggle('hidden', !active);
+    const inf = document.getElementById('btnDevInfRush');
+    if (inf) {
+      inf.textContent = `♾️ 無限ST: ${infiniteRushMode ? 'ON' : 'OFF'}`;
+      inf.className = infiniteRushMode
+        ? 'py-2 px-2 rounded-xl font-black bg-emerald-600 border border-yellow-200 text-white shadow active:scale-95 transition'
+        : 'py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition';
+    }
+  }
+
+  function enter() {
+    if (active) return true;
+    if (state.phase !== 'NORMAL' || !resultModal.classList.contains('hidden')) { showToast('通常時（待機中）にだけ切り替えできます'); return false; }
+    stopAuto(); stopHandleHold(false);
+    const snap = {}; TEST_DATA_KEYS.forEach(k => { snap[k] = state[k]; });
+    snapJson = JSON.stringify(snap);
+    active = true; infiniteRushMode = false; resetDevForce(); paint();
+    return true;
+  }
+
+  function exit() {
+    if (!active) return;
+    devReturnToNormal();                                   // 進行中の演出を止めて通常画面へ
+    try { Object.assign(state, JSON.parse(snapJson)); } catch (e) { console.error('test snapshot restore failed', e); }
+    active = false; snapJson = null; infiniteRushMode = false; resetDevForce();
+    promoTestMenu.classList.add('hidden');
+    paint();
+    state.phase = 'NORMAL'; setActiveScene('normal'); setControlMode('NORMAL');
+    updateStatsUI(); LiveSlump.draw(); DataPanel.refresh();
+  }
+
+  paint();
+  return { get active() { return active; }, enter, exit, paint };
+})();
+
 document.getElementById('btnOpenSettings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btnCloseSettings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
+document.getElementById('btnClosePromoMenu').addEventListener('click', () => promoTestMenu.classList.add('hidden'));
+document.getElementById('testPill').addEventListener('click', () => promoTestMenu.classList.toggle('hidden'));
+document.getElementById('btnOpenTestTools').addEventListener('click', () => { settingsModal.classList.add('hidden'); promoTestMenu.classList.remove('hidden'); });
+document.getElementById('btnToggleTestMode').addEventListener('click', () => {
+  if (TestMode.active) { TestMode.exit(); showToast('テストモードを終了しました（元の状態に戻りました）'); return; }
+  if (TestMode.enter()) { settingsModal.classList.add('hidden'); promoTestMenu.classList.remove('hidden'); showToast('🧪 テストモード開始：記録されません'); }
+});
+document.getElementById('btnDevExitTest').addEventListener('click', () => { TestMode.exit(); showToast('テストモードを終了しました（元の状態に戻りました）'); });
 
+function devGuard() { if (!TestMode.active) { showToast('テストモード中のみ使えます'); return false; } return true; }
+
+document.getElementById('btnDevToNormal').addEventListener('click', () => {
+  if (!devGuard()) return;
+  promoTestMenu.classList.add('hidden'); devReturnToNormal(); showToast('通常時へ移行しました');
+});
+function devForceInitialHit(kind) {
+  if (!devGuard()) return;
+  promoTestMenu.classList.add('hidden'); devReturnToNormal();
+  DevForce.normalHit = kind;
+  stepHandleSpin(false);                                   // 強制された初当たりを通常の流れで再生
+  handleLocked = false; handleActive = false;              // ボタン操作なのでハンドルの長押しロックは残さない
+}
+document.getElementById('btnDevHit1500R').addEventListener('click', () => devForceInitialHit('1500R'));
+document.getElementById('btnDevHit1500N').addEventListener('click', () => devForceInitialHit('1500N'));
+document.getElementById('btnDevHit3000').addEventListener('click', () => devForceInitialHit('3000'));
 document.getElementById('btnDevInstantRush').addEventListener('click', () => {
-  promoTestMenu.classList.add('hidden');
-  stopAuto(); seqToken++; hideFullscreenOverlay(); resultModal.classList.add('hidden');
-  document.getElementById('tabPlay').click();
+  if (!devGuard()) return;
+  promoTestMenu.classList.add('hidden'); devReturnToNormal();
   enterOnigakariRush(state.currentSpin || 1, false);
 });
-document.getElementById('btnDevInfRush').addEventListener('click', (e) => {
+document.getElementById('btnDevInfRush').addEventListener('click', () => {
+  if (!devGuard()) return;
   infiniteRushMode = !infiniteRushMode;
-  e.target.textContent = `♾️ 無限ST: ${infiniteRushMode ? 'ON' : 'OFF'}`;
-  e.target.className = infiniteRushMode
-    ? 'py-2 px-2 rounded-xl font-black bg-emerald-600 border border-yellow-200 text-white shadow active:scale-95 transition'
-    : 'py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition';
+  TestMode.paint();
   if (infiniteRushMode && state.phase === 'RUSH') { state.stRemaining = SPEC.ST_TOTAL; updateStatsUI(); }
 });
+
+// ★隠しコマンド用：RUSH突入→実際に6,000を獲得→（その直後に）ウェディング演出へ入るまでの本番どおりの流れを自動再生
+//   テストモードへ自動で入り（記録されない）、終了は画面上部の「TEST」から。メニューには一切表示しない。
+async function runRealFlowTest() {
+  if (!TestMode.active && !TestMode.enter()) return;
+  settingsModal.classList.add('hidden'); promoTestMenu.classList.add('hidden');
+  devReturnToNormal();
+  DevForce.cleanReserve = true; DevForce.nextRushHit = 'BONUS_6000'; DevForce.wedding = true;
+  showToast('🧪 TEST', 1400);
+  enterOnigakariRush(1, false);
+  const t0 = Date.now();
+  while (state.phase !== 'RUSH' && Date.now() - t0 < 4000) await new Promise(r => setTimeout(r, 60));
+  if (state.phase !== 'RUSH') return;
+  await new Promise(r => setTimeout(r, 900));              // RUSH突入直後の「いつもの間」
+  if (state.phase !== 'RUSH') return;
+  handleRushEvent(spinRushOnce(), { fromAuto: false });    // 以降は本番と同じ：6,000獲得演出 → 加算 → ST開始 → 0.85秒後に暗転ウェディング
+  handleLocked = false; handleActive = false;
+}
 
 let randomCrashIdx = 0, brainTestLvIdx = 0, vTestCycleIdx = 0, yakumonoTestIdx = 0;
 
 document.querySelectorAll('.promo-test-item').forEach(btn => {
   btn.addEventListener('click', async () => {
+    if (!devGuard()) return;
     if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
     promoTestMenu.classList.add('hidden');
-    stopAuto(); document.getElementById('tabPlay').click();
+    stopAuto();
 
     const kind = btn.dataset.test;
     const prevPhase = state.phase, prevScene = state.activeScene, prevRMode = state.rushMode;
@@ -1507,7 +1679,7 @@ document.getElementById('btnResetPlay').addEventListener('click', () => {
   updateReserveSlots('NORMAL'); setActiveScene('normal'); setReels(7, 3, 7);
   normalTitle.textContent = 'STANDBY'; normalTitle.className = 'text-lg sm:text-2xl font-black text-white';
   normalSub.textContent = 'データをリセットしました。';
-  document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="4" class="py-4 text-center text-amber-200/50">まだ履歴はありません。</td></tr>';
+  renderHistoryTable(); DataPanel.refresh();
   setControlMode('NORMAL'); BgmEngine.resume('normal'); updateStatsUI(); LiveSlump.draw();
 });
 
@@ -1727,21 +1899,71 @@ document.getElementById('btnMute').addEventListener('click', e => {
   e.target.textContent = m ? '🔇 全音 OFF' : '🔊 全音 ON';
   e.target.className = m ? 'py-1.5 rounded-lg text-[10px] font-black bg-slate-900 text-rose-400 border border-slate-700 active:scale-95' : 'py-1.5 rounded-lg text-[10px] font-black bg-slate-800 text-emerald-300 border border-slate-600 active:scale-95';
 });
-document.getElementById('tabPlay').addEventListener('click', () => {
-  document.getElementById('playModeContainer').classList.remove('hidden');
-  document.getElementById('sim100Container').classList.add('hidden');
-  document.getElementById('tabPlay').className = 'flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white shadow border border-yellow-200/60';
-  document.getElementById('tabSim100').className = 'flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-[#1e0d08]/90 text-amber-200/70 hover:text-amber-100 border border-amber-900/60';
-  setTimeout(() => { FxCanvas.resize(); StageBg.resize(); LiveSlump.draw(); }, 30);
-});
-document.getElementById('tabSim100').addEventListener('click', () => {
-  stopAuto();
-  document.getElementById('playModeContainer').classList.add('hidden');
-  document.getElementById('sim100Container').classList.remove('hidden');
-  document.getElementById('tabSim100').className = 'flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-amber-600 via-rose-600 to-red-800 text-white shadow border border-yellow-200/60';
-  document.getElementById('tabPlay').className = 'flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-[#1e0d08]/90 text-amber-200/70 hover:text-amber-100 border border-amber-900/60';
-  if (lastSimPoints.length === 0) runSim100(); else setTimeout(() => drawSlumpChart(lastSimPoints), 30);
-});
+// ---- 📊 台データ（データ／履歴／100回シミュ）。開いている間だけ描画する軽量実装 ----
+const DataPanel = (() => {
+  let tab = 'stats', opened = false, timer = null;
+  const $ = (id) => document.getElementById(id);
+  const num = (n) => Math.round(n).toLocaleString();
+  const signed = (n) => `${n >= 0 ? '+' : ''}${num(n)}`;
+
+  function paintTabs() {
+    document.querySelectorAll('.data-tab').forEach(b => {
+      const on = b.dataset.dtab === tab;
+      b.className = 'data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap '
+        + (on ? 'bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white border-yellow-200/60 shadow'
+              : 'bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60');
+    });
+    document.querySelectorAll('.data-pane').forEach(p => p.classList.toggle('hidden', p.id !== `dataPane-${tab}`));
+  }
+
+  function renderStats() {
+    const s = state;
+    const set = (id, v, cls) => { const el = $(id); if (!el) return; el.textContent = v; if (cls) el.className = cls; };
+    const hitProb = s.firstHits > 0 ? `1/${(s.totalNormalSpins / s.firstHits).toFixed(1)}` : '-';
+    const rushRate = s.firstHits > 0 ? `${Math.round((s.rushHits / s.firstHits) * 100)}%` : '-';
+    const sb = s.sakibareTotal > 0 ? `${s.sakibareWins}/${s.sakibareTotal} (${Math.round((s.sakibareWins / s.sakibareTotal) * 100)}%)` : '0/0 (-)';
+    const diff = Math.round(s.balls - (s.totalInvestYen / 500) * 125);
+    const bal = Math.round(s.balls * exchangeRate) - s.totalInvestYen;
+    set('dtSpins', num(s.totalNormalSpins));
+    set('dtHits', `${s.firstHits}回 (${hitProb})`);
+    set('dtRush', `${s.rushHits}回 (${rushRate})`);
+    set('dtSakibare', sb);
+    set('dtMaxChain', `${s.sessionMaxChains}連`);
+    set('dtMaxShot', `${num(s.sessionMaxOneShot)}個`);
+    set('dtInvest', `${num(s.totalInvestYen)}円`);
+    set('dtDiff', `${signed(diff)}発`, `text-sm font-black num-fixed ${diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-rose-400' : 'text-white'}`);
+    set('dtBalance', `${signed(bal)}円`, `text-sm font-black num-fixed ${bal > 0 ? 'text-emerald-400' : bal < 0 ? 'text-rose-400' : 'text-white'}`);
+  }
+
+  function refresh() {
+    if (!opened) return;
+    if (tab === 'stats') renderStats();
+    else if (tab === 'history') renderHistoryTable();
+  }
+
+  function setTab(t) {
+    tab = t; paintTabs();
+    clearInterval(timer); timer = null;
+    if (t === 'stats') { renderStats(); timer = setInterval(renderStats, 1000); }
+    else if (t === 'history') renderHistoryTable();
+    else if (t === 'sim') { if (lastSimPoints.length === 0) runSim100(); else setTimeout(() => drawSlumpChart(lastSimPoints), 30); }
+  }
+  function open(t) {
+    opened = true; stopAuto(); stopHandleHold(false);
+    dataModal.classList.remove('hidden');
+    setTab(t || tab);
+  }
+  function close() {
+    opened = false; dataModal.classList.add('hidden');
+    clearInterval(timer); timer = null;
+  }
+  return { open, close, setTab, refresh, isOpen: (t) => opened && (!t || tab === t) };
+})();
+
+document.getElementById('btnOpenData').addEventListener('click', () => DataPanel.open());
+document.getElementById('btnCloseData').addEventListener('click', () => DataPanel.close());
+dataModal.addEventListener('click', (e) => { if (e.target === dataModal) DataPanel.close(); });
+document.querySelectorAll('.data-tab').forEach(b => b.addEventListener('click', () => DataPanel.setTab(b.dataset.dtab)));
 document.getElementById('btnRunSim100').addEventListener('click', runSim100);
 
 function syncRotRate(v) {
@@ -1764,7 +1986,7 @@ function syncExchangeRate(rate) {
 document.querySelectorAll('.rate-btn, .sim-rate-btn').forEach(btn => btn.addEventListener('click', () => syncExchangeRate(btn.dataset.rate)));
 window.addEventListener('resize', () => {
   LiveSlump.draw();
-  if (lastSimPoints.length > 0 && !document.getElementById('sim100Container').classList.contains('hidden')) drawSlumpChart(lastSimPoints);
+  if (lastSimPoints.length > 0 && DataPanel.isOpen('sim')) drawSlumpChart(lastSimPoints);
 });
 
 // =========================================================================
@@ -2028,26 +2250,38 @@ window.addEventListener('resize', () => {
   };
 })();
 
-// ★開発者用隠しコマンド：左上の「鬼2」アイコンを5回連打でウェディング12,000テスト再生★
-(function initSecretWeddingTest() {
+// ★開発者用隠しコマンド（メニュー・画面には一切表示しない）★
+//   左上の「鬼2」アイコンを素早く連打：  5回＝ウェディング演出のみ  ／  9回以上＝RUSH→6,000獲得→ウェディングまでの実フロー（テストモード自動）
+(function initSecretCommands() {
   const icon = document.querySelector('header .w-7.h-7');
   if (!icon) return;
-  let taps = 0, tapTimer = null, running = false;
+  let taps = 0, idleTimer = null, running = false;
   icon.style.cursor = 'pointer';
-  icon.addEventListener('click', async () => {
-    if (running || state.phase === 'ANIMATING' || state.phase === 'REACH') return;
-    taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => { taps = 0; }, 1200);
-    if (taps < 5) return;
-    taps = 0; running = true;
-    stopAuto(); stopHandleHold(true);
+
+  async function weddingCinemaOnly() {
+    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
+    stopAuto(); stopHandleHold(false);
     const prevPhase = state.phase, prevScene = state.activeScene;
     const tok = ++seqToken; state.phase = 'ANIMATING'; setControlMode('BUSY');
     try { await playWedding12000Cinema(tok); } catch (e) {}
     finally {
-      running = false; state.phase = prevPhase; clearVisualEffects(); setActiveScene(prevScene);
+      state.phase = prevPhase; clearVisualEffects(); setActiveScene(prevScene);
       if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
       else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
     }
+  }
+
+  icon.addEventListener('click', () => {
+    taps++; clearTimeout(idleTimer);
+    idleTimer = setTimeout(async () => {
+      const n = taps; taps = 0;
+      if (running) return;
+      running = true;
+      try {
+        if (n === 5) await weddingCinemaOnly();
+        else if (n >= 9) await runRealFlowTest();
+      } finally { running = false; }
+    }, 520);
   });
 })();
 
