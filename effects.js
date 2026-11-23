@@ -659,7 +659,7 @@ const Assets = (() => {
     tryLoadList(['1500.jpg', '1500.png'], (_img, src) => { vstock.bg1500 = src; });
     tryLoadList(['300.jpg', '300.png'], (_img, src) => { vstock.bg300 = src; });
     tryLoadList(['restart.jpg', 'restart.png'], (_img, src) => { vstock.restart = src; });
-    tryLoadList(['niziiro.jpg', 'niziiro.png'], (_img, src) => { vstock.niziiro = src; });
+    tryLoadList(['niziiro.jpg', 'niziiro.png'], (_img, src) => { vstock.niziiro = src; try { if (_img && _img.decode) _img.decode().catch(() => {}); } catch (e) {} });
     tryLoadList(['oni_haikei.jpg', 'oni_haikei.png'], (_img, src) => { vstock.oniHaikei = src; const el = document.getElementById('oniHaikeiImg'); if (el) el.src = src; });
   }
 
@@ -1300,12 +1300,22 @@ const Yakumono = (() => {
     ], { duration: 440 });
   }
   // 時間停止：ロゴ・CSSアニメ・背景/パーティクルのCanvasを一瞬止める（着地の余韻）
+  // ※ 全要素に効く `html.time-stop *` のクラス切替は、ページ全体のスタイル再計算を2回起こして着地で引っかかるため、
+  //   動いているCSSアニメだけを Web Animations API で一時停止／再開する（対応していない環境のみ従来のクラス方式）
   function holdTime(ms) {
     window.__timeStopUntil = performance.now() + ms;
-    document.documentElement.classList.add('time-stop');
     const a = dropAnim; if (a) { try { a.pause(); } catch (e) {} }
+    let paused = null;
+    try {
+      if (typeof CSSAnimation !== 'undefined' && document.getAnimations) {
+        paused = document.getAnimations().filter(x => x instanceof CSSAnimation && x.playState === 'running');
+        paused.forEach(x => { try { x.pause(); } catch (e) {} });
+      }
+    } catch (e) { paused = null; }
+    if (!paused) document.documentElement.classList.add('time-stop');
     setTimeout(() => {
-      document.documentElement.classList.remove('time-stop');
+      if (paused) paused.forEach(x => { try { if (x.playState === 'paused') x.play(); } catch (e) {} });
+      else document.documentElement.classList.remove('time-stop');
       if (a && dropAnim === a) { try { a.play(); } catch (e) {} }
     }, ms);
   }
@@ -1329,6 +1339,7 @@ const Yakumono = (() => {
 
   // 落下→着地(バウンド)→保持→レールへ滑らかに戻る
   function release() {
+    if (lcdNiziiroBackLayer && lcdNiziiroBackLayer.classList.contains('niziiro-armed')) { try { setLcdNiziiroBack(false); } catch (e) {} }
     if (!yakumonoLogoWrap) return;
     if (!dropped) { if (logoPocketShadow) logoPocketShadow.classList.remove('pocket-open'); return; }
     dropped = false;
@@ -1347,9 +1358,10 @@ const Yakumono = (() => {
     };
   }
 
-  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, landOffset = 0, scaleMul = 1, onImpact = null, timeStop = 0, token = seqToken } = {}) {
+  async function drop({ color = 'rainbow', holdMs = 1150, withNiziiroBack = false, withSound = true, landOffset = 0, scaleMul = 1, onImpact = null, timeStop = 0, skipBurst = false, token = seqToken } = {}) {
     if (!yakumonoLogoWrap) return;
     stopAnims();
+    if (withNiziiroBack) armNiziiroBack();
     setColor(color);
     measure();
     if (logoPocketShadow) logoPocketShadow.classList.add('pocket-open');
@@ -1368,9 +1380,9 @@ const Yakumono = (() => {
       impactFx(color);
       if (cabinetShell) { cabinetShell.classList.add('shake-burst'); setTimeout(() => cabinetShell.classList.remove('shake-burst'), 520); }
       try { if (navigator && navigator.vibrate) navigator.vibrate(color === 'rainbow' ? [65, 30, 95] : [50, 25, 50]); } catch (e) {}
-      if (color === 'rainbow') { setCabinetGlow('rainbow'); FxCanvas.burstRainbow(68); FxCanvas.spawnRing('#fef08a', 320, 9); }
-      else if (color === 'gold') { setCabinetGlow('gold'); FxCanvas.burstGold(48); FxCanvas.spawnRing('#facc15', 280, 8); }
-      else if (color === 'red') { setCabinetGlow('red'); FxCanvas.burstFlames(40); FxCanvas.spawnRing('#ef4444', 260, 8); }
+      if (color === 'rainbow') { setCabinetGlow('rainbow'); if (!skipBurst) { FxCanvas.burstRainbow(68); FxCanvas.spawnRing('#fef08a', 320, 9); } }
+      else if (color === 'gold') { setCabinetGlow('gold'); if (!skipBurst) { FxCanvas.burstGold(48); FxCanvas.spawnRing('#facc15', 280, 8); } }
+      else if (color === 'red') { setCabinetGlow('red'); if (!skipBurst) { FxCanvas.burstFlames(40); FxCanvas.spawnRing('#ef4444', 260, 8); } }
     }, IMPACT_MS);
 
     if (holdMs > 0) {
@@ -1420,8 +1432,22 @@ function setYakumonoColor(color = 'white') { Yakumono.setColor(color); }
 function resetYakumono(color = 'white') { Yakumono.release(); Yakumono.setColor(color); }
 async function triggerYakumonoDrop(opts = {}) { return Yakumono.drop(opts); }
 
+// 落下の前に虹背景を「見えない状態」で描画・デコードしておき、着地の瞬間は不透明度を上げるだけにする（着地フレームの重さ対策）
+function armNiziiroBack() {
+  if (!lcdNiziiroBackLayer) return;
+  const src = Assets.getVStock('niziiro'); if (!src) return;
+  if (!lcdNiziiroBackLayer.querySelector('img')) {
+    lcdNiziiroBackLayer.innerHTML = `<img src="${src}" class="w-full h-full object-cover fx-niziiro-bg opacity-75" alt=""><div class="absolute inset-0" style="background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.66) 0%,rgba(0,0,0,.46) 48%,rgba(0,0,0,.12) 100%)"></div>`;
+  }
+  lcdNiziiroBackLayer.classList.add('niziiro-armed');
+  lcdNiziiroBackLayer.classList.remove('hidden');
+  const im = lcdNiziiroBackLayer.querySelector('img');
+  try { if (im && im.decode) im.decode().catch(() => {}); } catch (e) {}
+}
+
 function setLcdNiziiroBack(on, { instant = false } = {}) {
   if (!lcdNiziiroBackLayer) return;
+  lcdNiziiroBackLayer.classList.remove('niziiro-armed');
   lcdNiziiroBackLayer.classList.toggle('niziiro-instant', !!(on && instant));
   const src = Assets.getVStock('niziiro');
   if (on && src) {
@@ -1498,7 +1524,7 @@ function setOniReels(a, b, c, { spinning = false, hitLock = false, tenpaiSide = 
     renderDigitIntoEl(el, v, 'oni-digit-img', fb);
     const isSpin = spinning || (midSpin && i === 1);
     const isSideLock = tenpaiSide && (i === 0 || i === 2);
-    el.className = `oni-digit-slot ${sizeCls}${isSpin ? ' oni-reel-spin' : ''}${hitLock ? ' oni-digit-hit-lock' : ''}${isSideLock ? ' oni-digit-tenpai-side' : ''}`;
+    el.className = `oni-digit-slot ${sizeCls}${isSpin ? ' oni-reel-spin' : ''}${hitLock ? ' oni-digit-hit-lock' : ''}${isSideLock ? ' oni-digit-tenpai-side' : ''}${v === 0 ? ' oni-digit-zero' : ''}`;
   });
 }
 function randomOniMissReels(spinning = false) {
@@ -2018,11 +2044,19 @@ function triggerLamp(type, label) {
 }
 
 function fireRainbowBurst(lampLabel = '大当り!!', { withBackNiziiro = true } = {}) {
+  // 着地フレームには「フラッシュ＋虹背景」だけを置き、残りは次フレーム以降に分散（同時処理による引っかかり対策）
   fireGlobalRainbowFlash();
   if (withBackNiziiro) setLcdNiziiroBack(true, { instant: true });
-  setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true);
-  triggerLamp('rainbow', lampLabel); lcdFrame.classList.add('fx-rainbow', 'shake-burst'); setLed('rainbow');
-  FxCanvas.spawnRing('#fef08a', 320, 9); FxCanvas.spawnRing('#7dd3fc', 250, 7); FxCanvas.burstRainbow(72);
+  lcdFrame.classList.add('shake-burst');
+  requestAnimationFrame(() => {
+    setAmbientBg('rainbow'); setPremiaFrame(true); setLed('rainbow');
+    FxCanvas.spawnRing('#fef08a', 320, 9);
+    requestAnimationFrame(() => {
+      setSunburst(true); lcdFrame.classList.add('fx-rainbow');
+      triggerLamp('rainbow', lampLabel);
+      FxCanvas.spawnRing('#7dd3fc', 250, 7); FxCanvas.burstRainbow(72);
+    });
+  });
   setTimeout(() => lcdFrame.classList.remove('shake-burst'), 720);
 }
 
@@ -2507,10 +2541,16 @@ const OniFx = (() => {
   return { clearAll, countHit, countMiss, premiumCount, tenpai };
 })();
 
+// ハズレのテンパイ図柄：基本は 1-6,8。0 だけ少し混ぜる（0は大きく表示される煽り）
+function pickMissTenpaiDigit() {
+  if (Assets.getDigit(0) && Math.random() < 0.12) return 0;
+  return [1, 2, 3, 4, 5, 6, 8][Math.floor(Math.random() * 7)];
+}
+
 async function playOniTenpaiAori({ isHit, is6000, bonusType, fixedDig = null, token }) {
   const dig = fixedDig !== null ? fixedDig
     : isHit ? pickRushRuleDigit(bonusType || (is6000 ? 'BONUS_6000' : 'BONUS_1500'), true)
-    : [1, 2, 3, 4, 5, 6, 8][Math.floor(Math.random() * 7)];
+    : pickMissTenpaiDigit();
 
   const isPremDig = (dig === 7 || dig === 3 || dig === 0);
   setOniReels(dig, (dig % 8) + 1, dig, { tenpaiSide: true, midSpin: true });
@@ -2565,8 +2605,17 @@ async function playOnigakariCountdown({ isHit, is6000, bonusType = null, token }
   let winDig = null, note = '';
   if (premium) { note = 'プレミアカウント(1→2→3→4→5→6→000)'; winDig = Assets.getDigit(0) ? 0 : null; }
   else if (isHit) winDig = pickRushRuleDigit(bType, true);
+  if (isHit && winDig === null) winDig = pickRushRuleDigit(bType, true);
 
-  // 暗い背景に数字だけを浮かべる（既に暗転中ならそのまま）
+  // 先に「横が揃ったテンパイ」を見せる（テンパイしていないのにカウントが始まると、ハズレが透けて見えるため）
+  const tpDig = isHit ? winDig : pickMissTenpaiDigit();
+  const tpMid = (tpDig % 8) + 1;
+  setOniReels(tpDig, tpMid, tpDig, { tenpaiSide: true, midSpin: true });
+  if (tpDig === 0 || tpDig === 7) setPremiaFrame(true);
+  try { StudioAudio.playSoftHeartbeat(); FxCanvas.spawnRing(tpDig === 0 || tpDig === 7 ? '#fef08a' : '#ef4444', 250, 7); } catch (e) {}
+  await wait(430, token);
+
+  // 暗い背景に数字だけを浮かべる（既に暗転中ならそのまま。横のテンパイ図柄は薄く残す）
   const hadDark = oniRushStage.classList.contains('oni-bg-dark');
   oniRushStage.classList.add('oni-bg-dark');
   try {
@@ -2578,6 +2627,7 @@ async function playOnigakariCountdown({ isHit, is6000, bonusType = null, token }
     if (!hadDark) oniRushStage.classList.remove('oni-bg-dark');
   }
 
+  if (!isHit) { setOniReels(tpDig, tpMid, tpDig, { tenpaiSide: false, midSpin: false }); }
   if (isHit) {
     const wd = await playOniTotsuAtariPause({ is6000, bonusType, fixedDig: winDig, hadNotice: true, token });
     return { note, winDig: wd };
