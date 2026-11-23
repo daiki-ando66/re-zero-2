@@ -667,11 +667,12 @@ async function resolveNormalReach() {
     // 図柄は見せない：予告画面のまま一拍おいて、ロゴ役物が中央まで落下して当りを知らせる
     await wait(650, tok);
     // 着地の瞬間に虹色背景が同時に開き、一瞬だけ時間が止まる
-    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, timeStop: 650, withSound: false,
+    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, timeStop: 650, withSound: false, skipBurst: true,
       onImpact: () => {
         // 鬼がかってますねの締めと同じ：落下音＋衝撃音＋当たり音
-        StudioAudio.playOchiburu(false); StudioAudio.playSlash();
-        setTimeout(() => StudioAudio.play1500Jackpot(false), 140);
+        StudioAudio.playOchiburu(false);
+        setTimeout(() => StudioAudio.playSlash(), 45);
+        setTimeout(() => StudioAudio.play1500Jackpot(false), 170);
         fireRainbowBurst('大当り!!', { withBackNiziiro: true });
       }, token: tok });
 
@@ -815,7 +816,8 @@ async function afterBonusReserveCheck(prevType) {
         clearVisualEffects(); setActiveScene('rush-idle'); applyRushModeVisuals(); updateStatsUI();
         await wait(850, tok);
 
-        state.phase = 'ANIMATING'; BgmEngine.cut();
+        state.phase = 'ANIMATING';
+        await playWeddingLeadIn(tok);
         await playWedding12000Cinema(tok);
 
         hideFullscreenOverlay();
@@ -942,7 +944,7 @@ function spinRushOnce() {
     if (r < 0.015) teaser = 'BRAIN_HANDS_GAZE'; else if (r < 0.055) teaser = 'BRAIN_NOGA_GAZE';
   } else if (state.rushMode === 'onigakari') {
     const r = Math.random();
-    if (r < 0.015) teaser = 'ONI_CD_GAZE'; else if (r < 0.032) teaser = 'ONI_TENPAI_GAZE'; else if (r < 0.044) teaser = 'ONI_BLINK_GAZE';
+    if (r < 0.008) teaser = 'ONI_CD_GAZE'; else if (r < 0.018) teaser = 'ONI_TENPAI_GAZE'; else if (r < 0.030) teaser = 'ONI_BLINK_GAZE';
   }
   if (!teaser && state.rushCustTrust && Math.random() < 0.022) teaser = 'TRUST_GAZE';
   return { type: 'MISS', teaser };
@@ -2138,6 +2140,57 @@ window.addEventListener('resize', () => {
     `;
   }
 
+  // ★ウェディング前の「溜め」：BGM断→下の表示が"祝福"に変わる→ゆっくり暗転→暗闇から大きく「おめでとう」(エヴァ風)★
+  window.playWeddingLeadIn = async function (token) {
+    const el = weddingCinemaOverlay;
+    if (!el) return;
+    const bn = busyNotice, bnHtml = bn ? bn.innerHTML : '';
+    const setBn = (html, cls) => { if (!bn) return; bn.classList.remove('wed-bn-quiet', 'wed-bn-omedeto'); bn.innerHTML = html; if (cls) bn.classList.add(cls); };
+    let done = false, fade = null;
+    try {
+      BgmEngine.cut();
+      setBn('💍 ・・・ 💍', 'wed-bn-quiet');
+      await wait(650, token);
+      try { WeddingAudio.playBell(0.9); setCabinetGlow('gold'); } catch (e) {}
+      setBn('💍 おめでとう 💍', 'wed-bn-omedeto');
+      await wait(1250, token);
+
+      // ゆっくり暗転
+      try { StudioAudio.playSoftHeartbeat(); } catch (e) {}
+      el.className = 'fixed inset-0 z-[1002] bg-black flex items-center justify-center overflow-hidden';
+      el.innerHTML = '';
+      el.classList.remove('hidden');
+      fade = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1100, easing: 'ease-in', fill: 'forwards' });
+      await wait(1150, token);
+      try { fade.cancel(); } catch (e) {}
+      fade = null;
+      await wait(700, token);                       // 完全な静寂
+
+      // 暗闇から「おめでとう」：ハードカット＋明滅（エヴァ風の黒背景・明朝・縦長）
+      el.innerHTML = `<div class="wed-eva"><div class="wed-eva-sub" id="wedEvaSub1">C O N G R A T U L A T I O N S</div>
+        <div class="wed-eva-main" id="wedEvaMain" style="margin:4.2vh 0 4.8vh">おめでとう</div>
+        <div class="wed-eva-rule" id="wedEvaRule"></div>
+        <div class="wed-eva-sub" id="wedEvaSub2" style="margin-top:2.6vh">祝　福　の　刻</div></div>`;
+      const main = document.getElementById('wedEvaMain'), s1 = document.getElementById('wedEvaSub1'), s2 = document.getElementById('wedEvaSub2'), rule = document.getElementById('wedEvaRule');
+      try { StudioAudio.playSoftHeartbeat(); setTimeout(() => { try { StudioAudio.playSoftHeartbeat(); } catch (e) {} }, 180); setTimeout(() => { try { WeddingAudio.playBell(0.75); } catch (e) {} }, 520); } catch (e) {}
+      main.animate([{ opacity: 0, offset: 0 }, { opacity: 0, offset: .08 }, { opacity: 1, offset: .0801 }, { opacity: 1, offset: .15 }, { opacity: 0, offset: .1501 }, { opacity: 0, offset: .22 }, { opacity: 1, offset: .2201 }, { opacity: 1, offset: .30 }, { opacity: 0, offset: .3001 }, { opacity: 0, offset: .34 }, { opacity: 1, offset: .3401 }, { opacity: 1, offset: 1 }], { duration: 560, easing: 'linear', fill: 'forwards' });
+      main.animate([{ transform: 'scale(.92,1.65)' }, { transform: 'scale(.98,1.76)' }], { duration: 3200, easing: 'linear', fill: 'forwards' });
+      [s1, s2].forEach(n => n.animate([{ opacity: 0 }, { opacity: .9 }], { duration: 900, delay: 520, easing: 'ease-out', fill: 'forwards' }));
+      rule.animate([{ opacity: .85, transform: 'scaleX(0)' }, { opacity: .85, transform: 'scaleX(1)' }], { duration: 700, delay: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+      await wait(3200, token);
+
+      // 一瞬で黒へ（ここから本編の暗転演出に入る）
+      el.innerHTML = '';
+      await wait(380, token);
+      done = true;
+    } finally {
+      try { if (fade) fade.cancel(); } catch (e) {}
+      if (bn) { bn.classList.remove('wed-bn-quiet', 'wed-bn-omedeto'); bn.innerHTML = bnHtml; }
+      try { setCabinetGlow('idle'); } catch (e) {}
+      if (!done) { el.classList.add('hidden'); el.innerHTML = ''; }
+    }
+  };
+
   window.playWedding12000Cinema = async function (token) {
     const el = weddingCinemaOverlay;
     if (!el) return;
@@ -2172,7 +2225,7 @@ window.addEventListener('resize', () => {
 
     try {
       BgmEngine.cut(); StudioAudio.playPuchun(); setLed('off'); setAmbientBg(''); setSunburst(false);
-      await waitFreeze(1450, token);
+      await waitFreeze(700, token);
       SoftSparkle.start(); WeddingAudio.startHolyPad(); await waitFreeze(950, token);
 
       const bg1 = Assets.getWedding('bg1'), gensitu = Assets.getWedding('gensitu');
@@ -2263,7 +2316,7 @@ window.addEventListener('resize', () => {
     stopAuto(); stopHandleHold(false);
     const prevPhase = state.phase, prevScene = state.activeScene;
     const tok = ++seqToken; state.phase = 'ANIMATING'; setControlMode('BUSY');
-    try { await playWedding12000Cinema(tok); } catch (e) {}
+    try { await playWeddingLeadIn(tok); await playWedding12000Cinema(tok); } catch (e) {}
     finally {
       state.phase = prevPhase; clearVisualEffects(); setActiveScene(prevScene);
       if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
