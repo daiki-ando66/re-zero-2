@@ -465,6 +465,43 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #1a0b05; }
     ::-webkit-scrollbar-thumb { background: #b45309; border-radius: 9999px; }
+
+    /* =====================================================================
+       v8.1 追加：ロゴと被らないRUSHバッジ位置／テストモード表示／台データ
+       ===================================================================== */
+    #rushTopBadge { top: auto !important; bottom: 15% !important; }
+    html.is-test-mode body::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 3px; z-index: 2000; pointer-events: none; background: linear-gradient(90deg, #10b981, #6ee7b7, #10b981); }
+    html.is-test-mode header { box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.55), 0 6px 18px rgba(16, 185, 129, 0.18); }
+    .data-pane.hidden { display: none !important; }
+
+    /* =====================================================================
+       v8.1 鬼がかりRUSH：文字なしカウントダウン／テンパイ（図柄アート・光・ひび割れだけで見せる）
+       ===================================================================== */
+    .oni-fx-host { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .oni-fx-back { z-index: 3; }
+    .oni-fx-front { z-index: 9; }
+    .oni-fx-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 5cqh; }
+    .oni-count-digit { display: flex; align-items: center; justify-content: center; height: min(68cqw, 66cqh); will-change: transform, opacity, filter; }
+    .oni-count-cell { width: calc(min(52cqw, 92cqw / var(--n, 1))); height: 100%; display: flex; align-items: center; justify-content: center; }
+    .oni-count-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 14px rgba(250,204,21,.85)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-fallback { font-size: min(56cqw, 58cqh); line-height: 1; font-weight: 900; filter: drop-shadow(0 0 12px rgba(250,204,21,.8)) drop-shadow(0 6px 10px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-3 .oni-count-img, .oni-count-digit.tone-3 .oni-count-fallback { filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 16px rgba(125,211,252,.95)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-2 .oni-count-img, .oni-count-digit.tone-2 .oni-count-fallback { filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 16px rgba(251,146,60,.95)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-1 .oni-count-img, .oni-count-digit.tone-1 .oni-count-fallback { filter: drop-shadow(0 0 6px rgba(255,255,255,.95)) drop-shadow(0 0 22px rgba(254,240,138,1)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-rainbow .oni-count-img, .oni-count-digit.tone-rainbow .oni-count-fallback { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 20px rgba(244,114,182,.95)) drop-shadow(0 0 30px rgba(125,211,252,.9)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-shatter { position: relative; }
+    .oni-shatter > .oni-count-digit { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+    .oni-crack { position: absolute; inset: -4% 0; width: 100%; height: 108%; overflow: visible; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px rgba(255,255,255,.8)); opacity: 0; }
+    .oni-beam { position: absolute; left: 6%; right: 6%; height: 4px; border-radius: 4px; transform-origin: 50% 50%;
+      background: linear-gradient(90deg, rgba(var(--c),0), rgba(var(--c),1) 18%, rgba(255,255,255,.95) 50%, rgba(var(--c),1) 82%, rgba(var(--c),0));
+      box-shadow: 0 0 16px 3px rgba(var(--c), .8); }
+    .oni-pulse { background: radial-gradient(ellipse 36cqw 32cqh at 50% 54%, rgba(var(--c), .55), rgba(var(--c), 0) 72%); mix-blend-mode: screen; }
+    .oni-fx-layer.oni-rays { inset: auto; left: 50%; top: 54%; width: 160cqw; height: 160cqw; margin: -80cqw 0 0 -80cqw; display: block; padding: 0; border-radius: 50%;
+      background: repeating-conic-gradient(from 0deg, rgba(var(--ray-rgb),0) 0deg 8deg, rgba(var(--ray-rgb),.6) 8deg 12deg);
+      -webkit-mask-image: radial-gradient(circle, transparent 0 16%, #000 34%, transparent 66%); mask-image: radial-gradient(circle, transparent 0 16%, #000 34%, transparent 66%);
+      mix-blend-mode: screen; }
+    .oni-fx-layer.oni-rays-hue { animation: oniHue 1.4s linear infinite; }
+    @keyframes oniHue { to { filter: hue-rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen bg-gold-wagara text-slate-100 pb-8 relative">
@@ -491,14 +528,15 @@
         </div>
         <div class="leading-tight truncate">
           <h1 class="text-xs sm:text-sm font-black bg-gradient-to-r from-yellow-200 via-amber-300 to-rose-300 bg-clip-text text-transparent truncate">
-            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v7.1</span>
+            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v8.1</span>
           </h1>
         </div>
+        <button id="testPill" class="hidden shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 border border-emerald-300/80 text-emerald-200 animate-pulse whitespace-nowrap">🧪 TEST</button>
       </div>
 
       <div class="flex items-center gap-1.5 shrink-0">
-        <button id="btnTestPromo" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-gradient-to-r from-amber-600 to-fuchsia-700 hover:from-amber-500 text-yellow-100 shadow border border-amber-300/70 active:scale-95 transition whitespace-nowrap">
-          🎬 テスト ▾
+        <button id="btnOpenData" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-gradient-to-r from-amber-600 to-rose-700 hover:from-amber-500 text-yellow-100 shadow border border-amber-300/70 active:scale-95 transition whitespace-nowrap">
+          📊 台データ
         </button>
         <button id="btnOpenSettings" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-slate-900 hover:bg-slate-800 text-amber-200 border border-amber-500/70 active:scale-95 transition whitespace-nowrap">
           ⚙️ 設定
@@ -506,32 +544,40 @@
       </div>
     </div>
 
-    <!-- 演出テスト＆開発メニュー -->
-    <div id="promoTestMenu" class="hidden border-t border-amber-500/40 bg-[#1b0a07]/98">
-      <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-2.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-black text-amber-300">🎬 開発＆演出テスト（1タップ再生）</span>
-          <button id="btnClosePromoMenu" class="text-[10px] text-amber-200/80 px-2 py-0.5 rounded bg-black/50 border border-amber-800/60">閉じる</button>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
-          <button id="btnDevInstantRush" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-300/80 text-white active:scale-95 transition">🚀 即RUSH突入（開発）</button>
-          <button id="btnDevInfRush" class="py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition">♾️ 無限ST: OFF</button>
-          <button data-test="yakumonoDrop" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-500 via-rose-600 to-purple-700 border border-yellow-200 text-white active:scale-95 transition">✨ ロゴ役物落下 (赤/金/虹)</button>
-          <button data-test="restartRip" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-800 to-amber-700 border border-yellow-200/80 text-white active:scale-95 transition">⚔️ Re:Start引き裂き</button>
-          <button data-test="vstockCycle" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-700 to-rose-700 border border-amber-200/80 text-white active:scale-95 transition">⚡ V-STOCK (青300/赤1500)</button>
-          <button data-test="freeze3s" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-900 to-rose-900 border border-amber-300/70 text-amber-100 active:scale-95 transition">💀 液晶暗転→鬼がかってますね</button>
-          <button data-test="countup6000" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-600 via-rose-600 to-fuchsia-700 border border-yellow-200/80 text-white active:scale-95 transition">📈 出玉カウントアップ6,000</button>
-          <button data-test="brain4" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-800 via-fuchsia-800 to-rose-900 border border-fuchsia-300/80 text-fuchsia-100 active:scale-95 transition">🧠 脳が震える4層＆震えるロゴ</button>
-          <button data-test="remLamp" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 via-blue-800 to-fuchsia-900 border border-sky-300/80 text-sky-100 active:scale-95 transition">💙 レム入賞先バレ→当該覚醒</button>
-          <button data-test="oniApproach" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-red-800 border border-amber-300/80 text-amber-100 active:scale-95 transition">🔥 7テンパイ→鬼レム6,000</button>
-          <button data-test="zeroAlign" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-yellow-600 to-amber-800 border border-yellow-200/80 text-white active:scale-95 transition">0️⃣ 0揃い違和感→6,000</button>
-          <button data-test="glassFail" class="promo-test-item py-2 px-2 rounded-xl font-black bg-slate-800 border border-slate-500 text-slate-200 active:scale-95 transition">💥 ハズレ画面割れテスト</button>
-          <button data-test="revivalResult" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-800 to-purple-900 border border-fuchsia-400/70 text-fuchsia-100 active:scale-95 transition">⏪ リザルト死に戻り強制復活</button>
-          <button data-test="randomCrash" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-900 to-rose-950 border border-amber-400/70 text-amber-200 active:scale-95 transition">⚔️ 一刀両断 / 粉砕 / ボタン昇格</button>
-        </div>
-      </div>
-    </div>
   </header>
+
+  <!-- =======================================================================
+       🧪 テストツール（テストモード中のみ操作可・出玉/履歴/ランキングには一切記録されません）
+       ======================================================================= -->
+  <div id="promoTestMenu" class="hidden fixed left-0 right-0 top-[44px] z-[870] border-y border-emerald-400/60 bg-[#06150f]/97 backdrop-blur-md shadow-2xl max-h-[78vh] overflow-y-auto">
+    <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-2.5 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-black text-emerald-300">🧪 テストツール（記録されません）</span>
+        <button id="btnClosePromoMenu" class="text-[10px] text-emerald-100/80 px-2 py-0.5 rounded bg-black/50 border border-emerald-800/60">閉じる</button>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+        <button id="btnDevToNormal" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-700 to-slate-800 border border-slate-300/70 text-white active:scale-95 transition">🏠 即通常へ</button>
+        <button id="btnDevInstantRush" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-300/80 text-white active:scale-95 transition">🚀 即RUSH突入</button>
+        <button id="btnDevInfRush" class="py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition">♾️ 無限ST: OFF</button>
+        <button id="btnDevHit1500R" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-rose-700 border border-amber-300/80 text-white active:scale-95 transition">🎯 即初当たり 1,500<br><span class="text-[9px] font-bold opacity-80">RUSH突入</span></button>
+        <button id="btnDevHit1500N" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-800 to-stone-700 border border-amber-300/60 text-white active:scale-95 transition">🎯 即初当たり 1,500<br><span class="text-[9px] font-bold opacity-80">通常（RUSHなし）</span></button>
+        <button id="btnDevHit3000" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-700 to-indigo-800 border border-sky-200/80 text-white active:scale-95 transition">🐋 即初当たり 3,000<br><span class="text-[9px] font-bold opacity-80">白鯨直行</span></button>
+        <button data-test="yakumonoDrop" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-500 via-rose-600 to-purple-700 border border-yellow-200 text-white active:scale-95 transition">✨ ロゴ役物落下 (赤/金/虹)</button>
+        <button data-test="restartRip" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-800 to-amber-700 border border-yellow-200/80 text-white active:scale-95 transition">⚔️ Re:Start引き裂き</button>
+        <button data-test="vstockCycle" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-700 to-rose-700 border border-amber-200/80 text-white active:scale-95 transition">⚡ V-STOCK (青300/赤1500)</button>
+        <button data-test="freeze3s" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-900 to-rose-900 border border-amber-300/70 text-amber-100 active:scale-95 transition">💀 液晶暗転→鬼がかってますね</button>
+        <button data-test="countup6000" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-600 via-rose-600 to-fuchsia-700 border border-yellow-200/80 text-white active:scale-95 transition">📈 出玉カウントアップ6,000</button>
+        <button data-test="brain4" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-800 via-fuchsia-800 to-rose-900 border border-fuchsia-300/80 text-fuchsia-100 active:scale-95 transition">🧠 脳が震える4層＆震えるロゴ</button>
+        <button data-test="remLamp" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 via-blue-800 to-fuchsia-900 border border-sky-300/80 text-sky-100 active:scale-95 transition">💙 レム入賞先バレ→当該覚醒</button>
+        <button data-test="oniApproach" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-red-800 border border-amber-300/80 text-amber-100 active:scale-95 transition">🔥 7テンパイ→鬼レム6,000</button>
+        <button data-test="zeroAlign" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-yellow-600 to-amber-800 border border-yellow-200/80 text-white active:scale-95 transition">0️⃣ 0揃い違和感→6,000</button>
+        <button data-test="glassFail" class="promo-test-item py-2 px-2 rounded-xl font-black bg-slate-800 border border-slate-500 text-slate-200 active:scale-95 transition">💥 ハズレ画面割れテスト</button>
+        <button data-test="revivalResult" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-800 to-purple-900 border border-fuchsia-400/70 text-fuchsia-100 active:scale-95 transition">⏪ リザルト死に戻り強制復活</button>
+        <button data-test="randomCrash" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-900 to-rose-950 border border-amber-400/70 text-amber-200 active:scale-95 transition">⚔️ 一刀両断 / 粉砕 / ボタン昇格</button>
+      </div>
+      <button id="btnDevExitTest" class="w-full py-2.5 rounded-xl text-[11px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-200/80 text-white shadow active:scale-95 transition">🧪 テストを終了して元の状態に戻す</button>
+    </div>
+  </div>
 
   <!-- =======================================================================
        ⚙️ 設定モーダル
@@ -562,16 +608,6 @@
       </div>
 
       <div class="rounded-xl bg-black/50 border border-amber-800/50 p-2.5 space-y-2">
-        <div class="grid grid-cols-2 gap-2 text-center">
-          <div class="rounded-lg bg-black/60 border border-amber-900/60 py-1.5">
-            <div class="text-[9px] text-amber-200/80">RUSH突入 / 初当り</div>
-            <div id="statHits" class="text-xs font-black text-amber-100 num-fixed">0 / 0</div>
-          </div>
-          <div class="rounded-lg bg-black/60 border border-amber-900/60 py-1.5">
-            <div class="text-[9px] text-amber-200/80">先バレ勝率</div>
-            <div id="statSakibare" class="text-xs font-black text-amber-300 num-fixed">0/0 (-%)</div>
-          </div>
-        </div>
         <div>
           <div class="flex justify-between items-center mb-1">
             <label for="rotRateSlider" class="text-[10px] font-bold text-amber-200">通常回転率 (回/1k)</label>
@@ -638,6 +674,107 @@
           </div>
         </div>
       </details>
+
+      <details class="rounded-xl bg-black/45 border border-emerald-900/60 p-2.5 group">
+        <summary class="cursor-pointer text-[11px] font-black text-emerald-300/90 flex items-center justify-between list-none">
+          <span>🧪 テストモード（動作確認用）</span>
+          <span class="text-[10px] text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div class="mt-2.5 pt-2.5 border-t border-emerald-900/50 space-y-2">
+          <p class="text-[10px] leading-relaxed text-emerald-100/80">演出確認用の別枠です。テスト中の出玉・履歴・差玉グラフ・ランキングには<strong>一切記録されず</strong>、終了すると開始前の状態にそのまま戻ります（開始できるのは通常時の待機中のみ）。</p>
+          <div id="testModeState" class="text-[10px] font-black text-emerald-200">⚪ 通常：実戦データを記録しています</div>
+          <button id="btnToggleTestMode" class="w-full py-2.5 rounded-xl text-[11px] font-black bg-slate-900 border border-emerald-500/70 text-emerald-300 active:scale-95 transition">🧪 テストモードに入る</button>
+          <button id="btnOpenTestTools" class="hidden w-full py-2 rounded-xl text-[11px] font-black bg-emerald-950 border border-emerald-400/70 text-emerald-200 active:scale-95 transition">🛠️ テストツールを開く</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       📊 台データ（データ／履歴／100回シミュ）：開いている間だけ描画する軽量設計
+       ======================================================================= -->
+  <div id="dataModal" class="hidden fixed inset-0 z-[880] bg-black/90 backdrop-blur-sm flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="w-full max-w-lg sm:max-w-3xl my-2 rounded-3xl bg-gradient-to-b from-[#2a1008] via-[#18080a] to-[#0c0406] border-2 border-amber-500/80 p-3 shadow-2xl space-y-2.5">
+      <div class="flex items-center justify-between border-b border-amber-800/60 pb-2">
+        <h3 class="text-sm font-black text-amber-300">📊 台データ</h3>
+        <button id="btnCloseData" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-black/60 text-amber-200 border border-amber-700/70 active:scale-95">閉じる</button>
+      </div>
+      <div class="flex gap-1.5">
+        <button data-dtab="stats" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white border-yellow-200/60 shadow">📈 データ</button>
+        <button data-dtab="history" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">📜 履歴</button>
+        <button data-dtab="sim" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🚀 100回シミュ</button>
+      </div>
+
+      <div id="dataPane-stats" class="data-pane space-y-2">
+        <p class="text-[10px] text-amber-200/70">直近セッション（「リセット」からの実戦データ）</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総回転</div><div id="dtSpins" class="text-sm font-black text-white mt-0.5 num-fixed">0</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">初当たり（実測確率）</div><div id="dtHits" class="text-sm font-black text-amber-200 mt-0.5 num-fixed">0回 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">RUSH突入（突入率）</div><div id="dtRush" class="text-sm font-black text-rose-300 mt-0.5 num-fixed">0回 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">先バレ勝率</div><div id="dtSakibare" class="text-sm font-black text-amber-300 mt-0.5 num-fixed">0/0 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大連チャン</div><div id="dtMaxChain" class="text-sm font-black text-fuchsia-300 mt-0.5 num-fixed">0連</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大一撃（払出）</div><div id="dtMaxShot" class="text-sm font-black text-amber-300 mt-0.5 num-fixed">0個</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総投資</div><div id="dtInvest" class="text-sm font-black text-rose-400 mt-0.5 num-fixed">0円</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">差玉</div><div id="dtDiff" class="text-sm font-black text-white mt-0.5 num-fixed">+0発</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">収支（換金）</div><div id="dtBalance" class="text-sm font-black text-white mt-0.5 num-fixed">+0円</div></div>
+        </div>
+        <p class="text-[10px] text-slate-500 leading-relaxed">※差玉グラフは遊技画面の一番下にあります。「リセット」で実戦データは初期化されます。</p>
+      </div>
+
+      <div id="dataPane-history" class="data-pane hidden">
+        <div class="flex items-center justify-between mb-1.5"><h2 class="text-xs font-black text-amber-300">📜 実戦履歴ログ</h2><span class="text-[10px] text-amber-200/70">最新が上・直近50件</span></div>
+        <div class="overflow-x-auto max-h-[62vh] overflow-y-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="text-amber-300/80 border-b border-amber-900/70 sticky top-0 bg-[#1a0a07]">
+              <tr><th class="py-1.5 px-1.5">回転</th><th class="py-1.5 px-1.5">種別</th><th class="py-1.5 px-1.5">演出 / 内訳</th><th class="py-1.5 px-1.5 text-right">結果 / 出玉</th></tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-amber-950/80">
+              <tr><td colspan="4" class="py-4 text-center text-amber-200/50">まだ履歴はありません。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="dataPane-sim" class="data-pane hidden space-y-3">
+      <section class="rounded-2xl bg-[#1a0a07]/95 border border-amber-700/60 p-3.5 shadow-xl space-y-3.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h2 class="text-sm sm:text-base font-black text-amber-300">🚀 初当たり100回 高速シミュレーター</h2>
+            <p class="text-[11px] text-amber-100/70 mt-0.5">1/3,499白鯨直行・残保留4個厳密独立抽選（3.94%）・ウェディング12,000（6000獲得ごと約1/101）を<strong>実機基準</strong>で再現。※遊技画面のウェディングは演出用に判定窓10（内部確率・出玉は同一）のため、この数値より少し出やすくなります。</p>
+          </div>
+          <button id="btnRunSim100" class="px-5 py-3 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 hover:from-rose-500 text-slate-950 shadow-lg active:scale-95 transition whitespace-nowrap">🚀 100回シミュレーション実行</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center bg-black/45 p-2.5 rounded-xl border border-amber-950">
+          <div>
+            <div class="flex justify-between items-center mb-1"><span class="text-[11px] font-bold text-amber-200">回転率 (12〜24回/1k)</span><span id="simRotDisplay" class="text-xs font-black text-white num-fixed">16.5 回/1k</span></div>
+            <input id="simRotSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button data-rate="4.0" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
+            <button data-rate="3.6363636" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
+            <button data-rate="3.5714286" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総回転 / 平均確率</div><div id="simTotalSpins" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大ハマり</div><div id="simMaxHamari" class="text-xs sm:text-sm font-black text-rose-400 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">白鯨3000直行 (1/3499)</div><div id="simWhaleCount" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">RUSH突入 (理論55%)</div><div id="simRushRate" class="text-xs sm:text-sm font-black text-amber-200 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">鬼6000回数 (理論25%)</div><div id="sim6000Count" class="text-xs sm:text-sm font-black text-amber-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">保留連告知</div><div id="simHoryurenCount" class="text-xs sm:text-sm font-black text-fuchsia-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">💒 WEDDING 12,000</div><div id="simWeddingCount" class="text-xs sm:text-sm font-black text-pink-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大一撃 (払出/純増)</div><div id="simMaxPayout" class="text-xs sm:text-sm font-black text-amber-400 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">標準偏差 (理論±9,548)</div><div id="simStdDev" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最終差玉 / 金額収支</div><div id="simFinalBalance" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
+        </div>
+        <div class="rounded-2xl bg-black/75 border border-amber-900/70 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5"><span class="text-[11px] font-bold text-amber-200">📈 累計差玉スランプグラフ</span><span id="simPeakBottom" class="text-[10px] text-slate-400 num-fixed"></span></div>
+          <div class="relative w-full h-56 sm:h-72"><canvas id="slumpChartCanvas" class="w-full h-full block"></canvas></div>
+        </div>
+        <div id="simDiagnosis" class="rounded-xl bg-gradient-to-r from-rose-950/60 via-black/75 to-amber-950/50 border border-amber-500/40 p-3 text-xs text-amber-100 leading-relaxed">ボタンを押すと初当たり100回分のスランプグラフと分析が表示されます。</div>
+      </section>
+      </div>
     </div>
   </div>
 
@@ -898,75 +1035,13 @@
         </div>
       </section>
 
-      <!-- ⑤ リアルタイム差玉グラフ＆実戦履歴ログ -->
-      <section class="rounded-2xl bg-[#1a0a07]/90 border border-amber-800/50 p-3 shadow-xl">
-        <div class="flex items-center justify-between mb-1.5"><h2 class="text-xs font-black text-amber-300">📜 実戦履歴ログ</h2><span class="text-[10px] text-amber-200/70">最新が上</span></div>
-        <div class="overflow-x-auto max-h-48 overflow-y-auto">
-          <table class="w-full text-left text-[11px]">
-            <thead class="text-amber-300/80 border-b border-amber-900/70 sticky top-0 bg-[#1a0a07]">
-              <tr><th class="py-1.5 px-1.5">回転</th><th class="py-1.5 px-1.5">種別</th><th class="py-1.5 px-1.5">演出 / 内訳</th><th class="py-1.5 px-1.5 text-right">結果 / 出玉</th></tr>
-            </thead>
-            <tbody id="historyTableBody" class="divide-y divide-amber-950/80">
-              <tr><td colspan="4" class="py-4 text-center text-amber-200/50">「✋ 長押しハンドル」や「🎬 テスト ▾」を押してみてください！</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
-    <!-- =====================================================================
-         モード切替タブ（下へ移動）
-         ===================================================================== -->
-    <div class="flex gap-1.5 pt-1">
-      <button id="tabPlay" class="flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white shadow border border-yellow-200/60">🔥 実戦プレイモード</button>
-      <button id="tabSim100" class="flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all bg-[#1e0d08]/90 text-amber-200/70 hover:text-amber-100 border border-amber-900/60">📊 初当たり100回シミュ</button>
-    </div>
-
-    <!-- タブ2：初当たり100回シミュ -->
-    <div id="sim100Container" class="hidden space-y-3">
-      <section class="rounded-2xl bg-[#1a0a07]/95 border border-amber-700/60 p-3.5 shadow-xl space-y-3.5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div>
-            <h2 class="text-sm sm:text-base font-black text-amber-300">🚀 初当たり100回 高速シミュレーター</h2>
-            <p class="text-[11px] text-amber-100/70 mt-0.5">1/3,499白鯨直行・残保留4個厳密独立抽選（3.94%）・ウェディング12,000（約1/101）を完全再現。</p>
-          </div>
-          <button id="btnRunSim100" class="px-5 py-3 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 hover:from-rose-500 text-slate-950 shadow-lg active:scale-95 transition whitespace-nowrap">🚀 100回シミュレーション実行</button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center bg-black/45 p-2.5 rounded-xl border border-amber-950">
-          <div>
-            <div class="flex justify-between items-center mb-1"><span class="text-[11px] font-bold text-amber-200">回転率 (12〜24回/1k)</span><span id="simRotDisplay" class="text-xs font-black text-white num-fixed">16.5 回/1k</span></div>
-            <input id="simRotSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
-          </div>
-          <div class="grid grid-cols-3 gap-1.5">
-            <button data-rate="4.0" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
-            <button data-rate="3.6363636" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
-            <button data-rate="3.5714286" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総回転 / 平均確率</div><div id="simTotalSpins" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大ハマり</div><div id="simMaxHamari" class="text-xs sm:text-sm font-black text-rose-400 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">白鯨3000直行 (1/3499)</div><div id="simWhaleCount" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">RUSH突入 (理論55%)</div><div id="simRushRate" class="text-xs sm:text-sm font-black text-amber-200 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">鬼6000回数 (理論25%)</div><div id="sim6000Count" class="text-xs sm:text-sm font-black text-amber-300 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">保留連告知</div><div id="simHoryurenCount" class="text-xs sm:text-sm font-black text-fuchsia-300 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">💒 WEDDING 12,000</div><div id="simWeddingCount" class="text-xs sm:text-sm font-black text-pink-300 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大一撃 (払出/純増)</div><div id="simMaxPayout" class="text-xs sm:text-sm font-black text-amber-400 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">標準偏差 (理論±9,548)</div><div id="simStdDev" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
-          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最終差玉 / 金額収支</div><div id="simFinalBalance" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
-        </div>
-        <div class="rounded-2xl bg-black/75 border border-amber-900/70 p-3">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5"><span class="text-[11px] font-bold text-amber-200">📈 累計差玉スランプグラフ</span><span id="simPeakBottom" class="text-[10px] text-slate-400 num-fixed"></span></div>
-          <div class="relative w-full h-56 sm:h-72"><canvas id="slumpChartCanvas" class="w-full h-full block"></canvas></div>
-        </div>
-        <div id="simDiagnosis" class="rounded-xl bg-gradient-to-r from-rose-950/60 via-black/75 to-amber-950/50 border border-amber-500/40 p-3 text-xs text-amber-100 leading-relaxed">ボタンを押すと初当たり100回分のスランプグラフと分析が表示されます。</div>
-      </section>
-    </div>
   </main>
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=80"></script>
-  <script src="game.js?v=80"></script>
+  <script src="effects.js?v=81"></script>
+  <script src="game.js?v=81"></script>
 </body>
 </html>
