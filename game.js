@@ -90,6 +90,7 @@ const state = {
   rushCustNoNotice: false,
 
   currentSpin: 0,
+  excellentFired: false,
   totalNormalSpins: 0,
   firstHits: 0,
   rushHits: 0,
@@ -351,6 +352,7 @@ function updateStatsUI() {
 }
 function flushStatsUI() {
   statsQueued = false;
+  try { RushHud.update(); } catch (e) {}
   UiBatch.text('hudRushRemain', state.stRemaining);
   UiBatch.text('dashCurSpin', state.currentSpin.toLocaleString());
   UiBatch.text('dashTotalSpin', `総 ${state.totalNormalSpins.toLocaleString()}`);
@@ -423,7 +425,7 @@ function drawNormalSpin() {
   if (state.custSakibare) {
     if (isHit) {
       if (Math.random() < occ) {
-        const rainbowChance = state.custPremier ? 0.72 : 0.28;
+        const rainbowChance = state.custPremier ? 0.32 : 0.28;      // プレミアUPは +4% 程度の控えめな上乗せ
         bareType = (hesoType === '3000_RUSH' && Math.random() < rainbowChance) ? 'rainbow' : 'red';
       }
     } else {
@@ -438,7 +440,12 @@ function buildNormalScenario(res) {
   const { isHit, hesoType, bareType } = res;
   const is3000 = hesoType === '3000_RUSH';
   const ochiburu = is3000 && Math.random() < (state.custOchiburu ? 0.88 : 0.24);
-  const isPremier = isHit && state.custPremier && !is3000 && Math.random() < 0.48;
+  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約25%、ハズレ時はごく稀（プレミアUPは +4% 程度の上乗せ）
+  //   ※演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
+  const isPremier = !is3000 && (isHit ? Math.random() < ((0.25 + (state.custPremier ? 0.04 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0037);
+  // コードだけの短いプレミア予告（信頼度は約88%）
+  const shortPrem = (!is3000 && !isPremier && Math.random() < (isHit ? 0.07 + (state.custPremier ? 0.03 : 0) : 0.007))
+    ? ['goldRain', 'rainbowSweep', 'blueEyes'][Math.floor(Math.random() * 3)] : null;
   const tenpaiNum = is3000 ? 7
     : hesoType === '1500_RUSH' ? [1, 3, 5][Math.floor(Math.random() * 3)]
     : [2, 4, 6, 8][Math.floor(Math.random() * 4)];
@@ -460,7 +467,7 @@ function buildNormalScenario(res) {
     badge = '鬼がかってますね予告'; category = '鬼がかったやり方SP'; title = 'vs ウルガルム'; sub = 'レム覚醒!! 運命の一撃!!'; actor = 'rem';
   } else if (isHit) {
     const r = Math.random();
-    if (r < 0.38) { badge = '鬼がかってますね予告'; category = '鬼がかったやり方SP'; title = 'vs ウルガルム'; sub = '最終ジャッジへ!!'; actor = 'rem'; }
+    if (r < 0.38) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs ウルガルム'; sub = '最終ジャッジへ!!'; actor = 'rem'; }
     else if (r < 0.72) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs ペテルギウス'; sub = '見えざる手を断ち切れ!!'; actor = 'pete'; }
     else { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs エルザ'; sub = '激熱バトル発展!!'; actor = 'rem'; }
   } else {
@@ -470,7 +477,7 @@ function buildNormalScenario(res) {
     else { badge = '抗えチャンス'; category = '抗えSPリーチ'; title = '死の運命に抗え'; sub = 'ボタン一撃で突破せよ!!'; actor = null; }
   }
   const doGiji = isHit ? Math.random() < 0.65 : Math.random() < 0.35;
-  return { isHit, hesoType, bareType, is3000, isWhale, isPremier, ochiburu, tenpaiNum, titleColor, cutinColor, badge, category, title, sub, actor, doGiji, secretRevealed: false };
+  return { isHit, hesoType, bareType, is3000, isWhale, isPremier, shortPrem, ochiburu, tenpaiNum, titleColor, cutinColor, badge, category, title, sub, actor, doGiji, secretRevealed: false };
 }
 
 // 演出用：役物落下で例外が出ても通常リーチを止めない（キャンセルは再送出）
@@ -538,6 +545,7 @@ async function startNormalReach(res) {
       FxCanvas.burstFlames(28);
     }
 
+    if (sc.shortPrem) { await playShortPremium(sc.shortPrem, tok); reachSpCategory.textContent = 'プレミア予告'; }
     setReachActor(sc.actor);
     reachYokokuBadge.textContent = sc.badge;
     reachYokokuBadge.className = (sc.isWhale || sc.isPremier)
@@ -769,6 +777,65 @@ function fillStLookaheadQueue() {
   }
 }
 
+
+// =========================================================================
+// 実機風HUD（RUSH中：連チャン数・累計出玉の小プレート）＋ 連チャン更新スタンプ
+// =========================================================================
+const RushHud = (() => {
+  let plate = null, nEl = null, dEl = null, lastChains = 0, stampBusy = 0;
+  function css() {
+    if (document.getElementById('rushhud-css')) return;
+    const st = document.createElement('style'); st.id = 'rushhud-css';
+    st.textContent = `
+      #rushHudPlate{position:absolute;left:6px;top:6px;z-index:21;pointer-events:none;padding:3px 8px 3px 7px;border-radius:9px;border:1px solid rgba(251,191,36,.7);
+        background:linear-gradient(180deg,rgba(40,16,6,.82),rgba(10,4,4,.86));box-shadow:0 0 8px rgba(251,191,36,.25),inset 0 0 6px rgba(0,0,0,.7);font-variant-numeric:tabular-nums;line-height:1.05;display:none}
+      #rushHudPlate .t{font-size:9px;font-weight:900;letter-spacing:.2em;color:#fca5a5}
+      #rushHudPlate .n{font-size:21px;font-weight:900;color:#fef3c7;text-shadow:0 0 8px rgba(251,191,36,.8)}
+      #rushHudPlate .n small{font-size:9px;color:#fcd34d;margin-left:1px}
+      #rushHudPlate .d{font-size:12px;font-weight:900;color:#fde68a;margin-top:1px}
+      #rushHudStamp{position:absolute;left:0;right:0;bottom:19%;z-index:52;pointer-events:none;text-align:center;opacity:0;font-weight:900;font-style:italic;
+        font-family:'Inter','Noto Sans JP',sans-serif;background:linear-gradient(180deg,#fff7c2,#f5c431 55%,#c2810a);-webkit-background-clip:text;background-clip:text;color:transparent;
+        -webkit-text-stroke:1.5px rgba(70,28,4,.9);filter:drop-shadow(0 3px 3px rgba(0,0,0,.9)) drop-shadow(0 0 12px rgba(251,191,36,.8))}
+      #lcdFrame [data-glow]{animation:resGlow 1.05s ease-in-out infinite alternate}
+      #lcdFrame [data-glow="RED"]{--rg:239,68,68}#lcdFrame [data-glow="BLINK_RED"]{--rg:251,113,133}#lcdFrame [data-glow="RAINBOW"]{--rg:250,204,21}
+      #lcdFrame [data-glow="GOLD"]{--rg:253,224,71}#lcdFrame [data-glow="REM_CYAN"]{--rg:56,189,248}#lcdFrame [data-glow="BLINK"]{--rg:125,211,252}
+      @keyframes resGlow{from{box-shadow:0 0 4px 1px rgba(var(--rg),.45)}to{box-shadow:0 0 13px 4px rgba(var(--rg),.95)}}
+      #lcdFrame [data-glow="RAINBOW"]{animation:resGlow .7s ease-in-out infinite alternate,oniHue 1.6s linear infinite}
+    `;
+    document.head.appendChild(st);
+  }
+  function mount() {
+    css();
+    if (plate || !lcdFrame) return;
+    plate = document.createElement('div'); plate.id = 'rushHudPlate';
+    plate.innerHTML = '<div class="t">RUSH</div><div class="n"><span id="rhN">1</span><small>連</small></div><div class="d"><span id="rhD">0</span> 個</div>';
+    lcdFrame.appendChild(plate);
+    nEl = plate.querySelector('#rhN'); dEl = plate.querySelector('#rhD');
+  }
+  function stamp(n) {
+    if (!lcdFrame || stampBusy > performance.now()) return;
+    stampBusy = performance.now() + 700;
+    let el = document.getElementById('rushHudStamp');
+    if (!el) { el = document.createElement('div'); el.id = 'rushHudStamp'; lcdFrame.appendChild(el); }
+    const big = n % 5 === 0, W = lcdFrame.offsetWidth || 320;
+    el.textContent = `RUSH ×${n}`;
+    el.style.fontSize = Math.round(W * (big ? 0.17 : 0.12)) + 'px';
+    el.getAnimations().forEach(a => a.cancel());
+    el.animate([{ opacity: 0, transform: 'scale(2.4)' }, { opacity: 1, transform: 'scale(.92)', offset: .18 }, { transform: 'scale(1)', opacity: 1, offset: .3 }, { opacity: 1, offset: .72 }, { opacity: 0, transform: 'scale(1.06) translateY(-6px)' }],
+      { duration: big ? 1200 : 900, easing: 'cubic-bezier(.16,1,.3,1)' });
+    if (big) { try { FxCanvas.spawnRing('#fef08a', 260, 7); FxCanvas.burstGold(26); } catch (e) {} }
+  }
+  function update() {
+    mount(); if (!plate) return;
+    const on = rushMetaHud && !rushMetaHud.classList.contains('hidden') && state.rushChains > 0;
+    plate.style.display = on ? 'block' : 'none';
+    if (!on) { lastChains = 0; return; }
+    nEl.textContent = state.rushChains; dEl.textContent = state.rushDisp.toLocaleString();
+    if (state.rushChains > lastChains) { if (lastChains > 0 && state.rushChains >= 2) stamp(state.rushChains); lastChains = state.rushChains; }
+  }
+  return { update, stamp };
+})();
+
 function notifyHamari(spins) {
   try { const r = Records.noteHamari(spins); if (r > 0) showToast(`🕳️ ハマり ${Number(spins).toLocaleString()}回転 → 歴代${r}位に記録`, 3200); } catch (e) {}
 }
@@ -779,7 +846,7 @@ function enterOnigakariRush(hitSpin, is3000) {
   state.rushNet = is3000 ? SPEC.NET_3000 : SPEC.NET_1500;
   state.balls += state.rushNet; updateSessionBest(); LiveSlump.record(true);
   state.rush6000Count = 0; state.rushWeddingCount = 0; state.rushHoryurenCount = 0; state.rushRestartCount = 0;
-  state.rushIwakanNotes = []; state.rushStartSpin = hitSpin; state.currentSpin = 0;
+  state.rushIwakanNotes = []; state.rushStartSpin = hitSpin; state.currentSpin = 0; state.excellentFired = false;
   state.hasVStock = false; state.hasVStockRed = false; state.remSakibareActive = false; state.stLookaheadQueue = []; state.pendingResultRevival = false;
 
   if (rushMetaHud) rushMetaHud.classList.remove('hidden');
@@ -942,6 +1009,12 @@ function spinRushOnce() {
   }
 
   if (!infiniteRushMode && state.stRemaining <= 0) return { type: 'ST_END' };
+  // ★Excellent予告：RUSH残り50回以下で、すでに先読みで確定している当選(死に戻り以外)が4回転以内にある時だけ、RUSH中1回
+  if (!state.excellentFired && state.rushMode === 'onigakari' && !infiniteRushMode && state.stRemaining <= 50 && state.stRemaining >= 1
+      && !state.rushCustNoNotice && state.stLookaheadQueue.some(s => s.hit && s.bonusType !== 'RESTART') && Math.random() < 0.5) {
+    state.excellentFired = true;
+    return { type: 'MISS', teaser: 'EXCELLENT' };
+  }
   if (state.rushCustNoNotice || state.rushMode === 'rem') return { type: 'MISS', teaser: null };
 
   let teaser = null;
@@ -985,6 +1058,8 @@ async function playRushTeaserAndResume(teaser, resumeAuto = false) {
       await playOnigakariCountdown({ isHit: false, is6000: false, token: tok });
     } else if (teaser === 'ONI_TENPAI_GAZE') {
       await playOniTenpaiAori({ isHit: false, is6000: false, token: tok });
+    } else if (teaser === 'EXCELLENT') {
+      state.rushIwakanNotes.push('Excellent予告'); await playExcellentYokoku(tok);
     } else if (teaser === 'ONI_BLINK_GAZE') {
       updateReserveSlots('NORMAL', 'BLINK', 0); await wait(480, tok); updateReserveSlots('NORMAL', null);
     }
