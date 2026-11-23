@@ -1980,6 +1980,11 @@ function updateReserveSlots(mode = 'NORMAL', special = null, targetSlotIdx = 0) 
     else if (i === idx && special === 'REM_CYAN') { el.textContent = '鬼'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-sky-200 bg-gradient-to-br from-sky-400 to-blue-800 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-sky-400/90 animate-pulse'; }
     else { el.textContent = '○'; el.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60'; }
   }
+  // 保留アイコンの発光（CSS側：data-glow。色つきの鬼玉だけが脈打つ）
+  for (let i = 0; i < 4; i++) {
+    const g = (special === 'ALL_ONI') ? 'GOLD' : (i === idx && special) ? special : '';
+    if (g) resSlots[i].dataset.glow = g; else delete resSlots[i].dataset.glow;
+  }
 }
 
 function updateRes4Dots(activeCount) {
@@ -2058,6 +2063,64 @@ function fireRainbowBurst(lampLabel = '大当り!!', { withBackNiziiro = true } 
     });
   });
   setTimeout(() => lcdFrame.classList.remove('shake-burst'), 720);
+}
+
+
+// -------------------------------------------------------------------------
+// ★v8.3 追加：Excellent予告（コード描画のメタル文字）／短いプレミア予告（コードのみ）
+// -------------------------------------------------------------------------
+// 「当選確定の先読み」を知らせる。RUSH中に1回だけ。文字は銀メタル＋光の走査、画像は使わない。
+async function playExcellentYokoku(token) {
+  const host = lcdFrame; if (!host) return;
+  const W = host.offsetWidth || 320, fs = Math.round(W * 0.150);
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;inset:0;z-index:57;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);';
+  const txt = document.createElement('div');
+  txt.textContent = 'EXCELLENT';
+  txt.style.cssText = `font-family:'Inter','Noto Sans JP',sans-serif;font-weight:900;font-style:italic;letter-spacing:.04em;font-size:${fs}px;line-height:1;white-space:nowrap;`
+    + 'background:linear-gradient(100deg,#6b7c8c 0%,#f4f8fb 18%,#9fb4c7 34%,#ffffff 48%,#7d93a6 62%,#e9f1f7 80%,#5f7384 100%);background-size:260% 100%;'
+    + '-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1px rgba(20,30,40,.85);'
+    + 'filter:drop-shadow(0 3px 2px rgba(0,0,0,.9)) drop-shadow(0 0 14px rgba(180,220,255,.75));transform-origin:50% 50%;';
+  const line = (top) => { const l = document.createElement('div'); l.style.cssText = `position:absolute;left:6%;right:6%;top:${top};height:2px;background:linear-gradient(90deg,transparent,#e6f1fa,transparent);opacity:0;`; return l; };
+  const l1 = line('calc(50% - ' + Math.round(fs * 0.78) + 'px)'), l2 = line('calc(50% + ' + Math.round(fs * 0.72) + 'px)');
+  wrap.appendChild(l1); wrap.appendChild(l2); wrap.appendChild(txt); host.appendChild(wrap);
+  try {
+    try { StudioAudio.playPokyun(true); } catch (e) {}
+    wrap.animate([{ background: 'rgba(0,0,0,0)' }, { background: 'rgba(0,0,0,.55)', offset: .12 }, { background: 'rgba(0,0,0,.55)', offset: .8 }, { background: 'rgba(0,0,0,0)' }], { duration: 1750, fill: 'forwards' });
+    txt.animate([{ transform: 'scale(2.6)', opacity: 0 }, { transform: 'scale(.94)', opacity: 1, offset: .16 }, { transform: 'scale(1.04)', offset: .26 }, { transform: 'scale(1)', opacity: 1, offset: .8 }, { transform: 'scale(1.12)', opacity: 0 }], { duration: 1750, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'forwards' });
+    txt.animate([{ backgroundPosition: '130% 0' }, { backgroundPosition: '-30% 0' }], { duration: 1500, delay: 200, easing: 'ease-in-out', fill: 'forwards' });
+    [l1, l2].forEach(l => l.animate([{ opacity: 0, transform: 'scaleX(.1)' }, { opacity: .9, transform: 'scaleX(1)', offset: .2 }, { opacity: .9, offset: .8 }, { opacity: 0 }], { duration: 1750, fill: 'forwards' }));
+    FxCanvas.spawnRing('#cfe6ff', 300, 8); setTimeout(() => { try { FxCanvas.burstGold(30); } catch (e) {} }, 220);
+    await wait(1800, token);
+  } finally { wrap.remove(); }
+}
+
+// 短いプレミア予告（0.8秒前後・音と光だけ）。内部抽選には一切関与しない演出専用
+async function playShortPremium(kind, token) {
+  const host = lcdFrame; if (!host) return;
+  const el = document.createElement('div');
+  el.style.cssText = 'position:absolute;inset:0;z-index:55;pointer-events:none;opacity:0;';
+  host.appendChild(el);
+  try {
+    if (kind === 'goldRain') {
+      el.style.background = 'linear-gradient(180deg,rgba(254,240,138,.55),rgba(250,204,21,.0) 70%)';
+      try { StudioAudio.playKyuin(); } catch (e) {}
+      FxCanvas.burstGold(46); setTimeout(() => FxCanvas.burstGold(30), 160);
+      el.animate([{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 0 }], { duration: 820 });
+    } else if (kind === 'rainbowSweep') {
+      el.style.background = 'linear-gradient(105deg,transparent 30%,rgba(244,114,182,.55) 40%,rgba(254,240,138,.7) 48%,rgba(125,211,252,.6) 56%,transparent 66%)';
+      el.style.opacity = '1';
+      try { StudioAudio.playPokyun(false); } catch (e) {}
+      el.animate([{ transform: 'translateX(-100%)' }, { transform: 'translateX(100%)' }], { duration: 760, easing: 'ease-in-out' });
+      FxCanvas.burstRainbow(36);
+    } else {   // 'blueEyes'：青い光が中央から広がる（レムの瞳）
+      el.style.background = 'radial-gradient(circle at 50% 46%,rgba(186,230,253,.85) 0%,rgba(56,189,248,.45) 30%,transparent 62%)';
+      try { StudioAudio.playPuchun(); } catch (e) {}
+      el.animate([{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.1)', offset: .3 }, { opacity: 0, transform: 'scale(1.5)' }], { duration: 860, easing: 'ease-out' });
+      FxCanvas.spawnRing('#7dd3fc', 260, 7);
+    }
+    await wait(880, token);
+  } finally { el.remove(); }
 }
 
 // -------------------------------------------------------------------------
@@ -2538,7 +2601,13 @@ const OniFx = (() => {
     };
   }
 
-  return { clearAll, countHit, countMiss, premiumCount, tenpai };
+  // 7/0/3揃いの放射光（背面で回る光条。一定時間で自動消去）
+  function radiate(rgb = '254,240,138', hue = false) {
+    const d = rays(rgb, hue);
+    setTimeout(() => { try { d.remove(); } catch (e) {} }, 2300);
+    return d;
+  }
+  return { clearAll, countHit, countMiss, premiumCount, tenpai, radiate };
 })();
 
 // ハズレのテンパイ図柄：基本は 1-6,8。0 だけ少し混ぜる（0は大きく表示される煽り）
@@ -2588,6 +2657,7 @@ async function playOniTotsuAtariPause({ is6000, bonusType = null, fixedDig = nul
   await wait(550, token);
 
   if (winDig === 7 || winDig === 3 || winDig === 0) {
+    try { OniFx.radiate(winDig === 7 ? '254,240,138' : winDig === 3 ? '253,164,175' : '255,255,255', winDig === 0); } catch (e) {}
     StudioAudio.playPokyun(true); setLcdNiziiroBack(true); FxCanvas.burstRainbow(64);
   } else if (winDig % 2 === 0 && bType === 'BONUS_300') {
     StudioAudio.play300Sound();
