@@ -1972,6 +1972,7 @@ function clearIwakanEffects() {
   hiddenRemBadge.classList.add('hidden');
   rushNoiseVeil.classList.add('hidden');
   rushTopBadge.classList.add('hidden');
+  try { OniFx.clearAll(); } catch (e) {}      // 文字なしカウントダウン／テンパイの残骸を必ず消す
 }
 
 function clearVisualEffects() {
@@ -2304,6 +2305,208 @@ async function playRemTougaiBurst({ is6000, bonusType, fromSakibare = false, for
   return winDig === 0 ? '0揃い特別違和感' : note;
 }
 
+// -------------------------------------------------------------------------
+// 13b. 鬼がかりRUSH：文字を使わない映像表現（テンパイ煽り／カウントダウン）
+//   ・「テンパイ煽り!」「COUNT [3]」のような説明テキストは出さない（見れば分かる演出にする）
+//   ・図柄アート・光・リング・ひび割れだけで伝える。位置は図柄の列と同じ高さで、液晶上部のロゴ領域には掛けない
+//   ・カウントダウンの約束事：3 → 2 → 1 に届いたら大当り濃厚（ハズレは必ず 3 か 2 で割れて終わる）／1の次の 0 は 6000濃厚（0揃い）
+// -------------------------------------------------------------------------
+const OniFx = (() => {
+  const hosts = { back: null, front: null };
+  const SHARDS = [
+    'polygon(0 0, 55% 0, 30% 45%, 0 38%)',
+    'polygon(55% 0, 100% 0, 100% 30%, 62% 42%, 30% 45%)',
+    'polygon(0 38%, 30% 45%, 22% 100%, 0 100%)',
+    'polygon(30% 45%, 62% 42%, 70% 100%, 22% 100%)',
+    'polygon(62% 42%, 100% 30%, 100% 100%, 70% 100%)'
+  ];
+  const SH_ORIGIN = ['21% 21%', '69% 25%', '13% 70%', '46% 72%', '83% 68%'];
+  const SH_VEC = [[-16, -4], [14, -10], [-12, 12], [2, 16], [16, 10]];
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function host(which) {
+    let el = hosts[which];
+    if (el && el.isConnected) return el;
+    el = document.createElement('div');
+    el.className = `oni-fx-host oni-fx-${which}`;
+    oniRushStage.appendChild(el);
+    hosts[which] = el;
+    return el;
+  }
+  function layer(which, cls = '') {
+    const d = document.createElement('div');
+    d.className = `oni-fx-layer ${cls}`.trim();
+    host(which).appendChild(d);
+    return d;
+  }
+  function clearAll() {
+    ['back', 'front'].forEach(k => { const h = hosts[k]; if (h && h.isConnected) h.innerHTML = ''; });
+  }
+
+  // 数字アート（0〜8の画像）を並べた大きなカウント表示。画像が無い時は金／水色グラデ文字で代替
+  function bigNumber(str, tone) {
+    const el = document.createElement('div');
+    el.className = `oni-count-digit${tone ? ' tone-' + tone : ''}`;
+    el.style.setProperty('--n', String(String(str).length));
+    [...String(str)].forEach(ch => {
+      const n = parseInt(ch, 10);
+      const url = Assets.getDigit(clampDigit08(n));
+      const cell = document.createElement('div'); cell.className = 'oni-count-cell';
+      if (url) { const im = document.createElement('img'); im.src = url; im.alt = ch; im.className = 'oni-count-img'; cell.appendChild(im); }
+      else cell.innerHTML = `<span class="oni-count-fallback ${n % 2 === 1 || n === 0 ? 'gold-grad-text' : 'cyan-grad-text'}">${ch}</span>`;
+      el.appendChild(cell);
+    });
+    return el;
+  }
+
+  function popIn(el, dur = 170, from = 1.85) {
+    return el.animate([
+      { opacity: 0, transform: `scale(${from})`, filter: 'blur(8px) brightness(2.4)' },
+      { opacity: 1, transform: 'scale(0.95)', filter: 'blur(0px) brightness(1.4)', offset: 0.6 },
+      { opacity: 1, transform: 'scale(1)', filter: 'blur(0px) brightness(1)' }
+    ], { duration: dur, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'both' });
+  }
+  function beat(el, dur = 260, amp = 1.07) {
+    return el.animate([{ transform: 'scale(1)' }, { transform: `scale(${amp})` }, { transform: 'scale(1)' }], { duration: dur, easing: 'ease-in-out', iterations: 2 });
+  }
+  // 数字を消す（レイヤーごと除去）。to>1 なら光に溶けるように拡大して消える
+  function retire(el, dur = 110, to = 0.66) {
+    if (!el) return;
+    const lay = el.parentElement;
+    const a = el.animate([{ opacity: 1 }, { opacity: 0, transform: `scale(${to})`, filter: 'blur(4px)' }], { duration: dur, easing: 'ease-in', fill: 'forwards' });
+    a.onfinish = () => { if (lay && lay.classList.contains('oni-fx-layer')) lay.remove(); };
+  }
+  function countShow(str, { tone = '', dur = 170, from = 1.85 } = {}) {
+    const lay = layer('front', 'oni-count-lay');
+    const el = bigNumber(str, tone);
+    lay.appendChild(el);
+    popIn(el, dur, from);
+    return el;
+  }
+  function rays(rgb = '254,240,138', hue = false) {
+    const d = layer('back', `oni-rays${hue ? ' oni-rays-hue' : ''}`);
+    d.style.setProperty('--ray-rgb', rgb);
+    d.animate([{ transform: 'rotate(0deg)', opacity: 0 }, { transform: 'rotate(40deg)', opacity: 1, offset: 0.15 }, { transform: 'rotate(360deg)', opacity: 1 }],
+      { duration: 2600, easing: 'linear', fill: 'forwards' });
+    return d;
+  }
+
+  // ハズレ：数字にひびが走って、5枚の破片になって落ちる
+  async function crackAway(el, token) {
+    if (!el) return;
+    const lay = el.parentElement;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const wrap = document.createElement('div');
+    wrap.className = 'oni-shatter'; wrap.style.width = `${w}px`; wrap.style.height = `${h}px`;
+    const shards = SHARDS.map((poly, i) => {
+      const c = el.cloneNode(true);
+      c.style.clipPath = poly; c.style.webkitClipPath = poly; c.style.transformOrigin = SH_ORIGIN[i];
+      wrap.appendChild(c); return c;
+    });
+    wrap.insertAdjacentHTML('beforeend', '<svg class="oni-crack" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="52,-2 43,20 58,38 39,58 57,78 47,102" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg>');
+    lay.replaceChild(wrap, el);
+    const crack = wrap.querySelector('.oni-crack');
+    crack.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 80, fill: 'forwards' });
+    StudioAudio.playCrackNoise();
+    await wait(95, token);
+    shards.forEach((s, i) => {
+      const [vx, vy] = SH_VEC[i];
+      s.animate([
+        { transform: 'translate(0px,0px) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${vx * 0.6}px, ${vy * 0.6}px) rotate(${vx * 0.4}deg)`, opacity: 1, offset: 0.25 },
+        { transform: `translate(${vx * 1.6 + rand(-6, 6)}px, ${70 + rand(0, 60)}px) rotate(${vx * 2.2 + rand(-20, 20)}deg)`, opacity: 0 }
+      ], { duration: 520 + i * 35, easing: 'cubic-bezier(.45,0,.85,.6)', fill: 'forwards' });
+    });
+    crack.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
+    await wait(430, token);
+  }
+
+  const RING = { 3: ['#7dd3fc', 200, 5], 2: ['#fbbf24', 240, 6], 1: ['#fef08a', 300, 9], 0: ['#f9a8d4', 340, 10] };
+
+  // 当選：3 → 2 → 1（大当り濃厚）。揃う図柄が 0 のときだけ最後に 0（6000濃厚）まで数える
+  async function countHit(withZero, token) {
+    const seq = withZero ? [3, 2, 1, 0] : [3, 2, 1];
+    let prev = null;
+    for (const n of seq) {
+      if (prev) retire(prev, 100);
+      const el = countShow(String(n), { tone: n === 0 ? 'rainbow' : String(n), from: n === 3 ? 1.9 : 1.7 });
+      const [col, r, lw] = RING[n];
+      FxCanvas.spawnRing(col, r, lw);
+      if (n === 3) StudioAudio.playSoftHeartbeat();
+      if (n === 1) { FxCanvas.burstGold(34); rays('254,240,138'); beat(el, 200, 1.09); }
+      if (n === 0) { FxCanvas.burstRainbow(56); FxCanvas.spawnLightning('#fef08a', 4); rays('255,255,255', true); beat(el, 220, 1.08); }
+      prev = el;
+      await wait(n === 1 || n === 0 ? 430 : 290, token);
+    }
+    retire(prev, 160, 1.55);               // 最後の数字は、図柄が揃う瞬間に光へ溶ける
+  }
+
+  // ハズレ：必ず 3 か 2 で止まり、1 には届かない
+  async function countMiss(stopAt, token) {
+    const seq = stopAt === 3 ? [3] : [3, 2];
+    let prev = null;
+    for (const n of seq) {
+      if (prev) retire(prev, 100);
+      const el = countShow(String(n), { tone: String(n), from: n === 3 ? 1.9 : 1.7 });
+      const [col, r, lw] = RING[n];
+      FxCanvas.spawnRing(col, r, lw);
+      if (n === 3) StudioAudio.playSoftHeartbeat();
+      prev = el;
+      await wait(n === stopAt ? 360 : 290, token);
+    }
+    await crackAway(prev, token);
+  }
+
+  // 6000濃厚のプレミアカウント：1→2→3→4→5→6 と駆け上がり、最後は「6000」の数字アートが虹の光とともに現れる
+  async function premiumCount(token) {
+    let prev = null;
+    for (let n = 1; n <= 6; n++) {
+      if (prev) retire(prev, 70);
+      const el = countShow(String(n), { tone: n >= 4 ? '1' : String(Math.min(n, 3)), dur: 120, from: 1.5 });
+      FxCanvas.spawnRing(n >= 4 ? '#fef08a' : '#fbbf24', 180 + n * 26, n >= 4 ? 7 : 5);
+      if (n === 1) StudioAudio.playSoftHeartbeat();
+      if (n >= 4) setPremiaFrame(true);
+      prev = el;
+      await wait(n >= 4 ? 190 : 170, token);
+    }
+    retire(prev, 90);
+    const big = countShow('6000', { tone: 'rainbow', dur: 200, from: 2.1 });
+    rays('255,255,255', true);
+    FxCanvas.burstRainbow(60); FxCanvas.spawnLightning('#fef08a', 5); FxCanvas.spawnRing('#fef08a', 340, 11);
+    beat(big, 220, 1.08);
+    await wait(520, token);
+    retire(big, 160, 1.5);
+  }
+
+  // テンパイ煽り：図柄の列を上下から挟む光のビーム＋中央リールの脈動（プレミア図柄は放射光つき）。文字は出さない
+  function tenpai({ premium = false, dig = 0 } = {}) {
+    const nodes = [];
+    const rowR = oniReels[1] ? oniReels[1].getBoundingClientRect() : null;
+    const stR = oniRushStage.getBoundingClientRect();
+    const col = premium ? '254,240,138' : '248,113,113';
+    if (rowR && stR.height > 0) {
+      const ys = [rowR.top - stR.top - 4, rowR.bottom - stR.top + 2];
+      ys.forEach((y, i) => {
+        const b = document.createElement('div'); b.className = 'oni-beam'; b.style.top = `${y}px`; b.style.setProperty('--c', col);
+        host('front').appendChild(b); nodes.push(b);
+        b.animate([{ transform: 'scaleX(0)', opacity: 0 }, { transform: 'scaleX(1)', opacity: 1 }], { duration: 170 + i * 50, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'forwards' });
+      });
+    }
+    const pulse = layer('back', 'oni-pulse'); pulse.style.setProperty('--c', col);
+    pulse.animate([{ opacity: 0, transform: 'scale(.72)' }, { opacity: 0.9, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(.72)' }],
+      { duration: premium ? 460 : 560, iterations: Infinity, easing: 'ease-in-out' });
+    nodes.push(pulse);
+    if (premium && (dig === 7 || dig === 0)) nodes.push(rays(dig === 0 ? '255,255,255' : '254,240,138', dig === 0));
+    return {
+      stop() {
+        nodes.forEach(n => { const a = n.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }); a.onfinish = () => n.remove(); });
+      }
+    };
+  }
+
+  return { clearAll, countHit, countMiss, premiumCount, tenpai };
+})();
+
 async function playOniTenpaiAori({ isHit, is6000, bonusType, fixedDig = null, token }) {
   const dig = fixedDig !== null ? fixedDig
     : isHit ? pickRushRuleDigit(bonusType || (is6000 ? 'BONUS_6000' : 'BONUS_1500'), true)
@@ -2313,16 +2516,12 @@ async function playOniTenpaiAori({ isHit, is6000, bonusType, fixedDig = null, to
   setOniReels(dig, (dig % 8) + 1, dig, { tenpaiSide: true, midSpin: true });
   if (dig === 7 || dig === 0) setPremiaFrame(true);
 
-  rushTopBadge.classList.remove('hidden');
-  rushTopBadge.textContent = dig === 7 ? '7 テンパイ!!（大当り濃厚）' : dig === 0 ? '0 テンパイ!?（超違和感）' : `${dig} テンパイ煽り!`;
-  rushTopBadge.className = isPremDig
-    ? 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
-    : 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
-
+  // 説明テキストは出さず、光のビーム・脈動・リング・鼓動だけで「テンパイ」を見せる
+  const fx = OniFx.tenpai({ premium: isPremDig, dig });
   FxCanvas.spawnRing(isPremDig ? '#fef08a' : '#ef4444', 250, 7);
   StudioAudio.playSoftHeartbeat();
-  await wait(isPremDig ? 720 : 540, token);
-  rushTopBadge.classList.add('hidden');
+  try { await wait(isPremDig ? 720 : 540, token); }
+  finally { fx.stop(); }
 
   if (!isHit) {
     const missMid = (dig % 8) + 1;
@@ -2360,29 +2559,28 @@ async function playOniTotsuAtariPause({ is6000, bonusType = null, fixedDig = nul
 }
 
 async function playOnigakariCountdown({ isHit, is6000, bonusType = null, token }) {
-  let seq = ['3', '2', '1', '0'], note = '', isPrem = false, forceZero = false;
-  if (isHit && is6000 && Math.random() < 0.55) {
-    seq = ['1', '2', '3', '4', '5', '6', '000'];
-    note = 'プレミアカウント(1→2→3→4→5→6→000)';
-    isPrem = true; forceZero = true;
+  const bType = bonusType || (is6000 ? 'BONUS_6000' : 'BONUS_1500');
+  // 当選時は揃う図柄を先に決める。6000のプレミアカウント(55%)は 0揃い、通常は図柄ルール通り（0 のときだけ最後に 0 まで数える）
+  const premium = isHit && is6000 && Math.random() < 0.55;
+  let winDig = null, note = '';
+  if (premium) { note = 'プレミアカウント(1→2→3→4→5→6→000)'; winDig = Assets.getDigit(0) ? 0 : null; }
+  else if (isHit) winDig = pickRushRuleDigit(bType, true);
+
+  // 暗い背景に数字だけを浮かべる（既に暗転中ならそのまま）
+  const hadDark = oniRushStage.classList.contains('oni-bg-dark');
+  oniRushStage.classList.add('oni-bg-dark');
+  try {
+    if (premium) await OniFx.premiumCount(token);
+    else if (isHit) await OniFx.countHit(winDig === 0, token);
+    else await OniFx.countMiss(Math.random() < 0.45 ? 3 : 2, token);   // ハズレは 3 か 2 で止まる（1には届かない）
+  } finally {
+    OniFx.clearAll();
+    if (!hadDark) oniRushStage.classList.remove('oni-bg-dark');
   }
 
-  rushTopBadge.classList.remove('hidden');
-  for (let i = 0; i < seq.length; i++) {
-    rushTopBadge.textContent = `COUNT [ ${seq[i]} ]`;
-    const hot = isPrem && i >= 3;
-    rushTopBadge.className = hot
-      ? 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap'
-      : 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-rose-950/95 border border-amber-400 text-amber-200 shadow-lg whitespace-nowrap';
-    if (hot) setPremiaFrame(true);
-    FxCanvas.spawnRing(hot ? '#fef08a' : '#ef4444', 180 + i * 24, 5);
-    await wait(isPrem ? 210 : 240, token);
-    if (!isHit && i === 2) break;
-  }
-  rushTopBadge.classList.add('hidden');
   if (isHit) {
-    const winDig = await playOniTotsuAtariPause({ is6000, bonusType, fixedDig: forceZero && Assets.getDigit(0) ? 0 : null, hadNotice: true, token });
-    return { note, winDig };
+    const wd = await playOniTotsuAtariPause({ is6000, bonusType, fixedDig: winDig, hadNotice: true, token });
+    return { note, winDig: wd };
   }
   return { note: '', winDig: null };
 }
