@@ -725,7 +725,8 @@
       <div class="flex gap-1.5">
         <button data-dtab="stats" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white border-yellow-200/60 shadow">📈 データ</button>
         <button data-dtab="history" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">📜 履歴</button>
-        <button data-dtab="sim" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🚀 100回シミュ</button>
+        <button data-dtab="records" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🏆 記録</button>
+        <button data-dtab="sim" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🚀 100回</button>
       </div>
 
       <div id="dataPane-stats" class="data-pane space-y-2">
@@ -757,6 +758,8 @@
           </table>
         </div>
       </div>
+
+      <div id="dataPane-records" class="data-pane hidden space-y-2.5"><div id="recordsRoot" class="space-y-2.5"></div></div>
 
       <div id="dataPane-sim" class="data-pane hidden space-y-3">
       <section class="rounded-2xl bg-[#1a0a07]/95 border border-amber-700/60 p-3.5 shadow-xl space-y-3.5">
@@ -812,8 +815,22 @@
         <div class="rounded-xl bg-black/70 border border-fuchsia-500/60 p-2.5"><div class="text-[10px] text-fuchsia-300">Re:Start / 残保連</div><div id="resSpecial" class="text-sm font-black text-fuchsia-300 mt-1 num-fixed">0回 / 0回</div></div>
         <div class="rounded-xl bg-black/70 border border-cyan-500/60 p-2.5"><div class="text-[10px] text-cyan-300">獲得純増</div><div id="resNet" class="text-lg font-black text-cyan-300 num-fixed">0 発</div></div>
       </div>
+      <div id="resRank" class="hidden mb-3 rounded-xl border border-yellow-200/70 bg-gradient-to-r from-amber-900/70 via-yellow-800/60 to-amber-900/70 py-2 text-sm font-black text-yellow-100 shadow"></div>
       <div id="resSummaryText" class="text-xs font-bold text-amber-200 mb-4 leading-relaxed whitespace-pre-line"></div>
       <button id="btnCloseResult" class="w-full py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 hover:from-rose-500 text-slate-950 shadow-lg border border-yellow-200/70 active:scale-95 transition">通常時へ戻る</button>
+    </div>
+  </div>
+
+  <div id="nameModal" class="hidden fixed inset-0 z-[920] bg-black/92 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-xs rounded-3xl border-2 border-yellow-300/90 bg-gradient-to-b from-[#3a1a06] via-[#1c0a08] to-[#0a0406] p-5 shadow-2xl text-center space-y-3">
+      <div id="nameModalRank" class="text-lg font-black gold-grad-text">歴代 1 位 ランクイン!!</div>
+      <div id="nameModalDisp" class="text-2xl font-black text-white num-fixed">0 個</div>
+      <div class="text-[11px] font-bold text-amber-200">名前を登録しますか？（10文字まで）</div>
+      <input id="nameInput" type="text" maxlength="10" autocomplete="off" class="w-full rounded-xl bg-black/70 border border-amber-500/70 px-3 py-2.5 text-center text-base font-black text-amber-100 outline-none" placeholder="名無し">
+      <div class="flex gap-2">
+        <button id="nameSkip" class="flex-1 py-2.5 rounded-xl text-[11px] font-black bg-black/60 text-amber-200/80 border border-amber-800/70 active:scale-95">名無しのまま</button>
+        <button id="nameOk" class="flex-1 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 text-slate-950 border border-yellow-200/70 shadow active:scale-95">登録</button>
+      </div>
     </div>
   </div>
 
@@ -1064,6 +1081,7 @@
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
   <script src="effects.js?v=82"></script>
+  <script src="records.js?v=82"></script>
   <script src="game.js?v=82"></script>
 </body>
 </html>
