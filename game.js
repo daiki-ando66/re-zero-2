@@ -75,6 +75,7 @@ function drawWeddingWindowExt() {
 let rotRate = 16.5;
 let exchangeRate = 4.0;
 let infiniteRushMode = false;
+Records.setGuard(() => (typeof TestMode !== 'undefined' && TestMode.active) || infiniteRushMode);   // テスト／無限STは記録しない
 
 const state = {
   phase: 'NORMAL',
@@ -735,7 +736,7 @@ async function resolveNormalReach() {
       await wait(1280, tok);
 
       state.balls += SPEC.NET_1500; LiveSlump.record(true);
-      const hitSpin = state.currentSpin; state.currentSpin = 0; state.phase = 'NORMAL';
+      const hitSpin = state.currentSpin; state.currentSpin = 0; state.phase = 'NORMAL'; notifyHamari(hitSpin);
       clearVisualEffects(); setActiveScene('normal'); setReels(sc.tenpaiNum, sc.tenpaiNum, sc.tenpaiNum);
       normalTitle.textContent = '通常 1,500 終了'; normalTitle.className = 'text-lg sm:text-xl font-black text-amber-200';
       normalSub.textContent = '純増1,400発を持って通常時へ！';
@@ -768,7 +769,11 @@ function fillStLookaheadQueue() {
   }
 }
 
+function notifyHamari(spins) {
+  try { const r = Records.noteHamari(spins); if (r > 0) showToast(`🕳️ ハマり ${Number(spins).toLocaleString()}回転 → 歴代${r}位に記録`, 3200); } catch (e) {}
+}
 function enterOnigakariRush(hitSpin, is3000) {
+  notifyHamari(hitSpin);
   state.rushHits++; state.rushChains = 1;
   state.rushDisp = is3000 ? SPEC.DISP_3000 : SPEC.DISP_1500;
   state.rushNet = is3000 ? SPEC.NET_3000 : SPEC.NET_1500;
@@ -823,6 +828,7 @@ async function afterBonusReserveCheck(prevType) {
         hideFullscreenOverlay();
         state.rushChains++; state.rush6000Count++; state.rushWeddingCount++;
         state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000;
+        try { Records.noteWedding({ disp: state.rushDisp, chains: state.rushChains }); } catch (e) {}
         updateSessionBest(); LiveSlump.record(true); updateStatsUI();
         afterBonusReserveCheck('BONUS_6000');
         return;
@@ -1258,6 +1264,17 @@ function finishRush() {
   document.getElementById('resSummaryText').textContent =
     `総獲得払出 ${state.rushDisp.toLocaleString()}個（換金目安 ${cashEst.toLocaleString()}円）` +
     (state.rushWeddingCount > 0 ? `\nWEDDING 12,000 ×${state.rushWeddingCount}回!!` : '') + lastIwakan;
+  // 記録：復活(死に戻り)が確定していない＝このRUSHが本当に終わった時だけ書き込む
+  const rkEl = document.getElementById('resRank');
+  if (rkEl) rkEl.classList.add('hidden');
+  if (!state.pendingResultRevival) {
+    let rk = null;
+    try { rk = Records.commitRush({ disp: state.rushDisp, net: state.rushNet, chains: state.rushChains, n6000: state.rush6000Count, wed: state.rushWeddingCount, spin: state.rushStartSpin }); } catch (e) {}
+    if (rk && rkEl && (rk.rank > 0 || rk.dayRank > 0)) {
+      const parts = []; if (rk.rank > 0) parts.push(`🏆 歴代 ${rk.rank} 位`); if (rk.dayRank > 0) parts.push(`本日 ${rk.dayRank} 位`);
+      rkEl.textContent = parts.join('　/　'); rkEl.classList.remove('hidden');
+    }
+  }
   resultModal.classList.remove('hidden'); updateStatsUI();
 }
 
@@ -1597,6 +1614,7 @@ document.querySelectorAll('.promo-test-item').forEach(btn => {
 // 実戦操作ボタン
 // =========================================================================
 document.getElementById('btnCloseResult').addEventListener('click', async () => {
+  if (!state.pendingResultRevival && Records.hasPendingName()) { Records.openNameModal(() => document.getElementById('btnCloseResult').click()); return; }
   resultModal.classList.add('hidden');
   if (state.pendingResultRevival) {
     state.pendingResultRevival = false;
@@ -1941,6 +1959,7 @@ const DataPanel = (() => {
     if (!opened) return;
     if (tab === 'stats') renderStats();
     else if (tab === 'history') renderHistoryTable();
+    else if (tab === 'records') Records.render();
   }
 
   function setTab(t) {
@@ -1948,6 +1967,7 @@ const DataPanel = (() => {
     clearInterval(timer); timer = null;
     if (t === 'stats') { renderStats(); timer = setInterval(renderStats, 1000); }
     else if (t === 'history') renderHistoryTable();
+    else if (t === 'records') { Records.mount(document.getElementById('recordsRoot')); }
     else if (t === 'sim') { if (lastSimPoints.length === 0) runSim100(); else setTimeout(() => drawSlumpChart(lastSimPoints), 30); }
   }
   function open(t) {
