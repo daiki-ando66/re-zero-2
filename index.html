@@ -13,6 +13,10 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&family=Shippori+Mincho:wght@600;800&display=swap');
 
     * { box-sizing: border-box; }
+    /* iPhone Safari：長押しで文字・画像が選択／メニュー表示されるのを防ぐ（入力欄だけは入力可能に戻す） */
+    *, *::before, *::after { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+    img { -webkit-user-drag: none; }
 
     body {
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
@@ -20,7 +24,8 @@
       color: #fdf6e7;
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
-      user-select: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
     }
 
     .font-mincho { font-family: 'Shippori Mincho', 'Noto Sans JP', serif; }
@@ -550,7 +555,7 @@
         </div>
         <div class="leading-tight truncate">
           <h1 class="text-xs sm:text-sm font-black bg-gradient-to-r from-yellow-200 via-amber-300 to-rose-300 bg-clip-text text-transparent truncate">
-            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v9.1</span>
+            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v9.2</span>
           </h1>
         </div>
         <button id="testPill" class="hidden shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 border border-emerald-300/80 text-emerald-200 animate-pulse whitespace-nowrap">🧪 TEST</button>
@@ -1080,8 +1085,8 @@
 
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
-  <script src="effects.js?v=83"></script>
-  <script src="records.js?v=91"></script>
-  <script src="game.js?v=91"></script>
+  <script src="effects.js?v=92"></script>
+  <script src="records.js?v=92"></script>
+  <script src="game.js?v=92"></script>
 </body>
 </html>
