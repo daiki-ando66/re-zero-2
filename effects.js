@@ -1557,7 +1557,7 @@ function pickRushRuleDigit(bonusType, hadNotice = false) {
   const evens = [2, 4, 6, 8];
   if (bonusType === 'BONUS_300') return evens[Math.floor(Math.random() * evens.length)];
   if (bonusType === 'BONUS_1500') return Math.random() < 0.5 ? 1 : 5;
-  if (hadNotice && Math.random() < 0.24) return evens[Math.floor(Math.random() * evens.length)];
+  if (hadNotice && Math.random() < 0.45) return evens[Math.floor(Math.random() * evens.length)];
   if (Math.random() < 0.14 && Assets.getDigit(0)) return 0;
   if (Math.random() < 0.56) return 7;
   if (Math.random() < 0.84) return 3;
@@ -2610,9 +2610,8 @@ const OniFx = (() => {
   return { clearAll, countHit, countMiss, premiumCount, tenpai, radiate };
 })();
 
-// ハズレのテンパイ図柄：基本は 1-6,8。0 だけ少し混ぜる（0は大きく表示される煽り）
+// ハズレのテンパイ図柄：1-6,8 のみ。0 / 7 のテンパイは必ず当たり（ガセ無し）
 function pickMissTenpaiDigit() {
-  if (Assets.getDigit(0) && Math.random() < 0.12) return 0;
   return [1, 2, 3, 4, 5, 6, 8][Math.floor(Math.random() * 7)];
 }
 
