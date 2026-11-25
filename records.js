@@ -12,11 +12,10 @@ const Records = (() => {
   const SCHEMA = 1;
   const KEY = 'rezero-oni2:records', KEY_BAK = 'rezero-oni2:records:bak';
   const IDB_NAME = 'rezero-oni2', IDB_STORE = 'kv';
-  const TOP_N = 20, RECENT_MAX = 200, WED_MAX = 100, COMMENT_MIN_DISP = 20000, ALL_MIN_DISP = 10000, HAMA_MIN = 1000, NAME_LEN = 10, CM_LEN = 20, ONLINE_N = 100;
+  const TOP_N = 20, RECENT_MAX = 200, WED_MAX = 100, ALL_MIN_DISP = 10000, HAMA_MIN = 1000, NAME_LEN = 10, ONLINE_N = 100;
 
   let data = blank();
   let guard = () => false;
-  let pendingComment = null;       // { id, disp }
   let persisted = null;            // navigator.storage.persisted() の結果
   let ui = { root: null, period: 'all' };
   let dangerTimer = null;
@@ -146,7 +145,6 @@ const Records = (() => {
     return fetch(ONLINE_DB_URL + path, Object.assign({ signal: ac.signal, cache: 'no-store' }, opt)).finally(() => clearTimeout(tm));
   }
   const cleanName = (n) => Array.from(str(n, 40).trim()).slice(0, NAME_LEN).join('') || '名無し';
-  const cleanCm = (n) => Array.from(str(n, 80).trim()).slice(0, CM_LEN).join('');
   // 日付の区切りは日本時間(JST)の0時。端末の時計のタイムゾーンに左右されない
   function jstKeys(t) { const d = new Date((t || Date.now()) + 9 * 3600e3), y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, '0'), dd = String(d.getUTCDate()).padStart(2, '0'); return { d: `${y}${m}${dd}`, m: `${y}${m}`, label: `${y}/${m}/${dd}`, mlabel: `${y}/${m}` }; }
   function enqueue(kind, p, opt) {
@@ -156,7 +154,6 @@ const Records = (() => {
   }
   function rushPatchBody(item) {
     const p = item.p, k = jstKeys(p.ts), v = { name: p.name, disp: p.disp, chains: p.chains, n6000: p.n6000 || 0, wed: p.wed || 0, ts: p.ts };
-    if (p.cm) v.cm = p.cm;
     const b = {}; b[`rush/day/${k.d}/${item.id}`] = v; b[`rush/month/${k.m}/${item.id}`] = v;
     if (p.disp >= ALL_MIN_DISP) b[`rush/all/${item.id}`] = v;
     return b;
@@ -229,8 +226,7 @@ const Records = (() => {
 
   // RUSH最終終了時：{disp, net, chains, n6000, wed, spin} → {selfRank, id, needsComment}
   //   ・端末内には「自己ベスト」用に残す。オンラインへは出玉の大小を問わず全RUSHを送る（今日／今月、1万個以上は歴代にも）
-  //   ・2万個以上はコメント入力があるので、入力が済むまで送信を保留（あとで必ず送る）
-  function commitRush(info) {
+    function commitRush(info) {
     if (blocked() || !info) return null;
     const e = cleanRush({ id: uid(), ts: Date.now(), disp: info.disp, net: info.net, chains: info.chains, n6000: info.n6000, wed: info.wed, spin: info.spin, name: data.lastName });
     if (!e) return null;
@@ -238,11 +234,9 @@ const Records = (() => {
     data.top.push(e); data.top.sort(byDisp); data.top = data.top.slice(0, TOP_N);
     data.totals.rushes++; data.totals.disp += e.disp; data.totals.maxChain = Math.max(data.totals.maxChain, e.chains);
     const selfRank = rankOf(data.top, e.id);
-    const needsComment = e.disp >= COMMENT_MIN_DISP && onlineEnabled() && data.onlineOn;
-    pendingComment = needsComment ? { id: e.id, disp: e.disp } : null;
     save();
-    enqueue('rush', { name: cleanName(data.lastName), disp: e.disp, chains: Math.max(1, e.chains), n6000: e.n6000, wed: e.wed, ts: e.ts }, { id: e.id, hold: needsComment });
-    return { selfRank, id: e.id, needsComment };
+    enqueue('rush', { name: cleanName(data.lastName), disp: e.disp, chains: Math.max(1, e.chains), n6000: e.n6000, wed: e.wed, ts: e.ts }, { id: e.id });
+    return { selfRank, id: e.id };
   }
   // ハマり：初当たり到達時の通常回転数（1,000回転以上だけ記録）
   function noteHamari(spins) {
@@ -268,7 +262,6 @@ const Records = (() => {
   // ---- 入力モーダル（初回の名前／2万個超えの一言） ----
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function hasPendingComment() { return !!pendingComment; }
   function openModal(o, done) {
     const m = $('nameModal'); if (!m) { if (done) done(); return; }
     $('nameModalRank').textContent = o.title; $('nameModalDisp').textContent = o.sub; $('nameModalLabel').textContent = o.label;
@@ -280,16 +273,6 @@ const Records = (() => {
     $('nameSkip').onclick = () => finish('');
     inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(inp.value); } };
     setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 60);
-  }
-  // 2万個以上の「一言」：入力後（またはスキップ後）に保留していた送信を解放する
-  function openCommentModal(done) {
-    const p = pendingComment; if (!p) { if (done) done(); return; }
-    openModal({ title: '🎉 大量出玉!!', sub: `${p.disp.toLocaleString()} 個`, label: 'ランキングに一言どうぞ（20文字まで・任意）', value: '', max: CM_LEN, ph: '一言（空欄OK）', skip: 'スキップ', ok: '送信',
-      onDone: (val) => {
-        pendingComment = null;
-        const it = data.outbox.find(x => x.id === p.id);
-        if (it) { it.hold = false; const c = cleanCm(val); if (c) it.p.cm = c; save(); flush(); }
-      } }, done);
   }
   // 初めてサイトに入ったとき：名前を一度だけ
   function askNameOnce() {
@@ -394,8 +377,7 @@ const Records = (() => {
       const nm = escapeHtml(str(e.name, NAME_LEN * 2) || '名無し');
       const val = isRush ? `${num(e.disp).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 個</span>` : k === 'hama' ? `${num(e.spins).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 回転</span>` : `<span style="font-size:11px;color:#fde68a">💍</span>`;
       const tags = isRush ? [`${num(e.chains)}連`].concat(num(e.n6000) ? [`6000×${num(e.n6000)}`] : [], num(e.wed) ? [`💍×${num(e.wed)}`] : []).join(' ・ ') + ' ・ ' + fmtShort(num(e.ts)) : k === 'wed' ? fmtDate(num(e.ts)) : fmtShort(num(e.ts));
-      const cm = e.cm ? `<div class="rec-sub" style="color:#fde68a;white-space:normal">「${escapeHtml(str(e.cm, CM_LEN * 2))}」</div>` : '';
-      return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div><div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${tags}</div>${cm}</div><div class="rec-val">${val}</div></div>`;
+      return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div><div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${tags}</div></div><div class="rec-val">${val}</div></div>`;
     }).join('');
     const head = isRush ? `<div class="rec-note" style="margin:0 0 4px;color:#fde68a">${sp.title} ・ RUSH1回の総獲得払出 上位${ONLINE_N}</div>` : `<div class="rec-note" style="margin:0 0 4px;color:#fde68a">${k === 'hama' ? 'ハマり（初当たりまでの通常回転）' : 'ウェディング達成者（新しい順）'} 上位${ONLINE_N}</div>`;
     return `<div class="rec-sec"><div class="rec-h"><span>🌐 オンラインランキング</span><button class="rec-pt" style="flex:none;padding:3px 10px" data-rec-act="reload">更新</button></div>
@@ -456,12 +438,12 @@ const Records = (() => {
     else if (a === 'wipe') {
       const b = $('recWipe'); if (!b) return;
       if (b.dataset.armed === '1') {
-        clearTimeout(dangerTimer); data = blank(); pendingComment = null; save(); setTimeout(() => msg('全記録を削除しました'), 30);
+        clearTimeout(dangerTimer); data = blank(); save(); setTimeout(() => msg('全記録を削除しました'), 30);
       } else { b.dataset.armed = '1'; b.textContent = '⚠️ もう一度押すと全削除'; dangerTimer = setTimeout(() => { b.dataset.armed = ''; b.textContent = '🗑️ 全記録を削除'; }, 4000); }
     }
   }
   function mount(root) { ui.root = root; render(); if (onlineEnabled()) { flush(); loadBoard(ui.board || 'day').then(render); } }
 
-  return { setGuard: (fn) => { guard = fn; }, commitRush, fetchRanks, noteHamari, noteWedding, setName, hasPendingComment, openCommentModal, askNameOnce, mount, render,
+  return { setGuard: (fn) => { guard = fn; }, commitRush, fetchRanks, noteHamari, noteWedding, setName, askNameOnce, mount, render,
     _data: () => data, _import: importText, _export: exportText };
 })();
