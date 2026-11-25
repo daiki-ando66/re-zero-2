@@ -757,8 +757,10 @@ async function resolveNormalReach() {
 }// =========================================================================
 // 鬼がかりRUSH（青V=300 / 赤V=1500・一体表示＆油断暗転WEDDING 12,000）
 // =========================================================================
-function fillStLookaheadQueue() {
-  while (state.stLookaheadQueue.length < 4) {
+// spare：いま消化する1回転分の余裕。先読みはST(RUSH)の残り回転数を超えて作らない（ST終了後の当選に予告が反応する先バレを防ぐ）
+function fillStLookaheadQueue(spare = 0) {
+  const cap = infiniteRushMode ? 4 : Math.min(4, Math.max(1, state.stRemaining + spare));
+  while (state.stLookaheadQueue.length < cap) {
     if (state.stLookaheadQueue.some(s => s.hit)) break;
     const isHit = Math.random() < SPEC.ST_PROB;
     const bonusType = isHit ? drawRushBonusType() : null;
@@ -947,8 +949,10 @@ async function afterBonusReserveCheck(prevType) {
 }
 
 function applyRushModeVisuals() {
-  lcdFrame.classList.remove('fx-gold', 'bonus-theme-brain', 'bonus-theme-rem');
+  // 予告・演出で付いた虹の縁／揺れ／プレミア枠がRUSH通常画面に残らないよう、ここで必ず掃除する
+  lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'shake-burst', 'shake-intense', 'shake-mid', 'bonus-theme-brain', 'bonus-theme-rem');
   if (state.phase !== 'RUSH') return;
+  try { setPremiaFrame(false); setSunburst(false); } catch (e) {}
   syncRushStages(); BgmEngine.resume(state.rushMode);
 
   if (state.rushMode === 'onigakari') {
@@ -983,7 +987,7 @@ function spinRushOnce() {
     updateRes4Dots(state.reserveQueue.length);
     if (slot.hit) { state.reserveQueue = []; if (state.hasVStock) { state.hasVStock = false; state.hasVStockRed = false; setVStockBadge(false); } }
   } else {
-    fillStLookaheadQueue();
+    fillStLookaheadQueue(1);
     slot = state.stLookaheadQueue.shift();
     if (state.stRemaining > 0) fillStLookaheadQueue();
   }
@@ -1012,7 +1016,7 @@ function spinRushOnce() {
   if (!infiniteRushMode && state.stRemaining <= 0) return { type: 'ST_END' };
   // ★Excellent予告：RUSH残り50回以下で、すでに先読みで確定している当選(死に戻り以外)が4回転以内にある時だけ、RUSH中1回
   if (!state.excellentFired && state.rushMode === 'onigakari' && !infiniteRushMode && state.stRemaining <= 50 && state.stRemaining >= 1
-      && !state.rushCustNoNotice && state.stLookaheadQueue.some(s => s.hit && s.bonusType !== 'RESTART') && Math.random() < 0.5) {
+      && !state.rushCustNoNotice && state.stLookaheadQueue.some((s, i) => s.hit && s.bonusType !== 'RESTART' && i < state.stRemaining) && Math.random() < 0.5) {
     state.excellentFired = true;
     return { type: 'MISS', teaser: 'EXCELLENT' };
   }
@@ -1105,9 +1109,13 @@ async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPa
           await runSuddenOchiburu6000({ sub: state.rushMode === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH', rushMode: state.rushMode, token: tok });
           award6000AndContinue(); return;
         }
-        if (sub < 0.62) {
+        if (sub < 0.53) {
           clearIwakanEffects(); state.pendingRushHit = null;
           await runRush6000Sequence({ forceFake: 'restart', iwakanAnswer: '' }); return;
+        }
+        if (sub < 0.62) {   // 300から6000へ昇格（実機は300が出ればほぼ6000に発展する体感）
+          clearIwakanEffects(); state.pendingRushHit = null;
+          await runRush6000Sequence({ forceFake: '300', iwakanAnswer: '' }); return;
         }
         if (sub < 0.80) {
           state.rushIwakanNotes.push('液晶暗転フリーズ'); state.pendingRushHit = null;
@@ -2464,3 +2472,10 @@ LiveSlump.draw();
 setActiveScene('normal');
 setReels(7, 3, 7);
 updateStatsUI();
+
+// iPhone：長押しの文字選択・メニュー表示を抑止（入力欄だけは除く）
+['contextmenu', 'selectstart'].forEach(t => document.addEventListener(t, (e) => {
+  const el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
+  if (el && el.closest && el.closest('input, textarea')) return;
+  e.preventDefault();
+}, { capture: true }));
