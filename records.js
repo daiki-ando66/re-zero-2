@@ -1,5 +1,5 @@
 // =========================================================================
-// records.js — 記録（出玉ランキング／ハマりランキング／ウェディング記録）
+// records.js — 記録（オンライン出玉ランキング［今日／今月／歴代］／ハマり／ウェディング／自己ベスト）
 //  ・テスト／無限ST中は一切書き込まない（guard）
 //  ・更新で消えない保存：固定キー + スキーマ版 + localStorage + IndexedDB ミラー + 直前の正常コピー + 書き出し/読み込み
 //  ・ランキング対象：鬼がかりRUSH 1回の「総獲得払出(個)」（RUSH最終終了時に記録）
@@ -12,17 +12,17 @@ const Records = (() => {
   const SCHEMA = 1;
   const KEY = 'rezero-oni2:records', KEY_BAK = 'rezero-oni2:records:bak';
   const IDB_NAME = 'rezero-oni2', IDB_STORE = 'kv';
-  const TOP_N = 20, RECENT_MAX = 200, WED_MAX = 100, NAME_MIN_DISP = 20000, HAMA_MIN = 1000, NAME_LEN = 10;
+  const TOP_N = 20, RECENT_MAX = 200, WED_MAX = 100, COMMENT_MIN_DISP = 20000, ALL_MIN_DISP = 10000, HAMA_MIN = 1000, NAME_LEN = 10, CM_LEN = 20, ONLINE_N = 100;
 
   let data = blank();
   let guard = () => false;
-  let pendingName = null;          // { id, rank, disp }
+  let pendingComment = null;       // { id, disp }
   let persisted = null;            // navigator.storage.persisted() の結果
   let ui = { root: null, period: 'all' };
   let dangerTimer = null;
 
   function blank() {
-    return { app: 'rezero-oni2', v: SCHEMA, savedAt: 0, lastName: '', lastExportAt: 0,
+    return { app: 'rezero-oni2', v: SCHEMA, savedAt: 0, lastName: '', nameAsked: false, lastExportAt: 0,
       top: [], hama: [], recent: [], wedding: [], totals: { rushes: 0, disp: 0, maxChain: 0 },
       onlineOn: true, outbox: [] };
   }
@@ -50,7 +50,7 @@ const Records = (() => {
     const out = blank();
     // v0（版なし）→ v1：同名フィールドをそのまま検証して取り込む。将来の v2 以降はここに段階を足す。
     out.v = Math.max(SCHEMA, num(o.v, SCHEMA));
-    out.savedAt = num(o.savedAt); out.lastName = str(o.lastName, NAME_LEN * 2); out.lastExportAt = num(o.lastExportAt);
+    out.savedAt = num(o.savedAt); out.lastName = str(o.lastName, NAME_LEN * 2); out.nameAsked = !!o.nameAsked || !!out.lastName; out.lastExportAt = num(o.lastExportAt);
     out.top = (Array.isArray(o.top) ? o.top : []).map(cleanRush).filter(Boolean);
     out.recent = (Array.isArray(o.recent) ? o.recent : []).map(cleanRush).filter(Boolean);
     out.hama = (Array.isArray(o.hama) ? o.hama : []).map(cleanHama).filter(Boolean);
@@ -58,8 +58,8 @@ const Records = (() => {
     const t = o.totals || {};
     out.totals = { rushes: num(t.rushes), disp: num(t.disp), maxChain: num(t.maxChain) };
     out.onlineOn = o.onlineOn !== false;
-    out.outbox = (Array.isArray(o.outbox) ? o.outbox : []).filter(x => x && ['disp', 'hama', 'wed'].includes(x.kind) && x.p && typeof x.p === 'object')
-      .map(x => ({ id: str(x.id, 24) || uid(), kind: x.kind, p: x.p, tries: num(x.tries) })).slice(0, 50);
+    out.outbox = (Array.isArray(o.outbox) ? o.outbox : []).filter(x => x && ['rush', 'hama', 'wed'].includes(x.kind) && x.p && typeof x.p === 'object')
+      .map(x => ({ id: str(x.id, 24) || uid(), kind: x.kind, p: x.p, tries: num(x.tries) })).slice(0, 80);
     return normalize(out);
   }
   const byDisp = (a, b) => b.disp - a.disp || a.ts - b.ts;
@@ -76,10 +76,10 @@ const Records = (() => {
     const uni = (la, lb) => { const m = new Map(); la.concat(lb).forEach(e => { if (!m.has(e.id)) m.set(e.id, e); else if (e.name && !m.get(e.id).name) m.get(e.id).name = e.name; }); return [...m.values()]; };
     out.top = uni(a.top, b.top); out.recent = uni(a.recent, b.recent); out.hama = uni(a.hama, b.hama); out.wedding = uni(a.wedding, b.wedding);
     const newer = (a.savedAt >= b.savedAt) ? a : b;
-    out.lastName = newer.lastName || a.lastName || b.lastName; out.lastExportAt = Math.max(a.lastExportAt, b.lastExportAt);
+    out.lastName = newer.lastName || a.lastName || b.lastName; out.nameAsked = a.nameAsked || b.nameAsked; out.lastExportAt = Math.max(a.lastExportAt, b.lastExportAt);
     out.savedAt = Math.max(a.savedAt, b.savedAt); out.v = Math.max(a.v, b.v);
     out.onlineOn = a.onlineOn && b.onlineOn !== false ? true : (newer.onlineOn);
-    out.outbox = uni(a.outbox, b.outbox).slice(0, 50);
+    out.outbox = uni(a.outbox, b.outbox).slice(0, 80);
     out.totals = { rushes: Math.max(a.totals.rushes, b.totals.rushes), disp: Math.max(a.totals.disp, b.totals.disp), maxChain: Math.max(a.totals.maxChain, b.totals.maxChain) };
     return normalize(out);
   }
@@ -126,6 +126,7 @@ const Records = (() => {
 
   // 起動時：localStorage → 控え → （非同期）IndexedDB と合体
   data = readLS(KEY) || readLS(KEY_BAK) || blank();
+  data.outbox.forEach(x => { x.hold = false; });   // 前回コメント待ちのまま閉じられた分は、次の起動で送る
   idbGet().then(raw => {
     if (!raw) { if (data.top.length || data.hama.length || data.recent.length || data.wedding.length) idbPut(JSON.stringify(data)); return; }
     let o = null; try { o = migrate(JSON.parse(raw)); } catch (e) {}
@@ -139,46 +140,83 @@ const Records = (() => {
   // ---- オンライン送信（Firebase Realtime Database の REST API。SDK不要・失敗しても台の動作には影響しない） ----
   const onlineEnabled = () => /^https:\/\/[A-Za-z0-9.-]+\.(firebaseio\.com|firebasedatabase\.app)$/.test(ONLINE_DB_URL);
   let flushing = false;
-  const boards = { disp: null, hama: null, wed: null };
+  let boards = {};                   // path → { t, rows, err }
   function net(path, opt) {
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 9000);
     return fetch(ONLINE_DB_URL + path, Object.assign({ signal: ac.signal, cache: 'no-store' }, opt)).finally(() => clearTimeout(tm));
   }
   const cleanName = (n) => Array.from(str(n, 40).trim()).slice(0, NAME_LEN).join('') || '名無し';
-  function enqueue(kind, p) {
+  const cleanCm = (n) => Array.from(str(n, 80).trim()).slice(0, CM_LEN).join('');
+  // 日付の区切りは日本時間(JST)の0時。端末の時計のタイムゾーンに左右されない
+  function jstKeys(t) { const d = new Date((t || Date.now()) + 9 * 3600e3), y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, '0'), dd = String(d.getUTCDate()).padStart(2, '0'); return { d: `${y}${m}${dd}`, m: `${y}${m}`, label: `${y}/${m}/${dd}`, mlabel: `${y}/${m}` }; }
+  function enqueue(kind, p, opt) {
     if (!onlineEnabled() || !data.onlineOn) return;
-    data.outbox.push({ id: uid(), kind, p, tries: 0 }); data.outbox = data.outbox.slice(-50);
+    data.outbox.push({ id: (opt && opt.id) || uid(), kind, p, tries: 0, hold: !!(opt && opt.hold) }); data.outbox = data.outbox.slice(-80);
     save(); flush();
+  }
+  function rushPatchBody(item) {
+    const p = item.p, k = jstKeys(p.ts), v = { name: p.name, disp: p.disp, chains: p.chains, n6000: p.n6000 || 0, wed: p.wed || 0, ts: p.ts };
+    if (p.cm) v.cm = p.cm;
+    const b = {}; b[`rush/day/${k.d}/${item.id}`] = v; b[`rush/month/${k.m}/${item.id}`] = v;
+    if (p.disp >= ALL_MIN_DISP) b[`rush/all/${item.id}`] = v;
+    return b;
   }
   async function flush() {
     if (flushing || !onlineEnabled() || !data.outbox.length) return;
     flushing = true;
     try {
       let stop = false;
-      for (let round = 0; round < 6 && !stop && data.outbox.length; round++) {   // 送信中に増えた分も続けて送る
+      for (let round = 0; round < 6 && !stop && data.outbox.some(x => !x.hold); round++) {   // 送信中に増えた分も続けて送る
         for (const item of data.outbox.slice()) {
+          if (item.hold) continue;                                       // コメント入力待ち
           let res;
-          try { res = await net(`/ranking/${item.kind}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item.p) }); }
-          catch (e) { stop = true; break; }                              // 通信不可：次の機会に再送
+          try {
+            res = item.kind === 'rush'
+              ? await net('/.json', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rushPatchBody(item)) })
+              : await net(`/ranking/${item.kind}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item.p) });
+          } catch (e) { stop = true; break; }                            // 通信不可：次の機会に再送
           if (res.ok || (res.status >= 400 && res.status < 500)) {       // 成功、またはルールで拒否（再送しても無駄）→ 送信待ちから外す
-            data.outbox = data.outbox.filter(x => x.id !== item.id); boards[item.kind] = null;
+            data.outbox = data.outbox.filter(x => x.id !== item.id); boards = {};
             save();
           } else { stop = true; break; }                                 // 5xx：後で再送
         }
       }
     } finally { flushing = false; }
   }
-  async function loadBoard(kind) {
-    const b = boards[kind]; if (b && Date.now() - b.t < 30000) return b;
-    const field = kind === 'disp' ? 'disp' : kind === 'hama' ? 'spins' : 'ts';
+  // 盤の定義：kind = day | month | all | hama | wed
+  function boardSpec(kind) {
+    const k = jstKeys();
+    if (kind === 'day') return { path: `/rush/day/${k.d}`, field: 'disp', title: `${k.label}（日本時間）` };
+    if (kind === 'month') return { path: `/rush/month/${k.m}`, field: 'disp', title: `${k.mlabel}月` };
+    if (kind === 'all') return { path: '/rush/all', field: 'disp', title: `歴代（${ALL_MIN_DISP.toLocaleString()}個以上）` };
+    if (kind === 'hama') return { path: '/ranking/hama', field: 'spins', title: '' };
+    return { path: '/ranking/wed', field: 'ts', title: '' };
+  }
+  async function loadBoard(kind, force) {
+    const sp = boardSpec(kind), b = boards[sp.path];
+    if (!force && b && Date.now() - b.t < 30000) return b;
     try {
-      const res = await net(`/ranking/${kind}.json?orderBy=%22${field}%22&limitToLast=20`);
+      const res = await net(`${sp.path}.json?orderBy=%22${sp.field}%22&limitToLast=${ONLINE_N}`);
       if (!res.ok) throw new Error('http ' + res.status);
       const o = await res.json() || {};
-      const rows = Object.values(o).filter(x => x && typeof x === 'object').sort((a, c) => (c[field] - a[field]) || (a.ts - c.ts)).slice(0, TOP_N);
-      boards[kind] = { t: Date.now(), rows, err: '' };
-    } catch (e) { boards[kind] = { t: Date.now() - 20000, rows: (b && b.rows) || [], err: '取得できませんでした（通信を確認してください）' }; }
-    return boards[kind];
+      const rows = Object.entries(o).filter(([, x]) => x && typeof x === 'object').map(([k, x]) => Object.assign({ _k: k }, x))
+        .sort((a, c) => (num(c[sp.field]) - num(a[sp.field])) || (num(a.ts) - num(c.ts))).slice(0, ONLINE_N);
+      boards[sp.path] = { t: Date.now(), rows, err: '' };
+    } catch (e) { boards[sp.path] = { t: Date.now() - 20000, rows: (b && b.rows) || [], err: '取得できませんでした（通信を確認してください）', fail: true }; }
+    return boards[sp.path];
+  }
+  // 結果画面用：この出玉が「今日」「歴代」で何位か（上位100位まで）。0=圏外、-1=不明（通信不可）、null=対象外
+  async function fetchRanks(disp, id) {
+    const one = async (kind) => {
+      const b = await loadBoard(kind, true);
+      if (b.fail) return -1;
+      const rows = b.rows.filter(r => r._k !== id);
+      const cnt = rows.filter(r => num(r.disp) >= disp).length;
+      return cnt >= ONLINE_N ? 0 : cnt + 1;
+    };
+    if (!onlineEnabled() || !data.onlineOn || blocked()) return null;
+    const [day, all] = await Promise.all([one('day'), disp >= ALL_MIN_DISP ? one('all') : Promise.resolve(0)]);
+    return { day, all };
   }
   window.addEventListener('online', () => flush());
   setTimeout(() => flush(), 3500);
@@ -189,21 +227,22 @@ const Records = (() => {
   const startOfWeek = (t = Date.now()) => { const d = new Date(startOfDay(t)); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return d.getTime(); };   // 月曜始まり
   const rankOf = (list, id) => { const i = list.findIndex(e => e.id === id); return i < 0 ? 0 : i + 1; };
 
-  // RUSH最終終了時：{disp, net, chains, n6000, wed, spin} → {rank, dayRank, id, needsName}
+  // RUSH最終終了時：{disp, net, chains, n6000, wed, spin} → {selfRank, id, needsComment}
+  //   ・端末内には「自己ベスト」用に残す。オンラインへは出玉の大小を問わず全RUSHを送る（今日／今月、1万個以上は歴代にも）
+  //   ・2万個以上はコメント入力があるので、入力が済むまで送信を保留（あとで必ず送る）
   function commitRush(info) {
     if (blocked() || !info) return null;
-    const e = cleanRush({ id: uid(), ts: Date.now(), disp: info.disp, net: info.net, chains: info.chains, n6000: info.n6000, wed: info.wed, spin: info.spin });
+    const e = cleanRush({ id: uid(), ts: Date.now(), disp: info.disp, net: info.net, chains: info.chains, n6000: info.n6000, wed: info.wed, spin: info.spin, name: data.lastName });
     if (!e) return null;
     data.recent.unshift(Object.assign({}, e)); data.recent = data.recent.slice(0, RECENT_MAX);
     data.top.push(e); data.top.sort(byDisp); data.top = data.top.slice(0, TOP_N);
     data.totals.rushes++; data.totals.disp += e.disp; data.totals.maxChain = Math.max(data.totals.maxChain, e.chains);
-    const rank = rankOf(data.top, e.id);
-    const today = data.recent.filter(r => r.ts >= startOfDay()).sort(byDisp);
-    const dayRank = rankOf(today, e.id);
-    const needsName = rank > 0 && e.disp >= NAME_MIN_DISP;
-    pendingName = needsName ? { id: e.id, rank, disp: e.disp } : null;
+    const selfRank = rankOf(data.top, e.id);
+    const needsComment = e.disp >= COMMENT_MIN_DISP && onlineEnabled() && data.onlineOn;
+    pendingComment = needsComment ? { id: e.id, disp: e.disp } : null;
     save();
-    return { rank, dayRank, id: e.id, needsName };
+    enqueue('rush', { name: cleanName(data.lastName), disp: e.disp, chains: Math.max(1, e.chains), n6000: e.n6000, wed: e.wed, ts: e.ts }, { id: e.id, hold: needsComment });
+    return { selfRank, id: e.id, needsComment };
   }
   // ハマり：初当たり到達時の通常回転数（1,000回転以上だけ記録）
   function noteHamari(spins) {
@@ -223,37 +262,42 @@ const Records = (() => {
     enqueue('wed', { name: cleanName(data.lastName), ts: Date.now(), disp: Math.max(0, num(info && info.disp)), chains: Math.max(1, num(info && info.chains)) });
     return true;
   }
-  function setName(id, name) {
-    name = Array.from(str(name, 40).trim()).slice(0, NAME_LEN).join('');
-    [data.top, data.recent].forEach(l => l.forEach(e => { if (e.id === id) e.name = name; }));
-    if (name) data.lastName = name;
-    save();
+  function setName(name) {
+    data.lastName = Array.from(str(name, 40).trim()).slice(0, NAME_LEN).join(''); data.nameAsked = true; save();
   }
-
-  // ---- 名前入力モーダル ----
+  // ---- 入力モーダル（初回の名前／2万個超えの一言） ----
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function hasPendingName() { return !!pendingName; }
-  function openNameModal(done) {
-    const m = $('nameModal'); if (!m || !pendingName) { if (done) done(); return; }
-    const p = pendingName;
-    $('nameModalRank').textContent = `歴代 ${p.rank} 位 ランクイン!!`;
-    $('nameModalDisp').textContent = `${p.disp.toLocaleString()} 個`;
-    const inp = $('nameInput'); inp.value = data.lastName || ''; inp.maxLength = NAME_LEN;
+  function hasPendingComment() { return !!pendingComment; }
+  function openModal(o, done) {
+    const m = $('nameModal'); if (!m) { if (done) done(); return; }
+    $('nameModalRank').textContent = o.title; $('nameModalDisp').textContent = o.sub; $('nameModalLabel').textContent = o.label;
+    const inp = $('nameInput'); inp.value = o.value || ''; inp.maxLength = o.max; inp.placeholder = o.ph;
+    $('nameSkip').textContent = o.skip; $('nameOk').textContent = o.ok;
     m.classList.remove('hidden');
-    const finish = (name) => {
-      m.classList.add('hidden'); $('nameOk').onclick = $('nameSkip').onclick = inp.onkeydown = null;
-      const id = p.id; pendingName = null;
-      if (name) setName(id, name);
-      const ent = data.top.find(e => e.id === id);
-      if (ent && ent.disp >= NAME_MIN_DISP) enqueue('disp', { name: cleanName(name || ''), disp: ent.disp, chains: Math.max(1, ent.chains), n6000: ent.n6000, wed: ent.wed, ts: ent.ts });
-      if (done) done();
-    };
+    const finish = (val) => { m.classList.add('hidden'); $('nameOk').onclick = $('nameSkip').onclick = inp.onkeydown = null; o.onDone(val); if (done) done(); };
     $('nameOk').onclick = () => finish(inp.value);
     $('nameSkip').onclick = () => finish('');
     inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(inp.value); } };
     setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 60);
   }
+  // 2万個以上の「一言」：入力後（またはスキップ後）に保留していた送信を解放する
+  function openCommentModal(done) {
+    const p = pendingComment; if (!p) { if (done) done(); return; }
+    openModal({ title: '🎉 大量出玉!!', sub: `${p.disp.toLocaleString()} 個`, label: 'ランキングに一言どうぞ（20文字まで・任意）', value: '', max: CM_LEN, ph: '一言（空欄OK）', skip: 'スキップ', ok: '送信',
+      onDone: (val) => {
+        pendingComment = null;
+        const it = data.outbox.find(x => x.id === p.id);
+        if (it) { it.hold = false; const c = cleanCm(val); if (c) it.p.cm = c; save(); flush(); }
+      } }, done);
+  }
+  // 初めてサイトに入ったとき：名前を一度だけ
+  function askNameOnce() {
+    if (data.nameAsked || !$('nameModal')) return;
+    openModal({ title: 'ようこそ!!', sub: 'ランキング用のお名前', label: '10文字まで（あとで「記録」タブから変更できます）', value: data.lastName, max: NAME_LEN, ph: '名無し', skip: '名無しのまま', ok: '決定',
+      onDone: (val) => setName(val) });
+  }
+  setTimeout(() => { if (document.readyState !== 'loading') askNameOnce(); else document.addEventListener('DOMContentLoaded', askNameOnce); }, 700);
 
   // ---- 書き出し／読み込み ----
   const exportText = () => JSON.stringify(Object.assign({}, data, { v: SCHEMA, exportedAt: Date.now(), outbox: [] }), null, 1);
@@ -309,18 +353,13 @@ const Records = (() => {
     document.head.appendChild(st);
   }
 
-  function periodList() {
-    if (ui.period === 'all') return data.top.slice();
-    const from = ui.period === 'day' ? startOfDay() : startOfWeek();
-    return data.recent.filter(r => r.ts >= from).sort(byDisp).slice(0, TOP_N);
-  }
-  function rushRows(list) {
+  function selfRows() {
+    const list = data.top.slice(0, 5);
     if (!list.length) return '<div class="rec-empty">まだ記録がありません</div>';
     return list.map((e, i) => {
       const tags = [`${e.chains}連`]; if (e.n6000) tags.push(`6000×${e.n6000}`); if (e.wed) tags.push(`💍×${e.wed}`);
-      const nm = e.name ? escapeHtml(e.name) : '<span style="opacity:.4">—</span>';
       return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div>
-        <div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${tags.join(' ・ ')} ・ ${fmtShort(e.ts)}</div></div>
+        <div class="rec-main"><div class="rec-sub">${tags.join(' ・ ')} ・ ${fmtShort(e.ts)}</div></div>
         <div class="rec-val">${e.disp.toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 個</span></div></div>`;
     }).join('');
   }
@@ -345,36 +384,38 @@ const Records = (() => {
   }
   function onlineSection() {
     if (!onlineEnabled()) return '';
-    const k = ui.board || 'disp', b = boards[k];
-    const pt = (id, l) => `<button class="rec-pt${k === id ? ' on' : ''}" data-rec-board="${id}">${l}</button>`;
+    const k = ui.board || 'day', sp = boardSpec(k), b = boards[sp.path];
+    const pt = (id, l) => `<button class="rec-pt${k === id ? ' on' : ''}" data-rec-board="${id}" style="padding:6px 0">${l}</button>`;
+    const isRush = k === 'day' || k === 'month' || k === 'all';
     let rows;
     if (!b) rows = '<div class="rec-empty">読み込み中…</div>';
     else if (!b.rows.length) rows = `<div class="rec-empty">${b.err || 'まだ記録がありません'}</div>`;
     else rows = b.rows.map((e, i) => {
       const nm = escapeHtml(str(e.name, NAME_LEN * 2) || '名無し');
-      const val = k === 'disp' ? `${num(e.disp).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 個</span>` : k === 'hama' ? `${num(e.spins).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 回転</span>` : `<span style="font-size:11px;color:#fde68a">💍</span>`;
-      const sub = k === 'disp' ? `${num(e.chains)}連 ・ ${fmtShort(num(e.ts))}` : k === 'wed' ? fmtDate(num(e.ts)) : fmtShort(num(e.ts));
-      return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div><div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${sub}</div></div><div class="rec-val">${val}</div></div>`;
+      const val = isRush ? `${num(e.disp).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 個</span>` : k === 'hama' ? `${num(e.spins).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 回転</span>` : `<span style="font-size:11px;color:#fde68a">💍</span>`;
+      const tags = isRush ? [`${num(e.chains)}連`].concat(num(e.n6000) ? [`6000×${num(e.n6000)}`] : [], num(e.wed) ? [`💍×${num(e.wed)}`] : []).join(' ・ ') + ' ・ ' + fmtShort(num(e.ts)) : k === 'wed' ? fmtDate(num(e.ts)) : fmtShort(num(e.ts));
+      const cm = e.cm ? `<div class="rec-sub" style="color:#fde68a;white-space:normal">「${escapeHtml(str(e.cm, CM_LEN * 2))}」</div>` : '';
+      return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div><div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${tags}</div>${cm}</div><div class="rec-val">${val}</div></div>`;
     }).join('');
+    const head = isRush ? `<div class="rec-note" style="margin:0 0 4px;color:#fde68a">${sp.title} ・ RUSH1回の総獲得払出 上位${ONLINE_N}</div>` : `<div class="rec-note" style="margin:0 0 4px;color:#fde68a">${k === 'hama' ? 'ハマり（初当たりまでの通常回転）' : 'ウェディング達成者（新しい順）'} 上位${ONLINE_N}</div>`;
     return `<div class="rec-sec"><div class="rec-h"><span>🌐 オンラインランキング</span><button class="rec-pt" style="flex:none;padding:3px 10px" data-rec-act="reload">更新</button></div>
-      <div style="display:flex;gap:6px;margin-bottom:6px">${pt('disp', '出玉')}${pt('hama', 'ハマり')}${pt('wed', '💍ウェディング')}</div>${rows}
-      <div class="rec-note" style="margin-top:6px">送信対象：${NAME_MIN_DISP.toLocaleString()}個以上の出玉／${HAMA_MIN.toLocaleString()}回転以上のハマり／ウェディング（テスト・無限STは送信されません）。送信待ち ${data.outbox.length}件<br>
+      <div style="display:flex;gap:5px;margin-bottom:6px">${pt('day', '今日')}${pt('month', '今月')}${pt('all', '歴代')}${pt('hama', 'ハマり')}${pt('wed', '💍')}</div>${head}${rows}
+      <div class="rec-note" style="margin-top:6px">全てのRUSH結果が自動で送られます（歴代は${ALL_MIN_DISP.toLocaleString()}個以上のみ／今日・今月は日本時間0時で切替）。ハマりは${HAMA_MIN.toLocaleString()}回転以上、ウェディングも送信。テスト・無限STは送信されません。送信待ち ${data.outbox.length}件<br>
       <label style="display:flex;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="recOnlineOn" ${data.onlineOn ? 'checked' : ''}> オンラインに送信する</label></div></div>`;
   }
   function render() {
     const root = ui.root; if (!root || !root.isConnected) return;
-    if (root.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;   // 貼り付け入力中は再描画しない
+    if (root.contains(document.activeElement) && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.id === 'recName')) return;   // 貼り付け入力中は再描画しない
     injectCss();
-    const pt = (k, l) => `<button class="rec-pt${ui.period === k ? ' on' : ''}" data-rec-period="${k}">${l}</button>`;
     const prot = persisted === true ? '🔒 端末の自動削除から保護：ON' : persisted === false ? '⚠️ 端末の自動削除から保護：未確認（書き出しでバックアップ推奨）' : '保護状態：確認中';
     root.innerHTML = `
-      <div class="rec-sec"><div class="rec-h"><span>🏆 出玉ランキング（RUSH1回の総獲得払出）</span></div>
-        <div style="display:flex;gap:6px;margin-bottom:6px">${pt('all', '歴代')}${pt('week', '今週')}${pt('day', '今日')}</div>
-        ${rushRows(periodList())}
-        <div class="rec-note" style="margin-top:6px">※ ${NAME_MIN_DISP.toLocaleString()}個以上で歴代${TOP_N}位以内に入ると名前を登録できます。テスト／無限STは記録されません。</div></div>
+      <div class="rec-sec"><div class="rec-h"><span>👤 プレイヤー名</span></div>
+        <div style="display:flex;gap:6px"><input id="recName" type="text" maxlength="${NAME_LEN}" autocomplete="off" value="${escapeHtml(data.lastName)}" placeholder="名無し" style="flex:1;min-width:0;border-radius:10px;background:#0d0506;border:1px solid rgba(120,53,15,.7);color:#fde68a;font-weight:900;font-size:13px;padding:7px 10px"><button class="rec-btn" style="flex:none;padding:7px 14px" data-rec-act="name">変更</button></div>
+        <div class="rec-note" style="margin-top:4px">ランキングに載る名前です（${NAME_LEN}文字まで）。空欄は「名無し」。</div></div>
+      ${onlineSection()}
+      <div class="rec-sec"><div class="rec-h"><span>📒 自己ベスト（この端末・上位5）</span></div>${selfRows()}</div>
       <div class="rec-sec"><div class="rec-h"><span>🕳️ ハマりランキング（初当たりまでの通常回転）</span></div>${hamaRows()}</div>
       ${weddingCard()}
-      ${onlineSection()}
       <div class="rec-sec"><div class="rec-h"><span>💾 記録の保存・バックアップ</span></div>
         <div class="rec-note">累計RUSH ${data.totals.rushes.toLocaleString()}回 ・ 最大連チャン ${data.totals.maxChain}連 ・ 最終書き出し ${data.lastExportAt ? fmtDate(data.lastExportAt) : 'なし'}<br>${prot}<br>
         記録はこの端末のブラウザ内（localStorage＋IndexedDB）に保存され、ファイル更新では消えません。iPhoneのSafariは長期間開かないと自動削除されることがあるため、大きな記録の後は書き出しを。</div>
@@ -387,7 +428,6 @@ const Records = (() => {
       </div>`;
     root.querySelectorAll('[data-rec-board]').forEach(b => b.addEventListener('click', () => { ui.board = b.dataset.recBoard; render(); loadBoard(ui.board).then(render); }));
     const ck = $('recOnlineOn'); if (ck) ck.addEventListener('change', () => { data.onlineOn = ck.checked; save(); });
-    root.querySelectorAll('[data-rec-period]').forEach(b => b.addEventListener('click', () => { ui.period = b.dataset.recPeriod; render(); }));
     root.querySelectorAll('[data-rec-act]').forEach(b => b.addEventListener('click', () => act(b.dataset.recAct)));
     const f = $('recFile'); if (f) f.addEventListener('change', () => {
       const file = f.files && f.files[0]; if (!file) return;
@@ -396,7 +436,8 @@ const Records = (() => {
   }
   function msg(t) { const m = $('recMsg'); if (m) m.textContent = t; }
   function act(a) {
-    if (a === 'reload') { boards[ui.board || 'disp'] = null; render(); flush(); loadBoard(ui.board || 'disp').then(render); return; }
+    if (a === 'name') { const i = $('recName'); if (i) { setName(i.value); setTimeout(() => msg('名前を変更しました'), 30); } return; }
+    if (a === 'reload') { boards = {}; render(); flush(); loadBoard(ui.board || 'day', true).then(render); return; }
     if (a === 'export') {
       try {
         const blob = new Blob([exportText()], { type: 'application/json' });
@@ -415,12 +456,12 @@ const Records = (() => {
     else if (a === 'wipe') {
       const b = $('recWipe'); if (!b) return;
       if (b.dataset.armed === '1') {
-        clearTimeout(dangerTimer); data = blank(); pendingName = null; save(); setTimeout(() => msg('全記録を削除しました'), 30);
+        clearTimeout(dangerTimer); data = blank(); pendingComment = null; save(); setTimeout(() => msg('全記録を削除しました'), 30);
       } else { b.dataset.armed = '1'; b.textContent = '⚠️ もう一度押すと全削除'; dangerTimer = setTimeout(() => { b.dataset.armed = ''; b.textContent = '🗑️ 全記録を削除'; }, 4000); }
     }
   }
-  function mount(root) { ui.root = root; render(); if (onlineEnabled()) { flush(); loadBoard(ui.board || 'disp').then(render); } }
+  function mount(root) { ui.root = root; render(); if (onlineEnabled()) { flush(); loadBoard(ui.board || 'day').then(render); } }
 
-  return { setGuard: (fn) => { guard = fn; }, commitRush, noteHamari, noteWedding, setName, hasPendingName, openNameModal, mount, render,
+  return { setGuard: (fn) => { guard = fn; }, commitRush, fetchRanks, noteHamari, noteWedding, setName, hasPendingComment, openCommentModal, askNameOnce, mount, render,
     _data: () => data, _import: importText, _export: exportText };
 })();
