@@ -555,7 +555,7 @@
         </div>
         <div class="leading-tight truncate">
           <h1 class="text-xs sm:text-sm font-black bg-gradient-to-r from-yellow-200 via-amber-300 to-rose-300 bg-clip-text text-transparent truncate">
-            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v9.2</span>
+            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v9.2b</span>
           </h1>
         </div>
         <button id="testPill" class="hidden shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 border border-emerald-300/80 text-emerald-200 animate-pulse whitespace-nowrap">🧪 TEST</button>
@@ -1083,6 +1083,19 @@
 
   </main>
 
+  <script>
+    // 診断用：読み込み／実行エラーが起きたら画面上部に赤い帯で内容を出す（正常時は何も出ない）
+    (function () {
+      var box = null;
+      function show(t) { try { if (!box) { box = document.createElement('div'); box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:11px/1.4 monospace;padding:6px 8px;white-space:pre-wrap;word-break:break-all;max-height:40vh;overflow:auto'; document.body.appendChild(box); } box.textContent += t + '\n'; } catch (e) {} }
+      window.addEventListener('error', function (e) { show('ERR ' + (e.message || '') + ' @' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '')); });
+      window.addEventListener('unhandledrejection', function (e) { show('REJ ' + (e.reason && (e.reason.message || e.reason))); });
+      window.addEventListener('load', function () { setTimeout(function () {
+        var miss = ['StudioAudio', 'BgmEngine', 'FxCanvas', 'Records', 'setReels', 'spinRushOnce', 'beginHandlePress'].filter(function (n) { try { return typeof eval(n) === 'undefined'; } catch (e) { return true; } });
+        if (miss.length) show('未読込: ' + miss.join(', ') + '（ファイルの差し替え漏れ／途中切れの可能性）');
+      }, 2500); });
+    })();
+  </script>
   <script src="sound.js?v=71"></script>
   <script src="bgm.js?v=71"></script>
   <script src="effects.js?v=92"></script>
