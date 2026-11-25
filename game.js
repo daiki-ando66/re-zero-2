@@ -441,9 +441,9 @@ function buildNormalScenario(res) {
   const { isHit, hesoType, bareType } = res;
   const is3000 = hesoType === '3000_RUSH';
   const ochiburu = is3000 && Math.random() < (state.custOchiburu ? 0.88 : 0.24);
-  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約10%、ハズレ時はごく稀（プレミアUPは +4% 程度の上乗せ）
-  //   ※復活演出としての特別感を保つため、通常時は控えめ（当選の約10%）。演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
-  const isPremier = !is3000 && (isHit ? Math.random() < ((0.10 + (state.custPremier ? 0.03 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0015);
+  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約2%、ハズレ時はごく稀（プレミアUPは +0.6% 程度の上乗せ）
+  //   ※復活演出としての特別感を保つため、通常時は控えめ（当選の約10%）。初当たり前のテンポを守るため通常時はごく稀（復活演出が主役）。演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
+  const isPremier = !is3000 && (isHit ? Math.random() < ((0.02 + (state.custPremier ? 0.006 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0003);
   // コードだけの短いプレミア予告（信頼度は約88%）
   const shortPrem = (!is3000 && !isPremier && Math.random() < (isHit ? 0.07 + (state.custPremier ? 0.03 : 0) : 0.007))
     ? ['goldRain', 'rainbowSweep', 'blueEyes'][Math.floor(Math.random() * 3)] : null;
@@ -1363,7 +1363,14 @@ function finishRush() {
         if (on && on.all > 0) parts.push(`🏆 歴代 ${on.all} 位`);
         if (rk.selfRank > 0 && rk.selfRank <= 10) parts.push(`🎖 自己ベスト ${rk.selfRank} 位`);
         if (!parts.length) return;
-        rkEl.textContent = parts.join('　/　'); rkEl.classList.remove('hidden');
+        rkEl.textContent = parts.join('　/　');
+        if (on && on.all > 0 && on.all <= 10) {   // オンライン歴代TOP10入り：お祝い
+          const c = document.createElement('div'); c.className = 'gold-grad-text text-base font-black mt-1';
+          c.textContent = on.all === 1 ? '🎊 歴代1位!! おめでとうございます!! 🎊' : `🎉 歴代TOP10入り!! おめでとう!! 🎉`;
+          rkEl.appendChild(c);
+          try { FxCanvas.burstRainbow(60); StudioAudio.playPokyun(true); } catch (e) {}
+        }
+        rkEl.classList.remove('hidden');
       };
       paint(null);
       try { Records.fetchRanks(state.rushDisp, rk.id).then(paint).catch(() => {}); } catch (e) {}
@@ -1708,8 +1715,7 @@ document.querySelectorAll('.promo-test-item').forEach(btn => {
 // 実戦操作ボタン
 // =========================================================================
 document.getElementById('btnCloseResult').addEventListener('click', async () => {
-  if (!state.pendingResultRevival && Records.hasPendingComment()) { Records.openCommentModal(() => document.getElementById('btnCloseResult').click()); return; }
-  resultModal.classList.add('hidden');
+    resultModal.classList.add('hidden');
   if (state.pendingResultRevival) {
     state.pendingResultRevival = false;
     const tok = ++seqToken; state.phase = 'ANIMATING'; setControlMode('BUSY');
