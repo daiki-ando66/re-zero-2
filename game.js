@@ -440,9 +440,9 @@ function buildNormalScenario(res) {
   const { isHit, hesoType, bareType } = res;
   const is3000 = hesoType === '3000_RUSH';
   const ochiburu = is3000 && Math.random() < (state.custOchiburu ? 0.88 : 0.24);
-  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約25%、ハズレ時はごく稀（プレミアUPは +4% 程度の上乗せ）
-  //   ※演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
-  const isPremier = !is3000 && (isHit ? Math.random() < ((0.25 + (state.custPremier ? 0.04 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0037);
+  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約10%、ハズレ時はごく稀（プレミアUPは +4% 程度の上乗せ）
+  //   ※復活演出としての特別感を保つため、通常時は控えめ（当選の約10%）。演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
+  const isPremier = !is3000 && (isHit ? Math.random() < ((0.10 + (state.custPremier ? 0.03 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0015);
   // コードだけの短いプレミア予告（信頼度は約88%）
   const shortPrem = (!is3000 && !isPremier && Math.random() < (isHit ? 0.07 + (state.custPremier ? 0.03 : 0) : 0.007))
     ? ['goldRain', 'rainbowSweep', 'blueEyes'][Math.floor(Math.random() * 3)] : null;
@@ -1224,10 +1224,17 @@ async function runRush6000Sequence({ forceFake = null, iwakanAnswer = '' } = {})
 
   const rm = state.rushMode;
   const modePrefix = rm === 'brain' ? '脳が震える' : rm === 'rem' ? '鬼化レム' : '鬼がかり';
-  const pick = (forceFake && forceFake !== '300') ? forceFake : '1500';   // 300フェイク→昇格は廃止
+  const pick = forceFake || '1500';   // 偶数揃い＝300から昇格（偶数なのに最初から1500は違和感＝ネタバレ）
 
   let opts;
-  if (pick === 'restart') {
+  if (pick === '300') {
+    opts = {
+      fakeSub: '右打ち 6%', fakeTitle: `${modePrefix} 300 BONUS`, fakeDesc: '純増 +280発 ＆ ST144回リセット！',
+      fakeStyle: 'despair', fakeSound: '300', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
+      iwakanAnswer, finalSub: rm === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH',
+      finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'auto'
+    };
+  } else if (pick === 'restart') {
     opts = {
       fakeSub: '死に戻り', fakeTitle: 'Re:Start', fakeDesc: '出玉なし・ST144回へ巻き戻し',
       fakeStyle: 'despair', fakeSound: 'restart', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
