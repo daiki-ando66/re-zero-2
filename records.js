@@ -4,6 +4,10 @@
 //  ・更新で消えない保存：固定キー + スキーマ版 + localStorage + IndexedDB ミラー + 直前の正常コピー + 書き出し/読み込み
 //  ・ランキング対象：鬼がかりRUSH 1回の「総獲得払出(個)」（RUSH最終終了時に記録）
 // =========================================================================
+// ★オンラインランキング（任意）：Firebase Realtime Database の URL を入れると有効になる。空のままなら完全にオフライン動作。
+//   例) 'https://xxxxx-default-rtdb.asia-southeast1.firebasedatabase.app'   （末尾の / は付けない）
+const ONLINE_DB_URL = 'https://dayan66-default-rtdb.asia-southeast1.firebasedatabase.app';
+
 const Records = (() => {
   const SCHEMA = 1;
   const KEY = 'rezero-oni2:records', KEY_BAK = 'rezero-oni2:records:bak';
@@ -19,7 +23,8 @@ const Records = (() => {
 
   function blank() {
     return { app: 'rezero-oni2', v: SCHEMA, savedAt: 0, lastName: '', lastExportAt: 0,
-      top: [], hama: [], recent: [], wedding: [], totals: { rushes: 0, disp: 0, maxChain: 0 } };
+      top: [], hama: [], recent: [], wedding: [], totals: { rushes: 0, disp: 0, maxChain: 0 },
+      onlineOn: true, outbox: [] };
   }
   const num = (x, d = 0) => (Number.isFinite(+x) ? Math.round(+x) : d);
   const str = (x, n = 40) => String(x == null ? '' : x).replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, n);
@@ -52,6 +57,9 @@ const Records = (() => {
     out.wedding = (Array.isArray(o.wedding) ? o.wedding : []).map(cleanWed).filter(Boolean);
     const t = o.totals || {};
     out.totals = { rushes: num(t.rushes), disp: num(t.disp), maxChain: num(t.maxChain) };
+    out.onlineOn = o.onlineOn !== false;
+    out.outbox = (Array.isArray(o.outbox) ? o.outbox : []).filter(x => x && ['disp', 'hama', 'wed'].includes(x.kind) && x.p && typeof x.p === 'object')
+      .map(x => ({ id: str(x.id, 24) || uid(), kind: x.kind, p: x.p, tries: num(x.tries) })).slice(0, 50);
     return normalize(out);
   }
   const byDisp = (a, b) => b.disp - a.disp || a.ts - b.ts;
@@ -70,6 +78,8 @@ const Records = (() => {
     const newer = (a.savedAt >= b.savedAt) ? a : b;
     out.lastName = newer.lastName || a.lastName || b.lastName; out.lastExportAt = Math.max(a.lastExportAt, b.lastExportAt);
     out.savedAt = Math.max(a.savedAt, b.savedAt); out.v = Math.max(a.v, b.v);
+    out.onlineOn = a.onlineOn && b.onlineOn !== false ? true : (newer.onlineOn);
+    out.outbox = uni(a.outbox, b.outbox).slice(0, 50);
     out.totals = { rushes: Math.max(a.totals.rushes, b.totals.rushes), disp: Math.max(a.totals.disp, b.totals.disp), maxChain: Math.max(a.totals.maxChain, b.totals.maxChain) };
     return normalize(out);
   }
@@ -125,6 +135,54 @@ const Records = (() => {
   });
   try { if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p => { persisted = !!p; }); } catch (e) {}
 
+
+  // ---- オンライン送信（Firebase Realtime Database の REST API。SDK不要・失敗しても台の動作には影響しない） ----
+  const onlineEnabled = () => /^https:\/\/[A-Za-z0-9.-]+\.(firebaseio\.com|firebasedatabase\.app)$/.test(ONLINE_DB_URL);
+  let flushing = false;
+  const boards = { disp: null, hama: null, wed: null };
+  function net(path, opt) {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 9000);
+    return fetch(ONLINE_DB_URL + path, Object.assign({ signal: ac.signal, cache: 'no-store' }, opt)).finally(() => clearTimeout(tm));
+  }
+  const cleanName = (n) => Array.from(str(n, 40).trim()).slice(0, NAME_LEN).join('') || '名無し';
+  function enqueue(kind, p) {
+    if (!onlineEnabled() || !data.onlineOn) return;
+    data.outbox.push({ id: uid(), kind, p, tries: 0 }); data.outbox = data.outbox.slice(-50);
+    save(); flush();
+  }
+  async function flush() {
+    if (flushing || !onlineEnabled() || !data.outbox.length) return;
+    flushing = true;
+    try {
+      let stop = false;
+      for (let round = 0; round < 6 && !stop && data.outbox.length; round++) {   // 送信中に増えた分も続けて送る
+        for (const item of data.outbox.slice()) {
+          let res;
+          try { res = await net(`/ranking/${item.kind}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item.p) }); }
+          catch (e) { stop = true; break; }                              // 通信不可：次の機会に再送
+          if (res.ok || (res.status >= 400 && res.status < 500)) {       // 成功、またはルールで拒否（再送しても無駄）→ 送信待ちから外す
+            data.outbox = data.outbox.filter(x => x.id !== item.id); boards[item.kind] = null;
+            save();
+          } else { stop = true; break; }                                 // 5xx：後で再送
+        }
+      }
+    } finally { flushing = false; }
+  }
+  async function loadBoard(kind) {
+    const b = boards[kind]; if (b && Date.now() - b.t < 30000) return b;
+    const field = kind === 'disp' ? 'disp' : kind === 'hama' ? 'spins' : 'ts';
+    try {
+      const res = await net(`/ranking/${kind}.json?orderBy=%22${field}%22&limitToLast=20`);
+      if (!res.ok) throw new Error('http ' + res.status);
+      const o = await res.json() || {};
+      const rows = Object.values(o).filter(x => x && typeof x === 'object').sort((a, c) => (c[field] - a[field]) || (a.ts - c.ts)).slice(0, TOP_N);
+      boards[kind] = { t: Date.now(), rows, err: '' };
+    } catch (e) { boards[kind] = { t: Date.now() - 20000, rows: (b && b.rows) || [], err: '取得できませんでした（通信を確認してください）' }; }
+    return boards[kind];
+  }
+  window.addEventListener('online', () => flush());
+  setTimeout(() => flush(), 3500);
+
   // ---- 記録 API ----
   const blocked = () => { try { return !!guard(); } catch (e) { return true; } };
   const startOfDay = (t = Date.now()) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -155,12 +213,14 @@ const Records = (() => {
     data.hama.push(e); normalize(data);
     const rank = rankOf(data.hama, e.id);
     save();
+    if (rank > 0) enqueue('hama', { name: cleanName(data.lastName), spins: e.spins, ts: e.ts });
     return rank;
   }
   function noteWedding(info) {
     if (blocked()) return false;
     data.wedding.push({ id: uid(), ts: Date.now(), disp: num(info && info.disp), chains: num(info && info.chains) });
     normalize(data); save();
+    enqueue('wed', { name: cleanName(data.lastName), ts: Date.now(), disp: Math.max(0, num(info && info.disp)), chains: Math.max(1, num(info && info.chains)) });
     return true;
   }
   function setName(id, name) {
@@ -185,6 +245,8 @@ const Records = (() => {
       m.classList.add('hidden'); $('nameOk').onclick = $('nameSkip').onclick = inp.onkeydown = null;
       const id = p.id; pendingName = null;
       if (name) setName(id, name);
+      const ent = data.top.find(e => e.id === id);
+      if (ent && ent.disp >= NAME_MIN_DISP) enqueue('disp', { name: cleanName(name || ''), disp: ent.disp, chains: Math.max(1, ent.chains), n6000: ent.n6000, wed: ent.wed, ts: ent.ts });
       if (done) done();
     };
     $('nameOk').onclick = () => finish(inp.value);
@@ -194,12 +256,12 @@ const Records = (() => {
   }
 
   // ---- 書き出し／読み込み ----
-  const exportText = () => JSON.stringify(Object.assign({}, data, { v: SCHEMA, exportedAt: Date.now() }), null, 1);
+  const exportText = () => JSON.stringify(Object.assign({}, data, { v: SCHEMA, exportedAt: Date.now(), outbox: [] }), null, 1);
   function markExported() { data.lastExportAt = Date.now(); save(); }
   function importText(text) {
     let o; try { o = JSON.parse(text); } catch (e) { return { ok: false, msg: 'ファイルの形式が正しくありません' }; }
     if (!o || typeof o !== 'object' || (o.app && o.app !== 'rezero-oni2')) return { ok: false, msg: 'この台の記録ファイルではありません' };
-    const inc = migrate(o);
+    const inc = migrate(o); inc.outbox = [];
     if (!inc.top.length && !inc.hama.length && !inc.recent.length && !inc.wedding.length) return { ok: false, msg: '読み込める記録がありませんでした' };
     const before = sig(data);
     data = merge(data, inc); data.savedAt = Date.now(); save();
@@ -281,6 +343,24 @@ const Records = (() => {
       ${w.length > 1 ? `<div style="margin-top:6px;border-top:1px solid rgba(253,224,71,.25);padding-top:5px">${list}</div>` : ''}
       ${w.length > 1 ? `<div class="rec-sub" style="margin-top:3px">最新 ${fmtDate(last.ts)}</div>` : ''}</div></div>`;
   }
+  function onlineSection() {
+    if (!onlineEnabled()) return '';
+    const k = ui.board || 'disp', b = boards[k];
+    const pt = (id, l) => `<button class="rec-pt${k === id ? ' on' : ''}" data-rec-board="${id}">${l}</button>`;
+    let rows;
+    if (!b) rows = '<div class="rec-empty">読み込み中…</div>';
+    else if (!b.rows.length) rows = `<div class="rec-empty">${b.err || 'まだ記録がありません'}</div>`;
+    else rows = b.rows.map((e, i) => {
+      const nm = escapeHtml(str(e.name, NAME_LEN * 2) || '名無し');
+      const val = k === 'disp' ? `${num(e.disp).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 個</span>` : k === 'hama' ? `${num(e.spins).toLocaleString()}<span style="font-size:10px;color:#fcd34d"> 回転</span>` : `<span style="font-size:11px;color:#fde68a">💍</span>`;
+      const sub = k === 'disp' ? `${num(e.chains)}連 ・ ${fmtShort(num(e.ts))}` : k === 'wed' ? fmtDate(num(e.ts)) : fmtShort(num(e.ts));
+      return `<div class="rec-row"><div class="rec-rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</div><div class="rec-main"><div class="rec-name">${nm}</div><div class="rec-sub">${sub}</div></div><div class="rec-val">${val}</div></div>`;
+    }).join('');
+    return `<div class="rec-sec"><div class="rec-h"><span>🌐 オンラインランキング</span><button class="rec-pt" style="flex:none;padding:3px 10px" data-rec-act="reload">更新</button></div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">${pt('disp', '出玉')}${pt('hama', 'ハマり')}${pt('wed', '💍ウェディング')}</div>${rows}
+      <div class="rec-note" style="margin-top:6px">送信対象：${NAME_MIN_DISP.toLocaleString()}個以上の出玉／${HAMA_MIN.toLocaleString()}回転以上のハマり／ウェディング（テスト・無限STは送信されません）。送信待ち ${data.outbox.length}件<br>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="recOnlineOn" ${data.onlineOn ? 'checked' : ''}> オンラインに送信する</label></div></div>`;
+  }
   function render() {
     const root = ui.root; if (!root || !root.isConnected) return;
     if (root.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;   // 貼り付け入力中は再描画しない
@@ -294,6 +374,7 @@ const Records = (() => {
         <div class="rec-note" style="margin-top:6px">※ ${NAME_MIN_DISP.toLocaleString()}個以上で歴代${TOP_N}位以内に入ると名前を登録できます。テスト／無限STは記録されません。</div></div>
       <div class="rec-sec"><div class="rec-h"><span>🕳️ ハマりランキング（初当たりまでの通常回転）</span></div>${hamaRows()}</div>
       ${weddingCard()}
+      ${onlineSection()}
       <div class="rec-sec"><div class="rec-h"><span>💾 記録の保存・バックアップ</span></div>
         <div class="rec-note">累計RUSH ${data.totals.rushes.toLocaleString()}回 ・ 最大連チャン ${data.totals.maxChain}連 ・ 最終書き出し ${data.lastExportAt ? fmtDate(data.lastExportAt) : 'なし'}<br>${prot}<br>
         記録はこの端末のブラウザ内（localStorage＋IndexedDB）に保存され、ファイル更新では消えません。iPhoneのSafariは長期間開かないと自動削除されることがあるため、大きな記録の後は書き出しを。</div>
@@ -304,6 +385,8 @@ const Records = (() => {
         <div class="rec-note" id="recMsg" style="margin-top:6px;color:#fde68a"></div>
         <input type="file" id="recFile" accept="application/json,.json" style="display:none">
       </div>`;
+    root.querySelectorAll('[data-rec-board]').forEach(b => b.addEventListener('click', () => { ui.board = b.dataset.recBoard; render(); loadBoard(ui.board).then(render); }));
+    const ck = $('recOnlineOn'); if (ck) ck.addEventListener('change', () => { data.onlineOn = ck.checked; save(); });
     root.querySelectorAll('[data-rec-period]').forEach(b => b.addEventListener('click', () => { ui.period = b.dataset.recPeriod; render(); }));
     root.querySelectorAll('[data-rec-act]').forEach(b => b.addEventListener('click', () => act(b.dataset.recAct)));
     const f = $('recFile'); if (f) f.addEventListener('change', () => {
@@ -313,6 +396,7 @@ const Records = (() => {
   }
   function msg(t) { const m = $('recMsg'); if (m) m.textContent = t; }
   function act(a) {
+    if (a === 'reload') { boards[ui.board || 'disp'] = null; render(); flush(); loadBoard(ui.board || 'disp').then(render); return; }
     if (a === 'export') {
       try {
         const blob = new Blob([exportText()], { type: 'application/json' });
@@ -335,7 +419,7 @@ const Records = (() => {
       } else { b.dataset.armed = '1'; b.textContent = '⚠️ もう一度押すと全削除'; dangerTimer = setTimeout(() => { b.dataset.armed = ''; b.textContent = '🗑️ 全記録を削除'; }, 4000); }
     }
   }
-  function mount(root) { ui.root = root; render(); }
+  function mount(root) { ui.root = root; render(); if (onlineEnabled()) { flush(); loadBoard(ui.board || 'disp').then(render); } }
 
   return { setGuard: (fn) => { guard = fn; }, commitRush, noteHamari, noteWedding, setName, hasPendingName, openNameModal, mount, render,
     _data: () => data, _import: importText, _export: exportText };
