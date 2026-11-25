@@ -75,6 +75,7 @@ function drawWeddingWindowExt() {
 let rotRate = 16.5;
 let exchangeRate = 4.0;
 let infiniteRushMode = false;
+let rankTok = 0;
 Records.setGuard(() => (typeof TestMode !== 'undefined' && TestMode.active) || infiniteRushMode);   // テスト／無限STは記録しない
 
 const state = {
@@ -1352,9 +1353,20 @@ function finishRush() {
   if (!state.pendingResultRevival) {
     let rk = null;
     try { rk = Records.commitRush({ disp: state.rushDisp, net: state.rushNet, chains: state.rushChains, n6000: state.rush6000Count, wed: state.rushWeddingCount, spin: state.rushStartSpin }); } catch (e) {}
-    if (rk && rkEl && (rk.rank > 0 || rk.dayRank > 0)) {
-      const parts = []; if (rk.rank > 0) parts.push(`🏆 歴代 ${rk.rank} 位`); if (rk.dayRank > 0) parts.push(`本日 ${rk.dayRank} 位`);
-      rkEl.textContent = parts.join('　/　'); rkEl.classList.remove('hidden');
+    if (rk && rkEl) {
+      // 自己ベスト（端末内）は即表示、オンライン順位（本日／歴代）は取得でき次第そっと差し込む（リザルトのテンポは落とさない）
+      const myTok = ++rankTok;
+      const paint = (on) => {
+        if (myTok !== rankTok) return;
+        const parts = [];
+        if (on && on.day > 0) parts.push(`本日 ${on.day} 位`); else if (on && on.day === 0) parts.push('本日 100位圏外');
+        if (on && on.all > 0) parts.push(`🏆 歴代 ${on.all} 位`);
+        if (rk.selfRank > 0 && rk.selfRank <= 10) parts.push(`🎖 自己ベスト ${rk.selfRank} 位`);
+        if (!parts.length) return;
+        rkEl.textContent = parts.join('　/　'); rkEl.classList.remove('hidden');
+      };
+      paint(null);
+      try { Records.fetchRanks(state.rushDisp, rk.id).then(paint).catch(() => {}); } catch (e) {}
     }
   }
   resultModal.classList.remove('hidden'); updateStatsUI();
@@ -1696,7 +1708,7 @@ document.querySelectorAll('.promo-test-item').forEach(btn => {
 // 実戦操作ボタン
 // =========================================================================
 document.getElementById('btnCloseResult').addEventListener('click', async () => {
-  if (!state.pendingResultRevival && Records.hasPendingName()) { Records.openNameModal(() => document.getElementById('btnCloseResult').click()); return; }
+  if (!state.pendingResultRevival && Records.hasPendingComment()) { Records.openCommentModal(() => document.getElementById('btnCloseResult').click()); return; }
   resultModal.classList.add('hidden');
   if (state.pendingResultRevival) {
     state.pendingResultRevival = false;
