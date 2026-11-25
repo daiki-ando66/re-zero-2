@@ -1,2481 +1,1092 @@
-// =========================================================================
-// game.js (v8.1) : 筐体デザイン・ロゴ役物落下・固定枠ステータス完全統合版＋テストモード／台データ／ウェディング判定窓
-// =========================================================================
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a0905">
+  <title>e Re:ゼロ 鬼がかり2 v7.1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&family=Shippori+Mincho:wght@600;800&display=swap');
 
-const SPEC = {
-  NORMAL_PROB: 1 / 349.9,
-  H_3000_RUSH: 0.10,
-  H_1500_RUSH: 0.45,
-  H_1500_NORM: 0.45,
-  RUSH_ENTRY: 0.55,
+    * { box-sizing: border-box; }
+    /* iPhone Safari：長押しで文字・画像が選択／メニュー表示されるのを防ぐ（入力欄だけは入力可能に戻す） */
+    *, *::before, *::after { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+    img { -webkit-user-drag: none; }
 
-  ST_TOTAL: 144,
-  ST_RESERVE: 4,
-  WEDDING_WINDOW: 10,   // ウェディング判定窓：6000獲得直後に限り5〜10回転目も前倒し抽選して判定（各回転の確率・振分・出玉は不変）
-  ST_DENSA: 140,
-  ST_PROB: 1 / 99.9,
-  HORYUREN_NOTICE_RATE: 0.48,
-
-  R_6000: 0.25,
-  R_1500: 0.55,
-  R_300: 0.06,
-  R_RESTART: 0.14,
-
-  DISP_6000: 6000, NET_6000: 5600,
-  DISP_3000: 3000, NET_3000: 2800,
-  DISP_1500: 1500, NET_1500: 1400,
-  DISP_300: 300,   NET_300: 280
-};
-
-function drawRushBonusType() {
-  const r = Math.random();
-  if (r < SPEC.R_6000) return 'BONUS_6000';
-  if (r < SPEC.R_6000 + SPEC.R_1500) return 'BONUS_1500';
-  if (r < SPEC.R_6000 + SPEC.R_1500 + SPEC.R_300) return 'BONUS_300';
-  return 'RESTART';
-}
-
-function drawReserve4Slots() {
-  const slots = [];
-  const clean = TestMode.active && DevForce.cleanReserve;      // テスト専用：残保留を必ずハズレにする
-  for (let i = 1; i <= SPEC.ST_RESERVE; i++) {
-    if (!clean && Math.random() < SPEC.ST_PROB) {
-      slots.push({ hit: true, hitIndex: i, bonusType: drawRushBonusType(), isReserve: true, remSakibare: false, remPat: 'NORMAL' });
-      break;
-    } else {
-      slots.push({ hit: false, hitIndex: i, bonusType: null, isReserve: true, remSakibare: false, remPat: 'NORMAL' });
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #120604;
+      color: #fdf6e7;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
     }
-  }
-  return slots;
-}
 
-function drawReserve4() {
-  for (let i = 1; i <= SPEC.ST_RESERVE; i++) {
-    if (Math.random() < SPEC.ST_PROB) return { hit: true, hitIndex: i, bonusType: drawRushBonusType() };
-  }
-  return { hit: false, hitIndex: 0, bonusType: null };
-}
+    .font-mincho { font-family: 'Shippori Mincho', 'Noto Sans JP', serif; }
+    .num-fixed { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-// ★ウェディング判定窓：残保留4個の「先」（5〜WEDDING_WINDOW回転目）を前倒しで抽選する。
-//   各回転の当選確率(1/99.9)・ボーナス振分は通常のST消化と完全に同じ。抽選のタイミングを前倒ししているだけで、
-//   最初の当選までで打ち切る（当選後はSTが仕切り直されるため）。結果は呼び出し側が通常のST消化キューへそのまま載せる。
-function drawWeddingWindowExt() {
-  const out = [];
-  for (let i = SPEC.ST_RESERVE + 1; i <= SPEC.WEDDING_WINDOW; i++) {
-    const isHit = Math.random() < SPEC.ST_PROB;
-    out.push({ hit: isHit, hitIndex: i, bonusType: isHit ? drawRushBonusType() : null, isReserve: false, remSakibare: false, remPat: 'NORMAL' });
-    if (isHit) break;
-  }
-  return out;
-}
+    /* =====================================================================
+       シャンパンゴールド×深紅 和柄ベース ＆ 統一プリズム虹ライティング
+       ===================================================================== */
+    .bg-gold-wagara {
+      background-color: #150705;
+      background-image:
+        url("data:image/svg+xml,%3Csvg width='56' height='56' viewBox='0 0 56 56' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23f5d061' stroke-opacity='0.14' stroke-width='1'%3E%3Cpath d='M28 0L56 28L28 56L0 28Z'/%3E%3Cpath d='M28 8L48 28L28 48L8 28Z' stroke-opacity='0.09'/%3E%3Cpath d='M0 0L56 56M56 0L0 56' stroke-opacity='0.07'/%3E%3Ccircle cx='28' cy='28' r='3' fill='%23fef08a' fill-opacity='0.14' stroke='none'/%3E%3C/g%3E%3C/svg%3E"),
+        radial-gradient(circle at 50% 0%, rgba(217, 155, 42, 0.34) 0%, rgba(136, 19, 55, 0.36) 40%, rgba(21, 7, 5, 0.96) 82%),
+        linear-gradient(135deg, #210c05 0%, #14050c 50%, #241305 100%);
+      background-attachment: fixed;
+    }
 
-// =========================================================================
-// ゲーム状態＆DOM参照
-// =========================================================================
-let rotRate = 16.5;
-let exchangeRate = 4.0;
-let infiniteRushMode = false;
-let rankTok = 0;
-Records.setGuard(() => (typeof TestMode !== 'undefined' && TestMode.active) || infiniteRushMode);   // テスト／無限STは記録しない
+    #ambientBgLayer {
+      transition: background 0.35s ease, opacity 0.35s ease;
+      background:
+        radial-gradient(ellipse at 12% 45%, rgba(250, 204, 21, 0.14) 0%, transparent 55%),
+        radial-gradient(ellipse at 88% 45%, rgba(245, 158, 11, 0.14) 0%, transparent 55%);
+    }
+    #ambientBgLayer.bg-mode-redbare { background: radial-gradient(circle at 50% 45%, rgba(239, 68, 68, 0.58) 0%, rgba(153, 27, 27, 0.36) 55%, rgba(69, 10, 10, 0.25) 100%) !important; }
+    #ambientBgLayer.bg-mode-rush    { background: radial-gradient(ellipse at 15% 40%, rgba(253, 224, 71, 0.32) 0%, transparent 58%), radial-gradient(ellipse at 85% 40%, rgba(239, 68, 68, 0.28) 0%, transparent 58%) !important; }
+    #ambientBgLayer.bg-mode-brain   { background: radial-gradient(ellipse at 15% 40%, rgba(192, 132, 252, 0.34) 0%, transparent 58%), radial-gradient(ellipse at 85% 40%, rgba(217, 70, 239, 0.30) 0%, transparent 58%) !important; }
+    #ambientBgLayer.bg-mode-rem     { background: radial-gradient(ellipse at 15% 40%, rgba(217, 70, 239, 0.28) 0%, transparent 58%), radial-gradient(ellipse at 85% 40%, rgba(56, 189, 248, 0.30) 0%, transparent 58%) !important; }
+    #ambientBgLayer.bg-mode-rainbow { background: radial-gradient(circle at 50% 45%, rgba(254, 240, 138, 0.46) 0%, rgba(244, 114, 182, 0.30) 38%, rgba(125, 211, 252, 0.28) 70%, rgba(192, 132, 252, 0.26) 100%) !important; }
 
-const state = {
-  phase: 'NORMAL',
-  activeScene: 'normal',
-  custSakibare: true,
-  custOchiburu: true,
-  custPremier: false,
-  rushMode: 'onigakari',
+    @keyframes sunburstSpin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+    .sunburst-rays {
+      position: fixed; top: 50%; left: 50%; width: 220vmax; height: 220vmax; pointer-events: none;
+      background: repeating-conic-gradient(from 0deg, rgba(254, 249, 195, 0.28) 0deg 10deg, rgba(251, 191, 36, 0.20) 10deg 20deg, rgba(125, 211, 252, 0.22) 20deg 30deg, rgba(244, 114, 182, 0.18) 30deg 40deg, rgba(192, 132, 252, 0.18) 40deg 50deg, transparent 50deg 60deg);
+      animation: sunburstSpin 14s linear infinite;
+    }
 
-  rushCustTrust: false,
-  rushCustIwakan: true,
-  rushCustNoNotice: false,
+    /* =====================================================================
+       ★v7.1 液晶フルワイド＋役物レール（筐体画像なし）★
+       ===================================================================== */
+    main { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+    #cabinetShell {
+      --shell-h: 540px;
+      --drop-scale: 2.2;
+      position: relative; display: flex; flex-direction: column;
+      width: 100%; max-width: 680px; margin: 0 auto;
+      height: var(--shell-h);
+      border-radius: 16px; overflow: hidden;
+      background: #0d0407;
+      border: 2px solid rgba(234, 179, 8, 0.72);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.8);
+      transition: filter 0.35s ease;
+    }
+    @supports (height: 100dvh) {
+      #cabinetShell { --shell-h: clamp(480px, calc(100dvh - 236px), 760px); }
+    }
+    /* ロゴの落下距離：レール中央 → 液晶中央 */
+    #cabinetShell { --drop-y: calc(32px + (var(--shell-h) - 90px) / 2); }
 
-  currentSpin: 0,
-  excellentFired: false,
-  totalNormalSpins: 0,
-  firstHits: 0,
-  rushHits: 0,
-  sakibareTotal: 0,
-  sakibareWins: 0,
-  totalInvestYen: 0,
-  balls: 0,
-  unspentFrac: 0,
+    /* 役物レール（液晶の外・高さ64px） */
+    #yakumonoRail {
+      position: relative; z-index: 40; flex: none; height: 40px;
+      background: linear-gradient(180deg, #24100a 0%, #0d0407 100%);
+      border-bottom: 1px solid rgba(234, 179, 8, 0.5);
+      transition: filter 0.3s ease;
+    }
+    #cabinetShell.cabinet-blackout #yakumonoRail, #cabinetShell.rail-dim #yakumonoRail { filter: brightness(0.3) saturate(0.4); }
+    #railRem { transition: opacity 0.2s ease; }
+    #cabinetShell.rail-rem-off #railRem { opacity: 0.12; }
 
-  pendingReach: null,
-  pendingRushHit: null,
-  pendingResultRevival: false,
-  hasVStock: false,
-  hasVStockRed: false,
-  reserveQueue: [],
-  stLookaheadQueue: [],
-  remSakibareActive: false,
-  stRemaining: 0,
-  rushChains: 0,
-  rushDisp: 0,
-  rushNet: 0,
-  rush6000Count: 0,
-  rushWeddingCount: 0,
-  rushHoryurenCount: 0,
-  rushRestartCount: 0,
-  rushIwakanNotes: [],
-  rushStartSpin: 0,
+    /* 液晶ボックス：細い金縁のみ（筐体画像は廃止） */
+    #lcdBox {
+      position: relative; flex: 1; min-height: 0; box-sizing: border-box;
+      border: 2px solid rgba(234, 179, 8, 0.72); border-radius: 0 0 6px 6px;
+      background: #0d0407;
+    }
+    #lcdFrame { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; background: #0e0407; z-index: 10; }
 
-  sessionGraphPoints: [0],
-  sessionMaxChains: 0,
-  sessionMaxOneShot: 0,
-  _spinsSinceGraphSample: 0,
+    /* 発光は液晶の縁だけ（面には被せない・不透明度に上限） */
+    #lcdBox::before, #lcdBox::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 30; opacity: 0; transition: opacity 0.22s ease; }
+    #lcdBox::after { border-radius: 4px; }
+    #cabinetShell.cabinet-red-glow #lcdBox::after { opacity: 0.5; box-shadow: inset 0 0 22px 3px rgba(239, 68, 68, 0.9); }
+    #cabinetShell.cabinet-rem-glow #lcdBox::after { opacity: 0.45; box-shadow: inset 0 0 22px 3px rgba(56, 189, 248, 0.9); }
+    #cabinetShell.cabinet-gold-glow #lcdBox::after { opacity: 0.4; box-shadow: inset 0 0 20px 3px rgba(250, 204, 21, 0.85); }
+    #cabinetShell.cabinet-rainbow-glow #lcdBox::before {
+      padding: 3px; border-radius: 4px; opacity: 0.85;
+      background: conic-gradient(#fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #fef08a);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      animation: ringPulse 0.9s ease-in-out infinite alternate;
+    }
+    @keyframes ringPulse { from { opacity: 0.45; } to { opacity: 0.9; } }
 
-  autoMode: null,
-  autoTimer: null,
-  history: []
-};
+    /* ロゴ役物（常時表示・待機位置はレール中央／落下で液晶中央へ） */
+    #logoPocketShadow {
+      position: absolute; top: 2px; left: 50%; width: 190px; height: 34px; margin-left: -95px;
+      border-radius: 12px; background: radial-gradient(ellipse at center, rgba(6, 2, 10, 0.95) 50%, transparent 100%);
+      opacity: 0; transition: opacity 0.14s ease; pointer-events: none;
+    }
+    #logoPocketShadow.pocket-open { opacity: 1; }
+    #yakumonoLogoWrap {
+      position: absolute; top: 0; left: 50%; width: 200px; height: 102px;
+      transform: translateX(-50%); z-index: 36; pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+      transition: filter 0.2s ease, opacity 0.22s ease; will-change: transform;
+    }
+    #yakumonoLogoImg { height: 94px; width: 188px; display: block; object-fit: fill; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-dropped { z-index: 44; }
+    #yakumonoLogoWrap.yakumono-red #yakumonoLogoImg { filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-chance #yakumonoLogoImg { filter: drop-shadow(0 0 5px rgba(254, 249, 195, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-gold #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(254, 240, 138, 0.9)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-rainbow #yakumonoLogoImg { filter: drop-shadow(0 0 7px rgba(244, 114, 182, 0.85)) drop-shadow(0 0 10px rgba(125, 211, 252, 0.7)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+    #yakumonoLogoWrap.yakumono-off { filter: brightness(0.2) saturate(0.25); opacity: 0.1; }
+    #cabinetShell.cabinet-blackout #railRem { opacity: 0.08; }
 
-const resultModal = document.getElementById('resultModal');
-const settingsModal = document.getElementById('settingsModal');
-const dataModal = document.getElementById('dataModal');
-const normalTitle = document.getElementById('normalTitle');
-const normalSub = document.getElementById('normalSub');
-const reachYokokuBadge = document.getElementById('reachYokokuBadge');
-const reachStepBadge = document.getElementById('reachStepBadge');
-const reachSpCategory = document.getElementById('reachSpCategory');
-const reachTitle = document.getElementById('reachTitle');
-const reachSub = document.getElementById('reachSub');
-const pushHintText = document.getElementById('pushHintText');
-const rushModeBar = document.getElementById('rushModeBar');
-const rushStatusBar = document.getElementById('rushStatusBar');
-const normalControls = document.getElementById('normalControls');
-const rushControls = document.getElementById('rushControls');
-const busyNotice = document.getElementById('busyNotice');
+    /* レム役物（レール左端・顔と角をトリミング） */
+    #railRem { position: absolute; left: -6px; bottom: -4px; width: 96px; height: 96px; z-index: 28; pointer-events: none; opacity: 0.94; }
+    #railRemSlot { position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 76%); mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 76%); }
+    #railRemImg { width: 100%; height: 100%; object-fit: cover; object-position: 47% 32%; transform: scale(2.3); transform-origin: 47% 32%; }
+    #railRemImg:not([src]) { display: none; }
+    #cabinetRemGlow { position: absolute; inset: -8px; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.22s ease, background 0.22s ease; }
+    #cabinetRemGlow.rem-glow-red     { opacity: 0.7; background: radial-gradient(circle, rgba(239,68,68,0.6) 0%, rgba(185,28,28,0.25) 62%, transparent 74%); }
+    #cabinetRemGlow.rem-glow-rem     { opacity: 0.75; background: radial-gradient(circle, rgba(56,189,248,0.65) 0%, rgba(217,70,239,0.28) 62%, transparent 74%); }
+    #cabinetRemGlow.rem-glow-slow    { background: radial-gradient(circle, rgba(224,242,254,0.6) 0%, rgba(56,189,248,0.4) 55%, transparent 74%); animation: remSlowGlow 1.15s ease-in forwards; }
+    #cabinetRemGlow.rem-glow-strobe  { opacity: 1; background: radial-gradient(circle, rgba(255,255,255,0.6) 0%, rgba(56,189,248,0.5) 52%, transparent 74%); animation: remClassicFlash 0.12s steps(2) infinite; }
+    #cabinetRemGlow.rem-glow-rainbow { opacity: 0.8; background: conic-gradient(#fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #fef08a); filter: blur(5px); }
 
-['pointerdown', 'keydown'].forEach(ev => {
-  window.addEventListener(ev, () => BgmEngine.unlock(), { once: true });
-});
+    /* レール右：RUSH HUD（残り回数・保留4・V-STOCK） */
+    #railHud { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); max-width: 30%; }
+    #railHud #rushMetaHud { flex-direction: column; align-items: flex-end; gap: 3px; }
 
-// バックグラウンド移行時の発熱防止：裏画面へ行ったらオート＆BGMを自動停止
-document.addEventListener('visibilitychange', () => {
-  document.documentElement.classList.toggle('is-hidden', document.hidden);
-  if (document.hidden) {
-    stopAuto();
-    stopHandleHold(false);
-    BgmEngine.cut();
-  } else {
-    if (state.phase === 'NORMAL') BgmEngine.resume('normal');
-    else if (state.phase === 'RUSH') BgmEngine.resume(state.rushMode);
-  }
-});
+    /* 下ベゼル：保留・状態 */
+    #reserveBar {
+      flex: none; position: static; height: 30px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      background: #0d0407; border-top: 1px solid rgba(234, 179, 8, 0.5);
+    }
+    #reserveBar .w-6 { width: 22px; height: 22px; }
 
-// =========================================================================
-// 直近セッション リアルタイム差玉スランプグラフ（0発スタート・自動間引き）
-// =========================================================================
-const LiveSlump = (() => {
-  let canvas = null, diffEl = null, peakEl = null, bestEl = null;
-  let drawQueued = false, lastDrawMs = 0;
+    /* レールのロゴ背後の呼吸する光（不透明度のみ） */
+    #yakumonoRail::before { content: ""; position: absolute; left: 50%; top: -6px; width: 300px; height: 112px; margin-left: -150px; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.28) 0%, transparent 70%); animation: railBreath 3.4s ease-in-out infinite alternate; }
+    @keyframes railBreath { from { opacity: 0.35; } to { opacity: 1; } }
 
-  function mount() {
-    if (document.getElementById('liveSlumpCard')) return;
-    const hostParent = document.getElementById('playModeContainer');   // 差玉グラフはプレイ画面の一番下に常設
-    if (!hostParent) return;
+    /* 虹背景：出現を遅らせてフェードイン（文字と同時に被らないように） */
+    #lcdNiziiroBackLayer:not(.hidden) { animation: niziIn 0.9s ease 0.9s both; }
+    @keyframes niziIn { from { opacity: 0; } to { opacity: 1; } }
 
-    const card = document.createElement('div');
-    card.id = 'liveSlumpCard';
-    card.className = 'rounded-2xl bg-[#160806]/90 border border-amber-500/35 p-2.5 shadow-lg';
-    card.innerHTML = `
-      <div class="flex items-center justify-between gap-2 mb-1.5">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[11px] font-black text-amber-300 tracking-wider">📈 リアルタイム差玉グラフ</span>
-          <span id="liveSlumpDiff" class="text-[11px] font-black text-white num-fixed">0発</span>
+    /* ===== 鬼ラッシュ専用：背景(oni_haikei.jpg) + 図柄を液晶幅に比例して大型化 ===== */
+    #oniRushStage { container-type: size; padding: 18px 2px 0 2px; }
+    #oniHaikeiLayer { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: #120300; }
+    #oniHaikeiImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 50% 50%; animation: oniHaikeiBreath 5.5s ease-in-out infinite; will-change: transform; }
+    #oniHaikeiImg:not([src]) { display: none; }
+    @keyframes oniHaikeiBreath { 0%,100% { transform: scale(1.04); } 50% { transform: scale(1.11); } }
+    #oniHaikeiScrim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 54%, rgba(0,0,0,.40) 0%, rgba(0,0,0,.16) 58%, rgba(0,0,0,0) 100%); }
+    #oniHaikeiTint { position: absolute; inset: 0; background: #2563eb; mix-blend-mode: color; opacity: 0; transition: opacity .14s linear; }
+    #oniHaikeiDark { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0, rgba(0,0,0,0) 12%, rgba(0,0,0,.96) 44%); opacity: 0; transition: opacity .28s ease-out; }
+    #oniRushStage.oni-bg-blue #oniHaikeiTint { opacity: .88; }
+    #oniRushStage.oni-bg-dark #oniHaikeiDark { opacity: 1; }
+    #oniRushStage.oni-bg-dark .oni-digit-slot { opacity: .16; }
+    #oniRushStage.oni-bg-dark .oni-digit-slot.oni-digit-tenpai-side { opacity: .55; }
+    #oniRushStage.oni-bg-freeze #oniHaikeiImg { animation-play-state: paused; }
+    #oniRushStage .oni-digit-slot { margin: 0 -1.6cqw; transition: transform .12s cubic-bezier(0.16,1,0.3,1), filter .14s ease, opacity .28s ease-out; }
+    #oniRushStage .oni-digit-side { width: 32cqw; height: min(45cqw, 56cqh); }
+    #oniRushStage .oni-digit-mid  { width: 37cqw; height: min(52cqw, 64cqh); transform: translateY(4cqw); }
+    #oniRushStage .oni-digit-img { filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 4px rgba(0,0,0,.95)) drop-shadow(0 8px 14px rgba(0,0,0,.92)) drop-shadow(0 0 14px rgba(250,204,21,.5)); }
+
+    /* ===== 当たり時のV：大きく・叩きつけ・揺れ ===== */
+    .bonus-v-big { max-height: clamp(150px, 27dvh, 270px); max-width: 94%; object-fit: contain; position: relative; z-index: 2;
+      animation: vSlamBig .62s cubic-bezier(.16,1,.3,1) forwards, vBigPulse 1.8s ease-in-out .62s infinite; will-change: transform; }
+    @keyframes vSlamBig { 0% { transform: scale(2.7); opacity: 0; } 35% { transform: scale(.9); opacity: 1; } 58% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes vBigPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+
+    /* 初当たり：虹背景は着地と同時に即表示／時間停止中はCSSアニメを止める */
+    #lcdNiziiroBackLayer.niziiro-instant:not(.hidden) { animation: niziIn 0.12s ease 0s both; }
+    /* 初当たり：落下前に虹背景を不可視で描画しておく（着地では不透明度を上げるだけ） */
+    #lcdNiziiroBackLayer.niziiro-armed { animation: none !important; opacity: 0; will-change: opacity; }
+
+    /* 0図柄は一回り大きく */
+    #oniRushStage .oni-digit-slot.oni-digit-zero { scale: 1.24; z-index: 3; }
+    #oniRushStage .oni-digit-slot.oni-digit-zero .oni-digit-img { filter: drop-shadow(0 0 3px #000) drop-shadow(0 8px 14px rgba(0,0,0,.92)) drop-shadow(0 0 20px rgba(254,240,138,.85)); }
+
+    /* ===== ウェディング前兆（下の表示）＆ エヴァ風『おめでとう』 ===== */
+    #busyNotice.wed-bn-quiet { color: #fde68a; text-shadow: 0 0 10px rgba(253,224,71,.85); animation: wedBnPulse 1.1s ease-in-out infinite; }
+    #busyNotice.wed-bn-omedeto { font-size: 17px; letter-spacing: .32em; color: #fff7d6; text-shadow: 0 0 12px rgba(253,224,71,.95), 0 0 26px rgba(244,114,182,.7); animation: wedBnPulse .8s ease-in-out infinite; }
+    @keyframes wedBnPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+    .wed-eva { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; background: #000; overflow: hidden; }
+    .wed-eva-main { font-family: 'Shippori Mincho','Noto Serif JP','Hiragino Mincho ProN','Yu Mincho',serif; font-weight: 800; color: #f4f4ee; white-space: nowrap; line-height: 1;
+      font-size: min(20vw, 160px); letter-spacing: -.02em; transform: scale(.92, 1.65); transform-origin: 50% 50%;
+      text-shadow: -3px 0 0 rgba(255,40,40,.55), 3px 0 0 rgba(60,170,255,.35), 0 0 26px rgba(255,255,255,.22); }
+    .wed-eva-sub { font-family: 'Shippori Mincho','Noto Serif JP',serif; font-weight: 600; color: #e8e8e2; white-space: nowrap; font-size: min(3.1vw, 15px); letter-spacing: .5em; opacity: 0; }
+    .wed-eva-rule { width: min(78vw, 520px); height: 2px; background: #e8e8e2; opacity: 0; transform-origin: 0 50%; }
+    html.time-stop *, html.time-stop *::before, html.time-stop *::after { animation-play-state: paused !important; }
+
+    /* バックグラウンド時：CSSアニメ一括停止（発熱対策） */
+    html.is-hidden *, html.is-hidden *::before, html.is-hidden *::after { animation-play-state: paused !important; }
+
+    /* 数値パネル（固定枠）＆RUSHスロット */
+    #statSlot { position: relative; height: 112px; }
+    #statDash { height: 100%; }
+    .stat-cell { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 10px; border-radius: 12px; background: rgba(26, 10, 7, 0.92); border: 1px solid rgba(180, 83, 9, 0.5); overflow: hidden; contain: layout paint; }
+    .stat-label { font-size: 10px; color: rgba(253, 230, 138, 0.85); white-space: nowrap; }
+    .stat-val { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #dashCurSpin, #dashInvest, #dashBalls, #dashBalance { font-size: 15px !important; font-weight: 900 !important; line-height: 1.15 !important; }
+    #dashTotalSpin { font-size: 10px !important; line-height: 1.1 !important; }
+    #rushSlot { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 4px; pointer-events: none; z-index: 2; }
+    #rushSlot > * { pointer-events: auto; }
+    #playModeContainer:has(#rushStatusBar:not(.hidden)) #rushSlot { background: #150705; border-radius: 14px; }
+    #playModeContainer:has(#rushStatusBar:not(.hidden)) #statDash { visibility: hidden; }
+
+    /* 下部ドック（操作ボタンを画面下に固定） */
+    #controlDock {
+      position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 42;
+      width: min(100%, 680px); border-radius: 16px 16px 0 0;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+      backdrop-filter: blur(6px);
+    }
+
+    @keyframes remSlowGlow { 0% { opacity: 0.25; } 65% { opacity: 0.85; } 100% { opacity: 1; } }
+    @keyframes remClassicFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.22; } }
+    @keyframes rippleExpand { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
+    .lamp-ripple { position: absolute; inset: 15%; border-radius: 9999px; border: 4px solid #ef4444; pointer-events: none; animation: rippleExpand 0.72s cubic-bezier(0, 0.2, 0.8, 1) forwards; }
+
+    /* RUSH メタリックHUD */
+    .rush-meta-pill { background: linear-gradient(180deg, rgba(48, 10, 56, 0.94) 0%, rgba(16, 4, 24, 0.96) 100%); border: 1.5px solid rgba(250, 204, 21, 0.84); box-shadow: 0 0 14px rgba(168, 85, 247, 0.55), inset 0 0 8px rgba(250, 204, 21, 0.25); }
+
+    /* =====================================================================
+       ロゴ演出＆プレミア外枠
+       ===================================================================== */
+    @keyframes logoSlamIn {
+      0%   { opacity: 0; transform: scale(1.85) translateY(-10px); filter: brightness(2.4); }
+      52%  { opacity: 1; transform: scale(0.95) translateY(2px); filter: brightness(1.25); }
+      100% { opacity: 1; transform: scale(1.00) translateY(0); filter: brightness(1.06); }
+    }
+    @keyframes logoAlivePulse {
+      0%, 100% { transform: scale(1.00); filter: drop-shadow(0 0 14px rgba(253,224,71,0.85)) drop-shadow(0 6px 14px rgba(0,0,0,0.92)); }
+      50%      { transform: scale(1.04); filter: drop-shadow(0 0 28px rgba(254,249,195,0.98)) drop-shadow(0 0 46px rgba(244,114,182,0.75)) drop-shadow(0 6px 16px rgba(0,0,0,0.95)); }
+    }
+    .logo-alive-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; overflow: visible; padding: 2px; }
+    .logo-alive-halo { position: absolute; top: 50%; left: 50%; width: 155%; height: 155%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(254,249,195,0.48) 0%, rgba(250,204,21,0.22) 38%, rgba(244,114,182,0.10) 60%, transparent 74%); pointer-events: none; z-index: 0; }
+    .logo-alive-img { position: relative; z-index: 2; object-fit: contain; animation: logoSlamIn 0.30s cubic-bezier(0.16, 1, 0.3, 1) forwards, logoAlivePulse 1.6s ease-in-out 0.30s infinite; will-change: transform, filter; }
+    .bonus-logo-img { max-height: 112px; max-width: 84%; }
+    .fs-logo-img    { max-height: 168px; max-width: 88%; }
+    @media (min-width: 640px) {
+      .bonus-logo-img { max-height: 138px; max-width: 340px; }
+      .fs-logo-img    { max-height: 196px; max-width: 420px; }
+    }
+
+    #premiaFrameOverlay { position: absolute; inset: 0; z-index: 48; pointer-events: none; mix-blend-mode: screen; opacity: 0; transition: opacity 0.25s ease; }
+    #premiaFrameOverlay.premia-on { opacity: 1; }
+    #premiaFrameImg { width: 100%; height: 100%; object-fit: fill; }
+
+    /* =====================================================================
+       3D図柄・鬼がかりRUSH・脳が震える・レム告知（左端レム避けパディング込み）
+       ===================================================================== */
+    .normal-digit-img { width: 88%; height: 88%; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.85)); pointer-events: none; }
+
+    #oniRushStage { position: absolute; inset: 0; z-index: 7; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 14px 20px 0 26px; }
+    #oniRushStage.hidden { display: none !important; }
+    .oni-digit-slot { display: flex; align-items: center; justify-content: center; transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), filter 0.14s ease; will-change: transform, filter; }
+    .oni-digit-side { height: 122px; width: 88px; }
+    .oni-digit-mid  { height: 98px; width: 74px; transform: translateY(14px); }
+    @media (min-width: 640px) {
+      .oni-digit-side { height: 152px; width: 112px; }
+      .oni-digit-mid  { height: 122px; width: 92px; transform: translateY(18px); }
+    }
+    .oni-digit-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 10px rgba(250,204,21,0.58)) drop-shadow(0 8px 14px rgba(0,0,0,0.92)); }
+    .oni-digit-hit-lock { transform: scale(1.12) !important; filter: brightness(1.24) drop-shadow(0 0 22px rgba(254,240,138,0.98)) drop-shadow(0 0 40px rgba(244,63,94,0.88)) !important; }
+    .oni-digit-tenpai-side { transform: scale(1.08) !important; filter: brightness(1.18) drop-shadow(0 0 18px rgba(253,224,71,0.95)) !important; }
+    @keyframes oniReelBlur { 0% { transform: translateY(-10px) scaleY(1.14); filter: blur(1.4px); } 50% { transform: translateY(10px) scaleY(1.18); filter: blur(2.0px); } 100% { transform: translateY(-10px) scaleY(1.14); filter: blur(1.4px); } }
+    .oni-reel-spin { animation: oniReelBlur 0.085s linear infinite; }
+    @keyframes oniRemApproachAnim { 0% { opacity: 0; transform: scale(0.42); } 45% { opacity: 0.92; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1.26); filter: brightness(1.38) drop-shadow(0 0 48px rgba(250,204,21,1)); } }
+    .oni-rem-approach { animation: oniRemApproachAnim 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* 🧠 脳が震えるRUSH */
+    #brainRushStage { position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: hidden; }
+    #brainRushStage.hidden { display: none !important; }
+    .brain-pete-pos { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 22px; pointer-events: none; opacity: 0; transition: opacity 0.16s ease-out; }
+    .brain-pete-pos.pete-cover-pos { padding-top: 0; align-items: center; }
+    .brain-pete-pos.pete-shown { opacity: 1; }
+    @keyframes peteIdleBreath { 0%, 100% { transform: scale(1.00) translateY(0px); } 50% { transform: scale(1.045) translateY(-4px); } }
+    @keyframes petePunchIn { 0% { transform: scale(1.38); filter: brightness(2.0) contrast(1.4) hue-rotate(-14deg); } 42% { transform: scale(0.98); filter: brightness(1.16) contrast(1.18); } 100% { transform: scale(1.06); filter: brightness(1.06) contrast(1.14); } }
+    @keyframes peteMadQuiver { 0%, 100% { transform: translate(0, 0) scale(1.06); } 25% { transform: translate(-3px, 2px) scale(1.08); } 50% { transform: translate(3px, -2px) scale(1.07); } 75% { transform: translate(-2px, -2px) scale(1.09); } }
+    .brain-pete-img { width: 80%; height: 80%; max-width: 340px; object-fit: contain; filter: contrast(1.08) saturate(1.16) drop-shadow(0 0 22px rgba(168, 85, 247, 0.72)); will-change: transform, filter; }
+    .brain-pete-img.pete-cover-img { width: 108%; height: 108%; max-width: none; object-fit: cover; }
+    .brain-pete-img.pete-breath { animation: peteIdleBreath 2.6s ease-in-out infinite; }
+    .brain-pete-img.pete-punch  { animation: petePunchIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards, peteMadQuiver 0.11s linear 0.24s infinite; }
+
+    #brainAtmosphereVeil { position: absolute; inset: 0; z-index: 12; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(168, 85, 247, 0.06) 28%, rgba(46, 8, 72, 0.56) 74%, rgba(8, 2, 16, 0.90) 100%), linear-gradient(180deg, rgba(16, 4, 28, 0.58) 0%, transparent 20%, transparent 66%, rgba(12, 2, 22, 0.88) 100%); }
+    @keyframes brainEvoFlashAnim { 0% { opacity: 0.95; background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(217,70,239,0.88) 45%, rgba(59,7,100,0.96) 100%); } 100% { opacity: 0; } }
+    #brainEvoFlash { position: absolute; inset: 0; z-index: 24; pointer-events: none; opacity: 0; }
+    #brainEvoFlash.flash-fire { animation: brainEvoFlashAnim 0.22s ease-out forwards; }
+
+    #brainTextSwarm { position: absolute; inset: 0; z-index: 22; pointer-events: none; overflow: hidden; }
+    @keyframes nogaTremble { 0%, 100% { transform: translate(0, 0) rotate(var(--rot)) scale(var(--sc)); } 25% { transform: translate(-3.5px, 2px) rotate(calc(var(--rot) - 2deg)) scale(calc(var(--sc) * 1.04)); } 50% { transform: translate(3.5px, -2.5px) rotate(calc(var(--rot) + 2deg)) scale(calc(var(--sc) * 0.98)); } 75% { transform: translate(-2.5px, -2px) rotate(calc(var(--rot) - 1.5deg)) scale(calc(var(--sc) * 1.05)); } }
+    @keyframes nogaSlamIn { 0% { opacity: 0; transform: translate(0, 0) rotate(var(--rot)) scale(calc(var(--sc) * 2.1)); } 55% { opacity: 1; transform: translate(0, 0) rotate(var(--rot)) scale(calc(var(--sc) * 0.92)); } 100% { opacity: 1; transform: translate(0, 0) rotate(var(--rot)) scale(var(--sc)); } }
+    .noga-word { position: absolute; font-family: 'Shippori Mincho', 'Noto Sans JP', serif; font-weight: 900; line-height: 1; letter-spacing: -0.04em; white-space: nowrap; color: #f0abfc; -webkit-text-stroke: 2.5px #12021a; text-shadow: 0 0 8px #a21caf, 0 0 18px #d946ef, 3px 3px 0 #09010d, -2px -2px 0 #2e0642; animation: nogaSlamIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards, nogaTremble 0.085s linear 0.18s infinite; }
+    .noga-word.noga-hot  { color: #fda4af; -webkit-text-stroke: 3px #1c020c; text-shadow: 0 0 10px #e11d48, 0 0 24px #f43f5e, 0 0 38px #c026d3, 3px 3px 0 #09010d; }
+    .noga-word.noga-gold { color: #fef08a; -webkit-text-stroke: 3px #291202; text-shadow: 0 0 12px #facc15, 0 0 28px #f59e0b, 0 0 44px #ef4444, 3px 3px 0 #120601; }
+
+    #brainFurueruOverlay { position: absolute; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; pointer-events: none; padding: 14px; }
+    #brainFurueruOverlay.hidden { display: none !important; }
+    @keyframes furueruSlam { 0% { transform: scale(2.3) rotate(-6deg); opacity: 0; filter: brightness(2.2); } 45% { transform: scale(0.94) rotate(2deg); opacity: 1; filter: brightness(1.3); } 100% { transform: scale(1.04) rotate(0deg); opacity: 1; filter: brightness(1.12); } }
+    @keyframes furueruQuake { 0%, 100% { transform: translate(0,0) scale(1.04); } 25% { transform: translate(-5px, 3px) scale(1.07); } 50% { transform: translate(5px, -3px) scale(1.03); } 75% { transform: translate(-4px, -3px) scale(1.08); } }
+    #brainFurueruImg { max-width: 84%; max-height: 74%; object-fit: contain; filter: drop-shadow(0 0 22px rgba(253,224,71,0.95)) drop-shadow(0 0 44px rgba(239,68,68,0.88)); animation: furueruSlam 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards, furueruQuake 0.075s linear 0.22s infinite; }
+
+    /* 💙 レム告知モード */
+    #remRushStage { position: absolute; inset: 0; z-index: 7; pointer-events: none; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 18px 18px 10px 24px; }
+    #remRushStage.hidden { display: none !important; }
+    #remLampOuter { position: relative; z-index: 3; height: 96%; width: 92%; display: flex; align-items: center; justify-content: center; transition: transform 0.25s ease; }
+    #remLampOuter.rem-front-burst { z-index: 14; transform: scale(1.06); }
+    #remLampImg { position: relative; z-index: 2; max-height: 100%; max-width: 100%; object-fit: contain; transition: filter 0.16s ease, opacity 0.22s ease, transform 0.24s ease; will-change: filter, opacity, transform; }
+    #remHornGlow { position: absolute; z-index: 4; top: 22%; left: 49%; width: 52px; height: 72px; transform: translate(-50%, -50%); border-radius: 9999px; background: radial-gradient(ellipse at center, #ffffff 0%, rgba(255,255,255,0.92) 28%, rgba(224,242,254,0.55) 55%, transparent 78%); opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; }
+    #remHornGlow.horn-on { opacity: 1; transform: translate(-50%, -50%) scale(1.25); filter: drop-shadow(0 0 18px #ffffff) drop-shadow(0 0 36px #38bdf8); }
+    #remDigitsLayer { position: absolute; left: 18px; right: 14px; bottom: 14px; z-index: 9; display: flex; align-items: flex-end; justify-content: center; gap: 2px; pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; }
+    #remDigitsLayer.rem-digits-behind { opacity: 0.18; transform: scale(0.92) translateY(8px); }
+    .rem-digit-side { height: 96px; width: 72px; }
+    .rem-digit-mid  { height: 80px; width: 60px; transform: translateY(6px); }
+    @media (min-width: 640px) { .rem-digit-side { height: 118px; width: 90px; } .rem-digit-mid { height: 96px; width: 74px; transform: translateY(8px); } }
+    .rem-digit-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 10px rgba(217,70,239,0.55)) drop-shadow(0 6px 12px rgba(0,0,0,0.94)); }
+
+    .rem-img-idle { opacity: 0.36; filter: brightness(0.28) saturate(0.32) contrast(1.20); transform: scale(0.97); }
+    .rem-img-lit { opacity: 1 !important; filter: brightness(1.22) saturate(1.38) drop-shadow(0 0 10px rgba(56,189,248,1)) drop-shadow(0 0 26px rgba(14,165,233,0.95)) drop-shadow(0 0 46px rgba(217,70,239,0.75)) !important; transform: scale(1.03) !important; }
+    @keyframes remImgSlowWake { 0% { opacity: 0.32; filter: brightness(0.26) saturate(0.3); transform: scale(0.97); } 55% { opacity: 0.90; filter: brightness(1.02) saturate(1.25) drop-shadow(0 0 18px rgba(56,189,248,0.92)); transform: scale(1.02); } 100% { opacity: 1; filter: brightness(1.34) saturate(1.48) drop-shadow(0 0 12px rgba(74,222,128,1)) drop-shadow(0 0 28px rgba(56,189,248,1)) drop-shadow(0 0 48px rgba(217,70,239,0.95)); transform: scale(1.05); } }
+    .rem-img-slow { animation: remImgSlowWake 1.2s ease-in forwards !important; }
+    @keyframes remImgRainbowEdge { 0% { filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 10px #fef08a) drop-shadow(0 0 24px #38bdf8) drop-shadow(0 0 44px #e879f9); } 33% { filter: brightness(1.34) saturate(1.50) drop-shadow(0 0 10px #4ade80) drop-shadow(0 0 24px #fef08a) drop-shadow(0 0 44px #38bdf8); } 66% { filter: brightness(1.30) saturate(1.48) drop-shadow(0 0 10px #f472b6) drop-shadow(0 0 24px #4ade80) drop-shadow(0 0 44px #fef08a); } 100% { filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 10px #fef08a) drop-shadow(0 0 24px #38bdf8) drop-shadow(0 0 44px #e879f9); } }
+    .rem-img-rainbow { opacity: 1 !important; transform: scale(1.05) !important; animation: remImgRainbowEdge 0.55s linear infinite !important; }
+    @keyframes remImgStrobe { 0%, 100% { opacity: 1; filter: brightness(1.85) saturate(1.4) drop-shadow(0 0 16px #ffffff) drop-shadow(0 0 38px #38bdf8) drop-shadow(0 0 64px #4ade80); transform: scale(1.06); } 50% { opacity: 0.28; filter: brightness(0.35) saturate(0.4); transform: scale(0.98); } }
+    .rem-img-strobe { animation: remImgStrobe 0.13s steps(2) infinite !important; }
+
+    /* 通常時SPリーチ背面キャラ */
+    #reachActorBg { position: absolute; inset: 0; z-index: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; overflow: hidden; opacity: 0; transition: opacity 0.35s ease; }
+    #reachActorBg.actor-show { opacity: 0.48; }
+    #reachActorImg { max-height: 92%; max-width: 92%; object-fit: contain; filter: contrast(1.15) saturate(1.25) drop-shadow(0 0 24px rgba(239,68,68,0.65)); }
+
+    /* 3Dクリスタルボタン */
+    .botan-stage-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+    .botan-img-base { width: 100%; height: auto; display: block; filter: brightness(0.96) drop-shadow(0 8px 18px rgba(0,0,0,0.92)); transition: filter 0.14s ease, transform 0.14s ease; will-change: transform, filter; }
+    .botan-red-chassis { filter: sepia(0.85) hue-rotate(-48deg) saturate(4.2) brightness(1.08) drop-shadow(0 0 24px rgba(239,68,68,0.95)) drop-shadow(0 8px 18px rgba(0,0,0,0.92)) !important; }
+    .botan-crystal-glow { position: absolute; top: 10%; left: 16%; width: 68%; height: 58%; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; opacity: 0; transition: opacity 0.18s ease, background 0.18s ease; }
+    .botan-glow-red    { opacity: 0.85; background: radial-gradient(circle, #ffffff 0%, #ef4444 48%, transparent 80%); }
+    .botan-glow-purple { opacity: 0.78; background: radial-gradient(circle, #f5d0fe 0%, #c026d3 55%, transparent 80%); }
+    .botan-glow-gold   { opacity: 0.85; background: radial-gradient(circle, #fef9c3 0%, #facc15 55%, transparent 80%); }
+    .botan-glow-cyan   { opacity: 0.82; background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 55%, transparent 80%); }
+    @keyframes botanRainbowSpin { 0% { filter: hue-rotate(0deg) brightness(1.25); } 100% { filter: hue-rotate(360deg) brightness(1.25); } }
+    .botan-glow-rainbow { opacity: 0.92; background: conic-gradient(from 0deg, #fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #fef08a); animation: botanRainbowSpin 0.6s linear infinite; }
+
+    @keyframes btnVibeWeak { 0%, 100% { transform: translate(0, 0) scale(1.02); } 25% { transform: translate(-2.5px, 1.5px) scale(1.03); } 50% { transform: translate(2.5px, -1.5px) scale(1.02); } 75% { transform: translate(-2px, -1.5px) scale(1.03); } }
+    @keyframes btnVibeMid  { 0%, 100% { transform: translate(0, 0) scale(1.07) rotate(0deg); } 20% { transform: translate(-6px, 3px) scale(1.09) rotate(-1.6deg); } 40% { transform: translate(6px, -4px) scale(1.06) rotate(1.6deg); } 60% { transform: translate(-5px, -3px) scale(1.10) rotate(-1.4deg); } 80% { transform: translate(5px, 3px) scale(1.07) rotate(1.4deg); } }
+    @keyframes btnVibeMax  { 0%, 100% { transform: translate(0, 0) scale(1.14) rotate(0deg); filter: brightness(1.38) saturate(1.6) drop-shadow(0 0 24px rgba(253,224,71,1)) drop-shadow(0 0 52px rgba(244,114,182,0.95)); } 20% { transform: translate(-9px, -5px) scale(1.18) rotate(-3deg); } 45% { transform: translate(9px, 5px) scale(1.12) rotate(3deg); } 70% { transform: translate(-8px, 5px) scale(1.19) rotate(-2.5deg); } }
+    @keyframes botanDropSlam { 0% { transform: translateY(-30px) scale(1.16); } 38% { transform: translateY(8px) scale(0.93); } 68% { transform: translateY(2px) scale(1.04); } 100% { transform: translateY(4px) scale(1.02); } }
+    @keyframes btnRingPulse { 0% { transform: scale(0.75); opacity: 0.95; } 100% { transform: scale(1.55); opacity: 0; } }
+    @keyframes botanRiseIn { 0% { transform: translateY(45px) scale(0.75); opacity: 0; } 65% { transform: translateY(-3px) scale(1.04); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+
+    .btn-vibe-weak { animation: btnVibeWeak 0.08s linear infinite !important; filter: brightness(1.14) drop-shadow(0 0 18px rgba(217,70,239,0.92)) !important; }
+    .btn-vibe-mid  { animation: btnVibeMid 0.07s linear infinite !important; filter: brightness(1.28) saturate(1.45) drop-shadow(0 0 24px rgba(244,63,94,0.98)) drop-shadow(0 0 46px rgba(250,204,21,0.88)) !important; }
+    .btn-vibe-max  { animation: btnVibeMax 0.065s linear infinite !important; }
+    .btn-drop-ochi { animation: botanDropSlam 0.17s cubic-bezier(0.22, 1, 0.36, 1) forwards, btnVibeMax 0.065s linear 0.17s infinite !important; }
+    .btn-ring-active  { border: 3px solid #f0abfc; box-shadow: 0 0 24px #e879f9, inset 0 0 18px #f43f5e; animation: btnRingPulse 0.42s ease-out infinite !important; }
+    .btn-ring-rainbow { border: 4px solid #fef08a; box-shadow: 0 0 34px #fef08a, 0 0 58px #f472b6, inset 0 0 24px #7dd3fc; animation: btnRingPulse 0.28s ease-out infinite !important; }
+    .botan-rise-in { animation: botanRiseIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    /* 全画面ウェディング12,000（筐体すら突き破る特別全画面） */
+    #weddingCinemaOverlay { position: fixed; inset: 0; z-index: 1002; background: #000000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    #weddingCinemaOverlay.hidden { display: none !important; }
+
+    /* 横一刀両断・神秘カットイン */
+    @keyframes hSplitTopFly    { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 20% { transform: translateY(-10px) rotate(-1.4deg); opacity: 1; } 100% { transform: translateY(-120%) rotate(-8deg); opacity: 0; } }
+    @keyframes hSplitBottomFly { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 20% { transform: translateY(10px) rotate(1.4deg); opacity: 1; } 100% { transform: translateY(120%) rotate(8deg); opacity: 0; } }
+    @keyframes hSlashBeamAnim  { 0% { transform: translateX(-115%) scaleY(0.35); opacity: 1; } 30% { transform: translateX(0%) scaleY(1.85); opacity: 1; } 100% { transform: translateX(115%) scaleY(2.6); opacity: 0; } }
+    .split-panel-top { position: absolute; inset: 0; z-index: 54; pointer-events: none; background: linear-gradient(180deg, #160512 0%, #050208 82%, #fef08a 100%); clip-path: polygon(0 0, 100% 0, 100% 47%, 0 53%); box-shadow: inset 0 -18px 34px rgba(254,240,138,0.85); animation: hSplitTopFly 0.80s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .split-panel-bottom { position: absolute; inset: 0; z-index: 54; pointer-events: none; background: linear-gradient(0deg, #160512 0%, #050208 82%, #ef4444 100%); clip-path: polygon(0 53%, 100% 47%, 100% 100%, 0 100%); box-shadow: inset 0 18px 34px rgba(239,68,68,0.85); animation: hSplitBottomFly 0.80s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .h-slash-beam { position: absolute; top: 47%; left: -20%; width: 140%; height: 22px; z-index: 56; pointer-events: none; transform-origin: center; background: linear-gradient(90deg, transparent 0%, #ffffff 18%, #fef08a 45%, #f43f5e 68%, #ffffff 88%, transparent 100%); box-shadow: 0 0 42px 16px rgba(254,240,138,1), 0 0 82px 28px rgba(244,63,94,0.95); animation: hSlashBeamAnim 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    #softSparkleCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1005; pointer-events: none; opacity: 0; transition: opacity 0.9s ease-in-out; }
+    #softSparkleCanvas.sparkle-on { opacity: 1; }
+    @keyframes slowGentleFadeIn { 0% { opacity: 0; transform: scale(0.96); filter: brightness(0.45); } 45% { opacity: 0.48; transform: scale(0.99); filter: brightness(0.88); } 100% { opacity: 1; transform: scale(1.03); filter: brightness(1.08); } }
+    .cutin-gentle-fade { animation: slowGentleFadeIn 2.35s cubic-bezier(0.37, 0, 0.63, 1) forwards; }
+    @keyframes mysticAuroraSpin { 0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); } 50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.12); } 100% { transform: translate(-50%, -50%) rotate(360deg) scale(1); } }
+    .mystic-prism-rays { position: absolute; top: 50%; left: 50%; width: 180vmax; height: 180vmax; pointer-events: none; opacity: 0; transition: opacity 1.15s ease-in-out; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.40) 0%, rgba(254,240,138,0.24) 20%, rgba(244,114,182,0.18) 38%, rgba(125,211,252,0.18) 58%, transparent 74%), repeating-conic-gradient(from 0deg, rgba(255,255,255,0.22) 0deg 8deg, rgba(254,240,138,0.26) 8deg 18deg, rgba(244,114,182,0.22) 18deg 28deg, rgba(125,211,252,0.26) 28deg 38deg, rgba(192,132,252,0.24) 38deg 48deg, rgba(110,231,183,0.20) 48deg 58deg, transparent 58deg 68deg); animation: mysticAuroraSpin 16s linear infinite; }
+    .mystic-prism-rays.rays-on { opacity: 1; }
+    @keyframes prismShimmerSweep { 0% { transform: translateX(-140%) skewX(-24deg); opacity: 0; } 25% { opacity: 0.9; } 75% { opacity: 0.85; } 100% { transform: translateX(220%) skewX(-24deg); opacity: 0; } }
+    .prism-shimmer-bar { position: absolute; inset: 0; width: 42%; pointer-events: none; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 20%, rgba(254,240,138,0.45) 40%, rgba(255,255,255,0.88) 52%, rgba(125,211,252,0.45) 68%, rgba(244,114,182,0.28) 82%, transparent 100%); mix-blend-mode: screen; animation: prismShimmerSweep 1.65s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes mysticHaloPulse { 0% { box-shadow: 0 0 26px 6px rgba(255,255,255,0.75), 0 0 58px 16px rgba(254,240,138,0.78), 0 0 96px 28px rgba(244,114,182,0.58); border-color: #ffffff; } 33% { box-shadow: 0 0 30px 8px rgba(255,255,255,0.85), 0 0 64px 18px rgba(125,211,252,0.82), 0 0 104px 32px rgba(192,132,252,0.62); border-color: #e0f2fe; } 66% { box-shadow: 0 0 28px 7px rgba(255,255,255,0.80), 0 0 60px 16px rgba(110,231,183,0.76), 0 0 98px 28px rgba(254,240,138,0.60); border-color: #fef9c3; } 100% { box-shadow: 0 0 26px 6px rgba(255,255,255,0.75), 0 0 58px 16px rgba(254,240,138,0.78), 0 0 96px 28px rgba(244,114,182,0.58); border-color: #ffffff; } }
+    .mystic-halo-frame { animation: mysticHaloPulse 1.3s ease-in-out infinite; }
+
+    .bonus-theme-brain { background: radial-gradient(circle at 50% 45%, rgba(126,34,206,0.72) 0%, rgba(46,16,101,0.88) 55%, rgba(12,3,22,0.96) 100%) !important; }
+    .bonus-theme-rem   { background: radial-gradient(circle at 50% 42%, rgba(14,165,233,0.58) 0%, rgba(12,74,110,0.85) 55%, rgba(4,16,32,0.96) 100%) !important; }
+    @keyframes countBreakPop { 0% { transform: scale(0.75); filter: brightness(2.2); } 45% { transform: scale(1.24); filter: brightness(1.3); } 100% { transform: scale(1.0); filter: brightness(1.0); } }
+    .count-break-pop { animation: countBreakPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* 汎用アニメーション */
+    @keyframes brainShake { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 15% { transform: translate(-7px, -4px) rotate(-1deg); } 30% { transform: translate(7px, 4px) rotate(1deg); } 45% { transform: translate(-8px, 3px) rotate(-1.2deg); } 60% { transform: translate(8px, -3px) rotate(1.2deg); } 75% { transform: translate(-6px, -4px) rotate(-0.8deg); } 90% { transform: translate(6px, 4px) rotate(0.8deg); } }
+    .shake-intense { animation: brainShake 0.14s linear infinite; }
+    .shake-burst   { animation: brainShake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) 2; }
+    @keyframes brainShakeWeak { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2.5px, 1px); } 75% { transform: translate(2.5px, -1px); } }
+    @keyframes brainShakeMid  { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-5px, 2.5px) rotate(-0.5deg); } 75% { transform: translate(5px, -2.5px) rotate(0.5deg); } }
+    .shake-weak { animation: brainShakeWeak 0.11s linear infinite; }
+    .shake-mid  { animation: brainShakeMid 0.10s linear infinite; }
+
+    @keyframes pageMegaShake { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 12% { transform: translate(-11px, -7px) rotate(-1.4deg); } 25% { transform: translate(11px, 6px) rotate(1.4deg); } 37% { transform: translate(-13px, 5px) rotate(-1.8deg); } 50% { transform: translate(12px, -8px) rotate(1.6deg); } 62% { transform: translate(-9px, -6px) rotate(-1.2deg); } 75% { transform: translate(10px, 7px) rotate(1.3deg); } 87% { transform: translate(-7px, 4px) rotate(-0.9deg); } }
+    .page-mega-shake { animation: pageMegaShake 0.11s linear infinite !important; }
+    @keyframes rgbGlitchAnim { 0% { filter: drop-shadow(-5px 0 0 rgba(255,0,80,0.95)) drop-shadow(5px 0 0 rgba(0,240,255,0.95)) contrast(135%); transform: skewX(-4deg); } 33% { filter: drop-shadow(6px -2px 0 rgba(255,0,80,0.95)) drop-shadow(-6px 2px 0 rgba(0,240,255,0.95)) saturate(200%); transform: skewX(5deg); } 66% { filter: drop-shadow(-4px 3px 0 rgba(250,204,21,0.95)) drop-shadow(4px -3px 0 rgba(168,85,247,0.95)) contrast(150%); transform: skewX(-3deg); } 100% { filter: drop-shadow(0 0 0 transparent); transform: skewX(0deg); } }
+    .fx-rgb-glitch { animation: rgbGlitchAnim 0.10s steps(2) infinite !important; }
+    .iwakan-mono { filter: grayscale(100%) contrast(125%) !important; }
+    .iwakan-fade-remain { transition: opacity 0.85s ease; opacity: 0.06 !important; }
+    @keyframes remPuru { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2.5px, 1.5px); } 50% { transform: translate(2.5px, -1.5px); } 75% { transform: translate(-1.5px, -1.5px); } }
+    .iwakan-rempuru { animation: remPuru 0.09s linear infinite !important; }
+    @keyframes subtleWhisperIn { 0% { opacity: 0; transform: translateY(4px) scale(0.96); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+    .fx-whisper-in { animation: subtleWhisperIn 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .mode-despair-bg { background: radial-gradient(circle at 50% 40%, #0f172a 0%, #060914 60%, #020308 100%) !important; }
+    @keyframes redBareFlash { 0% { box-shadow: inset 0 0 0 0 rgba(239,68,68,0); } 14% { box-shadow: inset 0 0 110px 36px rgba(239,68,68,0.98); } 60% { box-shadow: inset 0 0 44px 12px rgba(220,38,38,0.65); } 100% { box-shadow: inset 0 0 18px 4px rgba(185,28,28,0.35); } }
+    .fx-redbare { animation: redBareFlash 0.9s ease-out forwards; }
+    @keyframes rainbowGlow { 0% { box-shadow: inset 0 0 56px 14px rgba(254,240,138,0.75); } 33% { box-shadow: inset 0 0 56px 14px rgba(125,211,252,0.75); } 66% { box-shadow: inset 0 0 56px 14px rgba(244,114,182,0.75); } 100% { box-shadow: inset 0 0 56px 14px rgba(254,240,138,0.75); } }
+    /* 縁の発光：box-shadow自体を毎フレーム描き直さず、疑似要素を色相/不透明度だけで動かす（軽量化） */
+    #lcdFrame.fx-rainbow::after, #lcdFrame.fx-gold::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 6; }
+    #lcdFrame.fx-rainbow::after { box-shadow: inset 0 0 56px 14px rgba(254,240,138,0.75); will-change: filter; animation: rainbowGlowC 1.05s linear infinite; }
+    @keyframes rainbowGlowC { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+    @keyframes goldFlash { 0%, 100% { box-shadow: inset 0 0 28px 6px rgba(250,204,21,0.42); } 50% { box-shadow: inset 0 0 68px 18px rgba(254,240,138,0.85); } }
+    #lcdFrame.fx-gold::before { box-shadow: inset 0 0 68px 18px rgba(254,240,138,0.85); will-change: opacity; animation: goldFlashC 0.8s ease-in-out infinite; }
+    @keyframes goldFlashC { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+    @keyframes glitchJitter { 0% { transform: translate(0, 0) skew(0deg); } 25% { transform: translate(-5px, 2px) skew(-4deg); } 50% { transform: translate(5px, -2px) skew(5deg); } 75% { transform: translate(-4px, -2px) skew(-3deg); } 100% { transform: translate(0, 0) skew(0deg); } }
+    .fx-glitch { animation: glitchJitter 0.1s steps(2) infinite; }
+    .crt-scanlines { background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0px, rgba(0,0,0,0.42) 2px, rgba(255,255,255,0.05) 2px, rgba(255,255,255,0.05) 4px); }
+    @keyframes dropCrashAnim { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 16% { transform: translateY(-6px) rotate(-3.5deg); opacity: 1; } 28% { transform: translateY(10px) rotate(4.2deg); opacity: 1; } 100% { transform: translateY(135%) rotate(18deg) scale(0.92); opacity: 0; } }
+    .drop-crash-panel { position: absolute; inset: 0; z-index: 56; pointer-events: none; background: linear-gradient(180deg, #1b0614 0%, #050208 55%, #2b0712 100%); border: 3px solid rgba(250,204,21,0.9); box-shadow: inset 0 0 42px rgba(239,68,68,0.85), 0 18px 40px rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; animation: dropCrashAnim 0.82s cubic-bezier(0.55,0.055,0.675,0.19) forwards; }
+    @keyframes shardFly { 0% { transform: translate3d(0,0,0) rotate(0deg) scale(1); opacity: 1; } 18% { transform: translate3d(calc(var(--tx)*0.12), calc(var(--ty)*0.12), 20px) rotate(calc(var(--rot)*0.15)) scale(1.05); opacity: 1; } 100% { transform: translate3d(var(--tx), var(--ty), 120px) rotate(var(--rot)) scale(1.45); opacity: 0; } }
+    .shatter-shard { position: absolute; z-index: 56; pointer-events: none; background: linear-gradient(135deg, #120410 0%, #030105 60%, #4c0519 100%); border: 2px solid rgba(254,240,138,0.92); box-shadow: inset 0 0 24px rgba(239,68,68,0.78), 0 0 18px rgba(250,204,21,0.65); animation: shardFly 0.84s cubic-bezier(0.16,1,0.3,1) forwards; }
+    @keyframes globalRainbowBurstAnim { 0% { opacity: 0.90; } 35% { opacity: 0.50; } 100% { opacity: 0; } }
+    .global-rainbow-burst { background: conic-gradient(from 0deg at 50% 50%, rgba(254,249,195,0.92), rgba(250,204,21,0.88), rgba(244,114,182,0.85), rgba(192,132,252,0.85), rgba(125,211,252,0.88), rgba(254,249,195,0.92)); animation: globalRainbowBurstAnim 0.72s ease-out forwards; }
+
+    .reel-box { background: linear-gradient(180deg, rgba(24,10,8,0.95) 0%, rgba(56,22,12,0.9) 50%, rgba(24,10,8,0.95) 100%); box-shadow: inset 0 4px 12px rgba(0,0,0,0.9), 0 0 14px rgba(234,179,8,0.28); }
+    .reel-tenpai { border-color: #fef08a !important; box-shadow: inset 0 0 16px rgba(250,204,21,0.55), 0 0 22px rgba(250,204,21,0.85) !important; }
+    @keyframes reelBlurSpin { 0% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; } 50% { transform: translateY(6px); filter: blur(1.8px); opacity: 1; } 100% { transform: translateY(-6px); filter: blur(1.2px); opacity: 0.85; } }
+    .reel-spinning { animation: reelBlurSpin 0.08s linear infinite; }
+    @keyframes slotBlink { 0%, 100% { opacity: 1; transform: scale(1.06); } 50% { opacity: 0.35; transform: scale(0.95); } }
+    .res-blink { animation: slotBlink 0.45s ease-in-out infinite; }
+    .res-blink-fast { animation: slotBlink 0.15s linear infinite; }
+
+    .gold-grad-text    { background: linear-gradient(180deg, #fffbeb 0%, #fef08a 38%, #f59e0b 82%, #b45309 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 12px rgba(250,204,21,0.58)); }
+    .crimson-grad-text { background: linear-gradient(180deg, #fecaca 0%, #ef4444 50%, #991b1b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(239,68,68,0.7)); }
+    .purple-grad-text  { background: linear-gradient(180deg, #fae8ff 0%, #e879f9 48%, #9333ea 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(192,38,211,0.75)); }
+    .cyan-grad-text    { background: linear-gradient(180deg, #e0f2fe 0%, #38bdf8 48%, #0284c7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 14px rgba(56,189,248,0.75)); }
+    .rainbow-grad-text { background: linear-gradient(90deg, #fffbeb, #fef08a, #f472b6, #7dd3fc, #c084fc, #6ee7b7, #fffbeb); background-size: 220% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineTxt 1.25s linear infinite; filter: drop-shadow(0 2px 12px rgba(254,240,138,0.55)); }
+    @keyframes shineTxt { to { background-position: 220% center; } }
+
+    @keyframes popIn { 0% { transform: scale(0.48); opacity: 0; } 60% { transform: scale(1.10); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    .pop-in { animation: popIn 0.30s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes cutinSlam { 0% { transform: scale(1.75) skewX(-8deg); opacity: 0; } 55% { transform: scale(0.95) skewX(-4deg); opacity: 1; } 100% { transform: scale(1) skewX(-2deg); opacity: 1; } }
+    .cutin-slam { animation: cutinSlam 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    @keyframes rainbowBgFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+    .overlay-blackout { background-color: #020104; }
+    .overlay-6000     { background: radial-gradient(circle at 50% 42%, #4a0d22 0%, #1c0518 52%, #07020a 100%); }
+    .overlay-wedding  { background: radial-gradient(circle at 50% 35%, #ffffff 0%, #fff1f2 46%, #fef3c7 100%); }
+    .overlay-rainbow  {
+      background: radial-gradient(circle at 50% 42%, rgba(254,249,195,0.42) 0%, rgba(217,119,6,0.28) 32%, transparent 65%), linear-gradient(135deg, #2e1042 0%, #713f12 22%, #831843 44%, #0c4a6e 66%, #4c1d95 85%, #713f12 100%);
+      background-size: 240% 240%; animation: rainbowBgFlow 2.6s ease infinite;
+    }
+
+    .secret-ok-btn { background: radial-gradient(circle at 35% 30%, #44403c 0%, #1c1917 65%, #0c0a09 100%); box-shadow: inset 0 2px 3px rgba(254,240,138,0.22), 0 3px 8px rgba(0,0,0,0.85); transition: transform 0.08s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+    .secret-ok-btn:active { transform: scale(0.90) translateY(1px); }
+    .secret-ok-active { border-color: rgba(251, 191, 36, 0.85) !important; box-shadow: inset 0 2px 4px rgba(254,240,138,0.35), 0 0 12px rgba(251,191,36,0.5); }
+    .handle-btn-active { transform: scale(0.96); box-shadow: 0 0 18px rgba(250, 204, 21, 0.9), inset 0 0 12px rgba(255, 255, 255, 0.5) !important; border-color: #fef08a !important; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #1a0b05; }
+    ::-webkit-scrollbar-thumb { background: #b45309; border-radius: 9999px; }
+
+    /* =====================================================================
+       v8.1 追加：ロゴと被らないRUSHバッジ位置／テストモード表示／台データ
+       ===================================================================== */
+    #rushTopBadge { top: auto !important; bottom: 15% !important; }
+    html.is-test-mode body::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 3px; z-index: 2000; pointer-events: none; background: linear-gradient(90deg, #10b981, #6ee7b7, #10b981); }
+    html.is-test-mode header { box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.55), 0 6px 18px rgba(16, 185, 129, 0.18); }
+    .data-pane.hidden { display: none !important; }
+
+    /* =====================================================================
+       v8.1 鬼がかりRUSH：文字なしカウントダウン／テンパイ（図柄アート・光・ひび割れだけで見せる）
+       ===================================================================== */
+    .oni-fx-host { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .oni-fx-back { z-index: 3; }
+    .oni-fx-front { z-index: 9; }
+    .oni-fx-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 5cqh; }
+    .oni-count-digit { display: flex; align-items: center; justify-content: center; height: min(68cqw, 66cqh); will-change: transform, opacity, filter; }
+    .oni-count-cell { width: calc(min(52cqw, 92cqw / var(--n, 1))); height: 100%; display: flex; align-items: center; justify-content: center; }
+    .oni-count-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 14px rgba(250,204,21,.85)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-fallback { font-size: min(56cqw, 58cqh); line-height: 1; font-weight: 900; filter: drop-shadow(0 0 12px rgba(250,204,21,.8)) drop-shadow(0 6px 10px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-3 .oni-count-img, .oni-count-digit.tone-3 .oni-count-fallback { filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 16px rgba(125,211,252,.95)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-2 .oni-count-img, .oni-count-digit.tone-2 .oni-count-fallback { filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 16px rgba(251,146,60,.95)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-1 .oni-count-img, .oni-count-digit.tone-1 .oni-count-fallback { filter: drop-shadow(0 0 6px rgba(255,255,255,.95)) drop-shadow(0 0 22px rgba(254,240,138,1)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-count-digit.tone-rainbow .oni-count-img, .oni-count-digit.tone-rainbow .oni-count-fallback { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 20px rgba(244,114,182,.95)) drop-shadow(0 0 30px rgba(125,211,252,.9)) drop-shadow(0 10px 16px rgba(0,0,0,.9)); }
+    .oni-shatter { position: relative; }
+    .oni-shatter > .oni-count-digit { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+    .oni-crack { position: absolute; inset: -4% 0; width: 100%; height: 108%; overflow: visible; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px rgba(255,255,255,.8)); opacity: 0; }
+    .oni-beam { position: absolute; left: 6%; right: 6%; height: 4px; border-radius: 4px; transform-origin: 50% 50%;
+      background: linear-gradient(90deg, rgba(var(--c),0), rgba(var(--c),1) 18%, rgba(255,255,255,.95) 50%, rgba(var(--c),1) 82%, rgba(var(--c),0));
+      box-shadow: 0 0 16px 3px rgba(var(--c), .8); }
+    .oni-pulse { background: radial-gradient(ellipse 36cqw 32cqh at 50% 54%, rgba(var(--c), .55), rgba(var(--c), 0) 72%); mix-blend-mode: screen; }
+    .oni-fx-layer.oni-rays { inset: auto; left: 50%; top: 54%; width: 160cqw; height: 160cqw; margin: -80cqw 0 0 -80cqw; display: block; padding: 0; border-radius: 50%;
+      background: repeating-conic-gradient(from 0deg, rgba(var(--ray-rgb),0) 0deg 8deg, rgba(var(--ray-rgb),.6) 8deg 12deg);
+      -webkit-mask-image: radial-gradient(circle, transparent 0 16%, #000 34%, transparent 66%); mask-image: radial-gradient(circle, transparent 0 16%, #000 34%, transparent 66%);
+      mix-blend-mode: screen; }
+    .oni-fx-layer.oni-rays-hue { animation: oniHue 1.4s linear infinite; }
+    @keyframes oniHue { to { filter: hue-rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen bg-gold-wagara text-slate-100 pb-8 relative">
+  <!-- 違和感演出「画面モザイク」用SVGフィルタ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="fxMosaic" x="0" y="0" width="100%" height="100%"><feFlood x="6" y="6" width="2" height="2"/><feComposite width="14" height="14"/><feTile result="t"/><feComposite in="SourceGraphic" in2="t" operator="in"/><feMorphology operator="dilate" radius="7"/></filter></svg>
+
+  <div id="ambientBgLayer" class="fixed inset-0 pointer-events-none z-0"></div>
+  <div id="sunburstLayer" class="hidden fixed inset-0 pointer-events-none z-0 overflow-hidden"><div class="sunburst-rays"></div></div>
+  <div id="globalBlackoutCurtain" class="hidden fixed inset-0 z-[999] bg-black pointer-events-none"></div>
+  <div id="globalRainbowFlash" class="hidden fixed inset-0 z-[998] pointer-events-none"></div>
+  <div id="globalCutinOverlay" class="hidden fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden"></div>
+  <!-- 全画面ウェディング12,000専用シネマオーバーレイ -->
+  <div id="weddingCinemaOverlay" class="hidden"></div>
+  <canvas id="softSparkleCanvas"></canvas>
+
+  <!-- =======================================================================
+       極薄ヘッダー（ファーストビューを筐体と操作に集中）
+       ======================================================================= -->
+  <header class="bg-[#180806]/92 border-b border-amber-500/45 shadow-lg sticky top-0 z-40 backdrop-blur-md">
+    <div class="max-w-lg sm:max-w-4xl mx-auto px-2.5 py-1.5 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-7 h-7 shrink-0 rounded-lg bg-gradient-to-br from-amber-300 via-yellow-500 to-rose-700 flex items-center justify-center shadow border border-yellow-200/80">
+          <span class="font-black text-slate-950 text-[10px]">鬼2</span>
         </div>
-        <span id="liveSlumpBest" class="text-[10px] font-bold text-amber-200/80 num-fixed">最大 0連 / 0個</span>
+        <div class="leading-tight truncate">
+          <h1 class="text-xs sm:text-sm font-black bg-gradient-to-r from-yellow-200 via-amber-300 to-rose-300 bg-clip-text text-transparent truncate">
+            リゼロ鬼がかり2 <span class="text-[10px] font-bold text-amber-200/80">v9.2</span>
+          </h1>
+        </div>
+        <button id="testPill" class="hidden shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 border border-emerald-300/80 text-emerald-200 animate-pulse whitespace-nowrap">🧪 TEST</button>
       </div>
-      <div class="relative w-full h-[112px] sm:h-[126px] rounded-xl bg-black/55 border border-amber-900/50 overflow-hidden">
-        <canvas id="liveSlumpCanvas" class="w-full h-full block"></canvas>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="btnOpenData" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-gradient-to-r from-amber-600 to-rose-700 hover:from-amber-500 text-yellow-100 shadow border border-amber-300/70 active:scale-95 transition whitespace-nowrap">
+          📊 台データ
+        </button>
+        <button id="btnOpenSettings" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-slate-900 hover:bg-slate-800 text-amber-200 border border-amber-500/70 active:scale-95 transition whitespace-nowrap">
+          ⚙️ 設定
+        </button>
       </div>
-      <div class="flex items-center justify-between mt-1 text-[10px] text-slate-400">
-        <span>0回転・0発スタート（直近セッション）</span>
-        <span id="liveSlumpPeak" class="num-fixed">最高: 0 / 最低: 0</span>
+    </div>
+
+  </header>
+
+  <!-- =======================================================================
+       🧪 テストツール（テストモード中のみ操作可・出玉/履歴/ランキングには一切記録されません）
+       ======================================================================= -->
+  <div id="promoTestMenu" class="hidden fixed left-0 right-0 top-[44px] z-[870] border-y border-emerald-400/60 bg-[#06150f]/97 backdrop-blur-md shadow-2xl max-h-[78vh] overflow-y-auto">
+    <div class="max-w-lg sm:max-w-4xl mx-auto px-3 py-2.5 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-black text-emerald-300">🧪 テストツール（記録されません）</span>
+        <button id="btnClosePromoMenu" class="text-[10px] text-emerald-100/80 px-2 py-0.5 rounded bg-black/50 border border-emerald-800/60">閉じる</button>
       </div>
-    `;
-    hostParent.appendChild(card);
-
-    canvas = document.getElementById('liveSlumpCanvas');
-    diffEl = document.getElementById('liveSlumpDiff');
-    peakEl = document.getElementById('liveSlumpPeak');
-    bestEl = document.getElementById('liveSlumpBest');
-  }
-
-  function currentDiffBalls() {
-    return Math.round(state.balls - (state.totalInvestYen / 500) * 125);
-  }
-
-  function record(force = false) {
-    if (!force) {
-      state._spinsSinceGraphSample++;
-      if (state._spinsSinceGraphSample < 12) return;
-      state._spinsSinceGraphSample = 0;
-    } else {
-      state._spinsSinceGraphSample = 0;
-    }
-    const v = currentDiffBalls();
-    const pts = state.sessionGraphPoints;
-    if (pts.length === 0 || pts[pts.length - 1] !== v || force) {
-      pts.push(v);
-      if (pts.length > 400) {
-        const thinned = [pts[0]];
-        for (let i = 1; i < pts.length - 1; i += 2) thinned.push(pts[i]);
-        thinned.push(pts[pts.length - 1]);
-        state.sessionGraphPoints = thinned;
-      }
-    }
-    scheduleDraw();
-  }
-
-  function scheduleDraw() {
-    const now = performance.now();
-    if (now - lastDrawMs < 180) {
-      if (!drawQueued) { drawQueued = true; setTimeout(() => { drawQueued = false; draw(); }, 190); }
-      return;
-    }
-    draw();
-  }
-
-  function draw() {
-    lastDrawMs = performance.now();
-    if (!canvas) mount();
-    if (!canvas || document.hidden) return;
-    const pts = state.sessionGraphPoints;
-    const cur = currentDiffBalls();
-
-    if (diffEl) {
-      diffEl.textContent = `${cur >= 0 ? '+' : ''}${cur.toLocaleString()}発`;
-      diffEl.className = `text-[11px] font-black num-fixed ${cur > 0 ? 'text-emerald-400' : cur < 0 ? 'text-rose-400' : 'text-white'}`;
-    }
-    if (bestEl) bestEl.textContent = `最大 ${state.sessionMaxChains}連 / ${state.sessionMaxOneShot.toLocaleString()}個`;
-
-    const peak = Math.max(0, ...pts, cur), bottom = Math.min(0, ...pts, cur);
-    if (peakEl) peakEl.textContent = `最高: ${peak >= 0 ? '+' : ''}${peak.toLocaleString()} / 最低: ${bottom >= 0 ? '+' : ''}${bottom.toLocaleString()}`;
-
-    const rect = canvas.parentElement.getBoundingClientRect();
-    if (rect.width < 20 || rect.height < 20) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
-    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const w = rect.width, h = rect.height, padL = 42, padR = 8, padT = 10, padB = 10;
-    const cw = w - padL - padR, ch = h - padT - padB;
-    ctx.clearRect(0, 0, w, h);
-
-    const drawPts = pts.length === 1 ? [0, cur] : pts;
-    const span = Math.max(5000, peak - bottom);
-    const yMin = bottom - span * 0.12, yMax = peak + span * 0.12;
-    const toX = (i) => padL + (i / Math.max(1, drawPts.length - 1)) * cw;
-    const toY = (v) => padT + ((yMax - v) / Math.max(1, yMax - yMin)) * ch;
-    const zeroY = toY(0);
-
-    ctx.strokeStyle = 'rgba(250, 204, 21, 0.12)'; ctx.lineWidth = 1; ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right';
-    [yMax, 0, yMin].forEach(val => {
-      const y = toY(val);
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-      const k = Math.round(val / 100) / 10;
-      ctx.fillText(val === 0 ? '0' : `${k > 0 ? '+' : ''}${k}k`, padL - 4, y + 3);
-    });
-
-    ctx.strokeStyle = 'rgba(250, 204, 21, 0.55)'; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(padL, zeroY); ctx.lineTo(w - padR, zeroY); ctx.stroke(); ctx.setLineDash([]);
-
-    ctx.lineWidth = 2;
-    for (let i = 1; i < drawPts.length; i++) {
-      const v0 = drawPts[i - 1], v1 = drawPts[i];
-      ctx.beginPath(); ctx.moveTo(toX(i - 1), toY(v0)); ctx.lineTo(toX(i), toY(v1));
-      ctx.strokeStyle = (v1 >= 0 && v0 >= 0) ? '#facc15' : (v1 < 0 && v0 < 0) ? '#f43f5e' : '#fb923c';
-      ctx.stroke();
-    }
-    const lx = toX(drawPts.length - 1), ly = toY(drawPts[drawPts.length - 1]);
-    ctx.fillStyle = cur >= 0 ? '#fef08a' : '#fda4af';
-    ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
-  }
-
-  return { mount, record, draw };
-})();
-
-// =========================================================================
-// 投資・ステータス（固定枠・10万回転/100万収支対応）・ログ管理
-// =========================================================================
-function consumeNormalBall() {
-  const ballsPerSpin = 250 / rotRate;
-  state.unspentFrac += ballsPerSpin;
-  const whole = Math.floor(state.unspentFrac);
-  state.unspentFrac -= whole;
-  if (state.balls >= whole) state.balls -= whole;
-  else {
-    const deficit = whole - state.balls;
-    state.balls = 0;
-    const units = Math.ceil(deficit / 125);
-    state.totalInvestYen += units * 500;
-    state.balls += units * 125 - deficit;
-  }
-  LiveSlump.record(false);
-}
-
-function updateSessionBest() {
-  if (state.rushChains > state.sessionMaxChains) state.sessionMaxChains = state.rushChains;
-  if (state.rushDisp > state.sessionMaxOneShot) state.sessionMaxOneShot = state.rushDisp;
-}
-
-function setControlMode(mode) {
-  normalControls.classList.toggle('hidden', mode !== 'NORMAL');
-  rushControls.classList.toggle('hidden', mode !== 'RUSH');
-  busyNotice.classList.toggle('hidden', mode === 'NORMAL' || mode === 'RUSH');
-}
-
-function stopAuto() {
-  state.autoMode = null;
-  if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; }
-  document.getElementById('btnAutoSakibare').textContent = '🔥 先バレ';
-  document.getElementById('btnAutoHit').textContent = '⚡ 当りオート';
-  document.getElementById('btnRushAuto').textContent = '⚡ RUSHオート';
-}
-
-// ---- v7.1 UiBatch：DOM更新をrAFで1回にまとめ、値が変わった時だけ書く ----
-const UiBatch = (() => {
-  const els = new Map();
-  const get = id => { if (!els.has(id)) els.set(id, document.getElementById(id)); return els.get(id); };
-  return {
-    text(id, v) { const el = get(id); if (!el) return; v = String(v); if (el._v !== v) { el._v = v; el.textContent = v; } },
-    tone(id, cls, all) { const el = get(id); if (!el || el._t === cls) return; el._t = cls; el.classList.remove(...all); el.classList.add(cls); }
-  };
-})();
-const BAL_TONES = ['text-emerald-400', 'text-rose-400', 'text-white'];
-let statsQueued = false;
-function updateStatsUI() {
-  if (statsQueued) return;
-  statsQueued = true;
-  requestAnimationFrame(flushStatsUI);
-}
-function flushStatsUI() {
-  statsQueued = false;
-  try { RushHud.update(); } catch (e) {}
-  UiBatch.text('hudRushRemain', state.stRemaining);
-  UiBatch.text('dashCurSpin', state.currentSpin.toLocaleString());
-  UiBatch.text('dashTotalSpin', `総 ${state.totalNormalSpins.toLocaleString()}`);
-  UiBatch.text('dashInvest', `${state.totalInvestYen.toLocaleString()}円`);
-  UiBatch.text('dashBalls', `${Math.floor(state.balls).toLocaleString()}発`);
-
-  const bal = Math.round(state.balls * exchangeRate) - state.totalInvestYen;
-  const balTxt = `${bal >= 0 ? '+' : ''}${bal.toLocaleString()}円`;
-  const tone = bal > 0 ? 'text-emerald-400' : bal < 0 ? 'text-rose-400' : 'text-white';
-  UiBatch.text('dashBalance', balTxt); UiBatch.tone('dashBalance', tone, BAL_TONES);
-  UiBatch.text('rushBalanceDisplay', balTxt); UiBatch.tone('rushBalanceDisplay', tone, BAL_TONES);
-
-  UiBatch.text('rushChainDisplay', `${state.rushChains}連`);
-  UiBatch.text('rushDispDisplay', `${state.rushDisp.toLocaleString()}個`);
-  UiBatch.text('rushNetDisplay', `${state.rushNet.toLocaleString()}発`);
-  UiBatch.text('rush6000Display', `${state.rush6000Count}回`);
-}
-
-let logRenderQueued = false;
-function renderHistoryTable() {
-  logRenderQueued = false;
-  const body = document.getElementById('historyTableBody');
-  if (!body) return;
-  if (state.history.length === 0) {
-    body.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-amber-200/50">まだ履歴はありません。</td></tr>';
-    return;
-  }
-  body.innerHTML = state.history.map(h => `
-    <tr class="hover:bg-amber-950/30">
-      <td class="py-1.5 px-1.5 font-bold text-slate-300 whitespace-nowrap num-fixed">${h.spinTxt}</td>
-      <td class="py-1.5 px-1.5 whitespace-nowrap"><span class="px-1.5 py-0.5 rounded text-[10px] font-black ${h.tagCls}">${h.tag}</span></td>
-      <td class="py-1.5 px-1.5 text-amber-100/90">${h.detail}</td>
-      <td class="py-1.5 px-1.5 text-right font-black whitespace-nowrap num-fixed ${h.resCls}">${h.resTxt}</td>
-    </tr>
-  `).join('');
-}
-function addLog(spinTxt, tag, tagCls, detail, resTxt, resCls) {
-  if (TestMode.active) return;                          // テストモード中は履歴にも残さない
-  state.history.unshift({ spinTxt, tag, tagCls, detail, resTxt, resCls });
-  if (state.history.length > 50) state.history.pop();
-  if (DataPanel.isOpen('history') && !logRenderQueued) {   // 台データ「履歴」を開いている時だけ描画（軽量化）
-    logRenderQueued = true;
-    requestAnimationFrame(renderHistoryTable);
-  }
-}
-
-// =========================================================================
-// 通常時抽選＆SPリーチ（ロゴ役物落下＋初当たり背面 niziiro.jpg）
-// =========================================================================
-function drawNormalSpin() {
-  consumeNormalBall();
-  state.currentSpin++;
-  state.totalNormalSpins++;
-
-  const p = SPEC.NORMAL_PROB;
-  const forced = (TestMode.active && DevForce.normalHit) ? DevForce.normalHit : null;   // テスト専用：初当たりを強制
-  const isHit = forced ? true : Math.random() < p;
-
-  let hesoType = null;
-  if (isHit) {
-    const r = Math.random();
-    if (r < SPEC.H_3000_RUSH) hesoType = '3000_RUSH';
-    else if (r < SPEC.RUSH_ENTRY) hesoType = '1500_RUSH';
-    else hesoType = '1500_NORM';
-    if (forced) { hesoType = forced === '3000' ? '3000_RUSH' : forced === '1500R' ? '1500_RUSH' : '1500_NORM'; DevForce.normalHit = null; }
-  }
-
-  let bareType = null;
-  const occ = 0.92;
-  if (state.custSakibare) {
-    if (isHit) {
-      if (Math.random() < occ) {
-        const rainbowChance = state.custPremier ? 0.32 : 0.28;      // プレミアUPは +4% 程度の控えめな上乗せ
-        bareType = (hesoType === '3000_RUSH' && Math.random() < rainbowChance) ? 'rainbow' : 'red';
-      }
-    } else {
-      const q = (p * occ * 0.60) / ((1 - p) * 0.40);
-      if (Math.random() < q) bareType = 'red';
-    }
-  }
-  return { isHit, hesoType, bareType };
-}
-
-function buildNormalScenario(res) {
-  const { isHit, hesoType, bareType } = res;
-  const is3000 = hesoType === '3000_RUSH';
-  const ochiburu = is3000 && Math.random() < (state.custOchiburu ? 0.88 : 0.24);
-  // 『鬼がかってますねSP』＝高信頼（当選の約98%）。当選時の約2%、ハズレ時はごく稀（プレミアUPは +0.6% 程度の上乗せ）
-  //   ※復活演出としての特別感を保つため、通常時は控えめ（当選の約10%）。初当たり前のテンポを守るため通常時はごく稀（復活演出が主役）。演出の振り分けだけで、当落や出玉の内部確率には一切関与しない
-  const isPremier = !is3000 && (isHit ? Math.random() < ((0.02 + (state.custPremier ? 0.006 : 0)) / (1 - SPEC.H_3000_RUSH)) : Math.random() < 0.0003);
-  // コードだけの短いプレミア予告（信頼度は約88%）
-  const shortPrem = (!is3000 && !isPremier && Math.random() < (isHit ? 0.07 + (state.custPremier ? 0.03 : 0) : 0.007))
-    ? ['goldRain', 'rainbowSweep', 'blueEyes'][Math.floor(Math.random() * 3)] : null;
-  const tenpaiNum = is3000 ? 7
-    : hesoType === '1500_RUSH' ? [1, 3, 5][Math.floor(Math.random() * 3)]
-    : [2, 4, 6, 8][Math.floor(Math.random() * 4)];
-
-  let titleColor = 'white', cutinColor = 'green';
-  if (is3000 || isPremier) { titleColor = 'gold'; cutinColor = 'gold'; }
-  else if (isHit) {
-    titleColor = Math.random() < 0.42 ? 'gold' : Math.random() < 0.85 ? 'red' : 'white';
-    cutinColor = Math.random() < 0.48 ? 'gold' : Math.random() < 0.88 ? 'red' : 'green';
-  } else {
-    titleColor = Math.random() < 0.08 ? 'gold' : Math.random() < 0.45 ? 'red' : 'white';
-    cutinColor = Math.random() < 0.07 ? 'gold' : Math.random() < 0.40 ? 'red' : 'green';
-  }
-
-  let isWhale = false, badge = '', category = '', title = '', sub = '', actor = null;
-  if (is3000) {
-    isWhale = true; badge = '白鯨襲来'; category = '白鯨討伐SP'; title = '白鯨攻略戦'; sub = '霧の魔獣を討伐せよ!!'; actor = null;
-  } else if (isPremier) {
-    badge = '鬼がかってますね予告'; category = '鬼がかったやり方SP'; title = 'vs ウルガルム'; sub = 'レム覚醒!! 運命の一撃!!'; actor = 'rem';
-  } else if (isHit) {
-    const r = Math.random();
-    if (r < 0.38) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs ウルガルム'; sub = '最終ジャッジへ!!'; actor = 'rem'; }
-    else if (r < 0.72) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs ペテルギウス'; sub = '見えざる手を断ち切れ!!'; actor = 'pete'; }
-    else { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs エルザ'; sub = '激熱バトル発展!!'; actor = 'rem'; }
-  } else {
-    const r = Math.random();
-    if (r < 0.36) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs ペテルギウス'; sub = '大チャンス到来!!'; actor = 'pete'; }
-    else if (r < 0.72) { badge = '鬼がかり予告'; category = '鬼がかったやり方SP'; title = 'vs エルザ'; sub = '運命のジャッジ!!'; actor = 'rem'; }
-    else { badge = '抗えチャンス'; category = '抗えSPリーチ'; title = '死の運命に抗え'; sub = 'ボタン一撃で突破せよ!!'; actor = null; }
-  }
-  const doGiji = isHit ? Math.random() < 0.65 : Math.random() < 0.35;
-  return { isHit, hesoType, bareType, is3000, isWhale, isPremier, shortPrem, ochiburu, tenpaiNum, titleColor, cutinColor, badge, category, title, sub, actor, doGiji, secretRevealed: false };
-}
-
-// 演出用：役物落下で例外が出ても通常リーチを止めない（キャンセルは再送出）
-async function dropSafe(opts) {
-  try { await triggerYakumonoDrop(opts); }
-  catch (e) { if (e === 'CANCELLED') throw e; console.error('yakumono drop failed', e); }
-}
-
-async function startNormalReach(res) {
-  stopAuto(); stopHandleHold(true); LiveSlump.record(true);
-  const tok = ++seqToken;
-  state.phase = 'REACH'; setControlMode('BUSY'); clearVisualEffects(); setActiveScene('reach');
-  reachStepBadge.classList.add('hidden'); reachSpCategory.textContent = ''; setReachActor(null); BgmEngine.cut();
-
-  const sc = buildNormalScenario(res);
-  state.pendingReach = sc;
-
-  if (sc.bareType === 'rainbow') {
-    state.sakibareTotal++; StudioAudio.playPokyun(true); setLcdNiziiroBack(true);
-    setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true); triggerLamp('rainbow', '虹バレ!!');
-    updateReserveSlots('NORMAL', 'RAINBOW', 0); lcdFrame.classList.add('fx-rainbow', 'shake-burst'); FxCanvas.burstRainbow(68);
-    reachYokokuBadge.textContent = '虹先バレ'; reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-black/85 border border-amber-300 rainbow-grad-text shadow';
-    reachTitle.textContent = 'ポキュ↑ーン↓!!'; reachTitle.className = 'font-mincho text-2xl sm:text-4xl font-black rainbow-grad-text cutin-slam';
-    reachSub.textContent = `${state.currentSpin.toLocaleString()}回転目`;
-  } else if (sc.bareType === 'red') {
-    state.sakibareTotal++; StudioAudio.playPokyun(false);
-    setAmbientBg('redbare'); triggerLamp('red', '先バレ!!');
-    updateReserveSlots('NORMAL', 'RED', 0); lcdFrame.classList.add('fx-redbare', 'shake-burst'); FxCanvas.burstFlames(42);
-    reachYokokuBadge.textContent = '先バレ'; reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-950/90 border border-rose-400 text-rose-200 shadow';
-    reachTitle.textContent = 'ポキュ↑ーン↓!!'; reachTitle.className = 'text-2xl sm:text-4xl font-black crimson-grad-text cutin-slam';
-    reachSub.textContent = `${state.currentSpin.toLocaleString()}回転目・SP発展`;
-  } else {
-    reachYokokuBadge.textContent = 'SP発展'; reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-black/85 border border-amber-400 text-amber-300';
-    reachTitle.textContent = 'リーチ発展!!'; reachTitle.className = 'text-2xl sm:text-3xl font-black gold-grad-text pop-in';
-    reachSub.textContent = `${state.currentSpin.toLocaleString()}回転目`;
-  }
-  updateStatsUI();
-
-  try {
-    await wait(700, tok);
-    lcdFrame.classList.remove('shake-burst');
-    BgmEngine.resume('reach');
-
-    if (sc.doGiji && !sc.isWhale) {
-      reachSpCategory.textContent = '疑似連'; reachTitle.textContent = '継続 ×2'; reachTitle.className = 'text-2xl sm:text-3xl font-black gold-grad-text pop-in';
-      FxCanvas.spawnRing('#facc15', 220, 6); await wait(380, tok);
-      reachTitle.textContent = '鬼がかり継続 ×3!!'; reachTitle.className = 'text-xl sm:text-3xl font-black crimson-grad-text cutin-slam';
-      FxCanvas.burstFlames(36); await wait(440, tok);
-    }
-
-    if (sc.isWhale) {
-      StudioAudio.playWhaleSiren(); setAmbientBg('rainbow'); setPremiaFrame(true);
-      await dropSafe({ color: 'rainbow', holdMs: 680, withNiziiroBack: false, token: tok });
-      lcdFrame.classList.add('fx-rainbow', 'shake-burst'); triggerLamp('rainbow', '白鯨襲来!!'); FxCanvas.spawnLightning('#7dd3fc', 6);
-    } else if (sc.isPremier) {
-      await playOnigakariImageCutin({ caption: '鬼がかってますね', dur: 3200, withPokyun: false, fromBlackout: false, token: tok });
-      setPremiaFrame(true); lcdFrame.classList.add('fx-rainbow'); triggerLamp('rainbow', 'プレミア!!'); FxCanvas.burstRainbow(56);
-    } else if (sc.titleColor === 'gold') {
-      await dropSafe({ color: 'gold', holdMs: 560, withNiziiroBack: false, token: tok });
-    } else if (sc.titleColor === 'red') {
-      await dropSafe({ color: 'red', holdMs: 500, withNiziiroBack: false, token: tok });
-    } else {
-      if (typeof Yakumono !== 'undefined') Yakumono.fire('chance');
-      else console.warn('effects.js が古い版です（Yakumono 未定義）。effects.js を v7.3 に差し替えてください');
-      FxCanvas.burstFlames(28);
-    }
-
-    if (sc.shortPrem) { await playShortPremium(sc.shortPrem, tok); reachSpCategory.textContent = 'プレミア予告'; }
-    setReachActor(sc.actor);
-    reachYokokuBadge.textContent = sc.badge;
-    reachYokokuBadge.className = (sc.isWhale || sc.isPremier)
-      ? 'px-2 py-0.5 rounded-full text-[10px] font-black bg-black/90 border border-amber-300 rainbow-grad-text shadow'
-      : 'px-2 py-0.5 rounded-full text-[10px] font-black bg-black/90 border border-amber-400/80 text-amber-300 shadow';
-
-    reachStepBadge.classList.remove('hidden'); reachSpCategory.textContent = sc.category;
-    if (sc.titleColor === 'gold') {
-      reachStepBadge.textContent = '金タイトル!!'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow pop-in';
-      reachTitle.className = 'font-mincho text-xl sm:text-3xl font-black gold-grad-text cutin-slam whitespace-nowrap';
-    } else if (sc.titleColor === 'red') {
-      reachStepBadge.textContent = '赤タイトル!'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-950/95 border border-rose-400 text-rose-200 shadow pop-in';
-      reachTitle.className = 'font-mincho text-xl sm:text-3xl font-black crimson-grad-text cutin-slam whitespace-nowrap';
-    } else {
-      reachStepBadge.textContent = '白タイトル'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900/90 border border-slate-500 text-slate-200';
-      reachTitle.className = 'font-mincho text-xl sm:text-3xl font-black text-white cutin-slam whitespace-nowrap';
-    }
-    reachTitle.textContent = sc.title; reachSub.textContent = sc.sub;
-
-    await wait(560, tok);
-    if (sc.cutinColor === 'gold') {
-      reachStepBadge.textContent = '金カットイン!!'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow pop-in';
-      FxCanvas.spawnRing('#fef08a', 240, 7);
-    } else if (sc.cutinColor === 'red') {
-      reachStepBadge.textContent = '赤カットイン!'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-950/95 border border-rose-400 text-rose-200 shadow pop-in';
-      FxCanvas.spawnRing('#ef4444', 210, 5);
-    } else {
-      reachStepBadge.textContent = '緑カットイン'; reachStepBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/90 border border-emerald-400 text-emerald-200';
-    }
-
-    pushButtonArea.classList.remove('hidden');
-    btnOniPush.classList.remove('botan-rise-in'); void btnOniPush.offsetWidth; btnOniPush.classList.add('botan-rise-in');
-    reachBotanText.textContent = sc.isWhale ? '撃破' : 'PUSH';
-    pushHintText.textContent = sc.isWhale ? 'タップ / Spaceで白鯨撃破!!' : 'タップ / Spaceでジャッジ！（OKで裏告知）';
-
-    const btnCol = (sc.isWhale || sc.isPremier) ? 'rainbow' : sc.cutinColor === 'gold' ? 'gold' : sc.cutinColor === 'red' ? 'red' : '';
-    setReachBotanState({ vibe: btnCol === 'gold' || btnCol === 'rainbow' ? 'weak' : 'idle', color: btnCol });
-
-    if (sc.ochiburu) {
-      await wait(340, tok); BgmEngine.cut(); StudioAudio.playOchiburu(true);
-      setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true);
-      lcdFrame.classList.add('shake-intense', 'fx-gold'); setReachBotanState({ vibe: 'max', color: 'rainbow', drop: true }); setLed('rainbow');
-      FxCanvas.spawnRing('#fef08a', 300, 9); FxCanvas.spawnLightning('#fef08a', 5);
-      reachYokokuBadge.textContent = '鬼がかり3,000濃厚!!';
-      reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow pop-in';
-    }
-  } catch (e) {
-    if (e === 'CANCELLED') return;                       // 別の演出に切り替わった場合のみ中断
-    console.error('startNormalReach failed', e);
-    try {                                                // それ以外の失敗でも、PUSHは必ず出して進行を止めない
-      reachSub.textContent = '演出エラー: ' + ((e && e.message) || e);
-      reachStepBadge.classList.add('hidden');
-      pushButtonArea.classList.remove('hidden'); reachBotanText.textContent = 'PUSH';
-      pushHintText.textContent = 'タップでジャッジ';
-    } catch (_) {}
-  }
-}
-
-btnOniPush.addEventListener('click', () => { if (state.phase === 'REACH') resolveNormalReach(); });
-
-btnSecretOk.addEventListener('click', () => {
-  if (canInterruptPromotion()) { interruptPromotionByOk(); return; }
-  if (state.phase === 'REACH') {
-    const sc = state.pendingReach;
-    if (!sc || sc.secretRevealed || sc.ochiburu || !sc.isHit) return;
-    sc.secretRevealed = true; BgmEngine.cut();
-    if (sc.is3000) {
-      sc.ochiburu = true; StudioAudio.playOchiburu(true); setLcdNiziiroBack(true);
-      setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true);
-      lcdFrame.classList.add('shake-intense', 'fx-gold'); setReachBotanState({ vibe: 'max', color: 'rainbow', drop: true });
-      triggerLamp('rainbow', '3,000!!'); setLed('rainbow');
-      FxCanvas.spawnRing('#fef08a', 300, 9); FxCanvas.spawnLightning('#fef08a', 5); FxCanvas.burstRainbow(64);
-      reachYokokuBadge.textContent = '鬼がかり3,000濃厚!!'; reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-950/95 border border-yellow-200 text-yellow-200 shadow pop-in';
-      pushHintText.textContent = 'タップ / Spaceで3,000BONUSへ!!';
-    } else {
-      StudioAudio.playKyuin(); setLcdNiziiroBack(true); setAmbientBg('rainbow'); setPremiaFrame(true); lcdFrame.classList.add('fx-rainbow', 'shake-burst');
-      setReachBotanState({ vibe: 'mid', color: 'rainbow' }); triggerLamp('rainbow', '一発告知!!');
-      FxCanvas.spawnLightning('#fef08a', 5); FxCanvas.burstRainbow(58);
-      reachYokokuBadge.textContent = '大当り濃厚!!'; reachYokokuBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-black/95 border border-amber-300 rainbow-grad-text shadow pop-in';
-      pushHintText.textContent = 'タップ / Spaceで図柄揃いへ!!';
-    }
-    return;
-  }
-  if (state.pendingRushHit && state.pendingRushHit.type === 'BONUS_6000' && !state.pendingRushHit.okRevealed) {
-    state.pendingRushHit.okRevealed = true; BgmEngine.cut(); StudioAudio.playOchiburu(true);
-    setAmbientBg('rainbow'); setSunburst(true); setPremiaFrame(true); triggerLamp('rainbow', '6,000!!'); FxCanvas.spawnLightning('#fef08a', 5);
-    rushTopBadge.classList.remove('hidden'); rushTopBadge.textContent = '鬼がかり6,000濃厚!!';
-    rushTopBadge.className = 'pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border border-yellow-200 rainbow-grad-text shadow-lg pop-in whitespace-nowrap';
-  }
-});
-
-async function resolveNormalReach() {
-  const sc = state.pendingReach;
-  if (!sc) return;
-  state.pendingReach = null;
-  const tok = ++seqToken;
-
-  lcdFrame.classList.remove('shake-intense', 'shake-burst');
-  setReachBotanState({ vibe: 'idle', color: '' });
-  pushButtonArea.classList.add('hidden');
-  updateReserveSlots('NORMAL');
-
-  if (!sc.isHit) {
-    state.phase = 'ANIMATING';
-    try { await playGlassShatterFail(tok); } catch (e) {}
-    setReachActor(null); clearVisualEffects(); state.phase = 'NORMAL'; setActiveScene('normal'); randomMissReels();
-    normalTitle.textContent = 'ハズレ…'; normalTitle.className = 'text-lg sm:text-2xl font-black text-slate-400';
-    normalSub.textContent = `${sc.title}で敗北。次こそ！`;
-    setControlMode('NORMAL');
-    setTimeout(() => { if (state.phase === 'NORMAL') BgmEngine.resume('normal'); }, 550);
-    if (sc.bareType) addLog(`${state.currentSpin}回`, '先バレ', 'bg-rose-950 text-rose-300 border border-rose-700', sc.title, 'ハズレ', 'text-slate-400');
-    updateStatsUI(); return;
-  }
-
-  setReachActor(null); BgmEngine.cut();
-  if (sc.bareType) state.sakibareWins++;
-  state.firstHits++; state.phase = 'ANIMATING'; updateStatsUI();
-
-  try {
-    if (sc.hesoType === '3000_RUSH') {
-      fireRainbowBurst('大当り!!', { withBackNiziiro: true });
-      await runWhale3000Direct(tok);
-      enterOnigakariRush(state.currentSpin, true);
-      return;
-    }
-
-    // ★初当たり：ロゴ役物『Re:ゼロ』がガシャーンと落下し、背面に niziiro.jpg が爆発展開!!★
-    // 図柄は見せない：予告画面のまま一拍おいて、ロゴ役物が中央まで落下して当りを知らせる
-    await wait(650, tok);
-    // 着地の瞬間に虹色背景が同時に開き、一瞬だけ時間が止まる
-    await triggerYakumonoDrop({ color: 'rainbow', holdMs: 1150, withNiziiroBack: true, timeStop: 650, withSound: false, skipBurst: true,
-      onImpact: () => {
-        // 鬼がかってますねの締めと同じ：落下音＋衝撃音＋当たり音
-        StudioAudio.playOchiburu(false);
-        setTimeout(() => StudioAudio.playSlash(), 45);
-        setTimeout(() => StudioAudio.play1500Jackpot(false), 170);
-        fireRainbowBurst('大当り!!', { withBackNiziiro: true });
-      }, token: tok });
-
-    setActiveScene('bonus');
-    setBonusSceneBackdrop('niziiro');
-    setBonusLogo('rezeroPurple');
-    bonusSubLabel.className = 'text-[10px] sm:text-xs font-black tracking-[0.16em] text-amber-200 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] leading-none';
-    bonusSubLabel.textContent = '図柄揃い大当り';
-    bonusMainTitle.className = 'text-lg sm:text-2xl font-black gold-grad-text drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] pop-in';
-    bonusMainTitle.textContent = '1,500 BONUS';
-    bonusDesc.className = 'text-[10px] sm:text-xs font-black text-amber-100 bg-black/55 px-2.5 py-0.5 rounded-full';
-    bonusDesc.textContent = '鬼がかりチャレンジで55%を突破せよ!!';
-    await wait(900, tok);
-
-    const isRush = sc.hesoType === '1500_RUSH';
-    const isRedButton = isRush && Math.random() < 0.38;
-    if (isRedButton) {
-      StudioAudio.playPokyun(false); setAmbientBg('redbare'); triggerLamp('red', '赤ボタン!!'); setLed('red');
-      lcdFrame.classList.add('fx-redbare', 'shake-burst'); FxCanvas.spawnRing('#ef4444', 320, 10); FxCanvas.burstFlames(48);
-      try { if (navigator && navigator.vibrate) navigator.vibrate([70, 35, 110]); } catch (e) {}
-      setTimeout(() => lcdFrame.classList.remove('shake-burst'), 520);
-    }
-
-    await waitUniversalBotanTap({
-      label: isRedButton ? '鬼がかりチャレンジ!!【赤ボタン濃厚!!】' : '鬼がかりチャレンジ!!（55% RUSH）',
-      vibe: isRedButton ? 'mid' : 'weak', color: isRedButton ? 'red' : 'gold', redChassis: isRedButton, token: tok
-    });
-    hideUniversalBotan();
-
-    if (isRush) {
-      const isRevival = !isRedButton && Math.random() < 0.45;
-      if (isRevival) {
-        await playGlassShatterFail(tok);
-        const useOnigakariRevive = Math.random() < 0.62;
-        await runGoldenPromotionSequence({
-          fakeSub: '鬼がかりチャレンジ失敗…', fakeTitle: '通常 1,500 BONUS', fakeDesc: 'RUSH非突入（純増 +1,400発獲得）',
-          fakeStyle: 'despair', fakeSound: 'fail', fakeIsRush: false, fakeBurstGold: false, rushMode: 'onigakari', iwakanAnswer: '',
-          finalSub: useOnigakariRevive ? '鬼がかってますね復活' : '死に戻り復活', finalTitle: '鬼がかりRUSH 突入!!',
-          finalExtra: '払出 1,500個（純増 1,400発）＋ ST144回獲得!!', finalSound: '3000', crashType: useOnigakariRevive ? 'freeze3s' : 'slash', token: tok
-        });
-        enterOnigakariRush(state.currentSpin, false);
-      } else {
-        StudioAudio.playSlash(); firePhysicalSplitSlash(); StudioAudio.play1500Jackpot(true);
-        setAmbientBg('rainbow'); setSunburst(true);
-        showFullscreenOverlay({
-          mode: 'rainbow', sub: isRedButton ? '赤ボタン一撃成功!!' : '鬼がかりチャレンジ成功!!',
-          main: '鬼がかりRUSH 突入!!', logoKey: 'oniRush', premia: true, extra: '払出 1,500個（純増 1,400発）＋ ST144回獲得!!'
-        });
-        FxCanvas.burstRainbow(72); await wait(1700, tok); hideFullscreenOverlay();
-        enterOnigakariRush(state.currentSpin, false);
-      }
-    } else {
-      await playGlassShatterFail(tok);
-      setActiveScene('bonus'); setBonusSceneBackdrop(null); setLcdNiziiroBack(false);
-      lcdFrame.classList.add('mode-despair-bg'); setBonusLogo('rezeroPurple');
-      bonusSubLabel.textContent = '鬼がかりチャレンジ失敗…'; bonusSubLabel.className = 'text-[10px] font-black text-slate-400 leading-none';
-      bonusMainTitle.textContent = '通常 1,500 BONUS'; bonusMainTitle.className = 'text-lg sm:text-2xl font-black text-slate-200';
-      bonusDesc.className = 'text-[10px] sm:text-xs font-bold text-slate-300';
-      bonusDesc.textContent = 'RUSH非突入（実質純増 +1,400発獲得）';
-      await wait(1280, tok);
-
-      state.balls += SPEC.NET_1500; LiveSlump.record(true);
-      const hitSpin = state.currentSpin; state.currentSpin = 0; state.phase = 'NORMAL'; notifyHamari(hitSpin);
-      clearVisualEffects(); setActiveScene('normal'); setReels(sc.tenpaiNum, sc.tenpaiNum, sc.tenpaiNum);
-      normalTitle.textContent = '通常 1,500 終了'; normalTitle.className = 'text-lg sm:text-xl font-black text-amber-200';
-      normalSub.textContent = '純増1,400発を持って通常時へ！';
-      setControlMode('NORMAL'); BgmEngine.resume('normal');
-      addLog(`${hitSpin}回`, '初当り(通常)', 'bg-slate-800 text-amber-200 border border-amber-700/60', sc.title, '1,500個 (1,400発)', 'text-amber-200');
-      updateStatsUI();
-    }
-  } catch (e) {}
-}// =========================================================================
-// 鬼がかりRUSH（青V=300 / 赤V=1500・一体表示＆油断暗転WEDDING 12,000）
-// =========================================================================
-// spare：いま消化する1回転分の余裕。先読みはST(RUSH)の残り回転数を超えて作らない（ST終了後の当選に予告が反応する先バレを防ぐ）
-function fillStLookaheadQueue(spare = 0) {
-  const cap = infiniteRushMode ? 4 : Math.min(4, Math.max(1, state.stRemaining + spare));
-  while (state.stLookaheadQueue.length < cap) {
-    if (state.stLookaheadQueue.some(s => s.hit)) break;
-    const isHit = Math.random() < SPEC.ST_PROB;
-    const bonusType = isHit ? drawRushBonusType() : null;
-    const slot = { hit: isHit, bonusType, isReserve: false, remSakibare: false, remPat: 'NORMAL' };
-    state.stLookaheadQueue.push(slot);
-
-    if (isHit && bonusType !== 'RESTART' && state.rushMode === 'rem' && !state.remSakibareActive && !state.rushCustNoNotice) {
-      const spinsAhead = state.stLookaheadQueue.length - 1;
-      if (spinsAhead >= 1 && Math.random() < 0.85) {
-        const is6 = bonusType === 'BONUS_6000';
-        const pat = (is6 && Math.random() < 0.65) ? ['SLOW_GLOW', 'CLASSIC_FLASH', 'RAINBOW'][Math.floor(Math.random() * 3)] : 'NORMAL';
-        slot.remSakibare = true; slot.remPat = pat; state.remSakibareActive = true;
-        triggerRemSakibareBack({ is6000: is6, pat, countdownSpins: spinsAhead });
-      }
-    }
-    if (isHit) break;
-  }
-}
-
-
-// =========================================================================
-// 実機風HUD（RUSH中：連チャン数・累計出玉の小プレート）＋ 連チャン更新スタンプ
-// =========================================================================
-const RushHud = (() => {
-  let plate = null, nEl = null, dEl = null, lastChains = 0, stampBusy = 0;
-  function css() {
-    if (document.getElementById('rushhud-css')) return;
-    const st = document.createElement('style'); st.id = 'rushhud-css';
-    st.textContent = `
-      #rushHudPlate{position:absolute;left:6px;top:6px;z-index:21;pointer-events:none;padding:3px 8px 3px 7px;border-radius:9px;border:1px solid rgba(251,191,36,.7);
-        background:linear-gradient(180deg,rgba(40,16,6,.82),rgba(10,4,4,.86));box-shadow:0 0 8px rgba(251,191,36,.25),inset 0 0 6px rgba(0,0,0,.7);font-variant-numeric:tabular-nums;line-height:1.05;display:none}
-      #rushHudPlate .t{font-size:9px;font-weight:900;letter-spacing:.2em;color:#fca5a5}
-      #rushHudPlate .n{font-size:21px;font-weight:900;color:#fef3c7;text-shadow:0 0 8px rgba(251,191,36,.8)}
-      #rushHudPlate .n small{font-size:9px;color:#fcd34d;margin-left:1px}
-      #rushHudPlate .d{font-size:12px;font-weight:900;color:#fde68a;margin-top:1px}
-      #rushHudStamp{position:absolute;left:0;right:0;bottom:19%;z-index:52;pointer-events:none;text-align:center;opacity:0;font-weight:900;font-style:italic;
-        font-family:'Inter','Noto Sans JP',sans-serif;background:linear-gradient(180deg,#fff7c2,#f5c431 55%,#c2810a);-webkit-background-clip:text;background-clip:text;color:transparent;
-        -webkit-text-stroke:1.5px rgba(70,28,4,.9);filter:drop-shadow(0 3px 3px rgba(0,0,0,.9)) drop-shadow(0 0 12px rgba(251,191,36,.8))}
-      #lcdFrame [data-glow]{animation:resGlow 1.05s ease-in-out infinite alternate}
-      #lcdFrame [data-glow="RED"]{--rg:239,68,68}#lcdFrame [data-glow="BLINK_RED"]{--rg:251,113,133}#lcdFrame [data-glow="RAINBOW"]{--rg:250,204,21}
-      #lcdFrame [data-glow="GOLD"]{--rg:253,224,71}#lcdFrame [data-glow="REM_CYAN"]{--rg:56,189,248}#lcdFrame [data-glow="BLINK"]{--rg:125,211,252}
-      @keyframes resGlow{from{box-shadow:0 0 4px 1px rgba(var(--rg),.45)}to{box-shadow:0 0 13px 4px rgba(var(--rg),.95)}}
-      #lcdFrame [data-glow="RAINBOW"]{animation:resGlow .7s ease-in-out infinite alternate,oniHue 1.6s linear infinite}
-    `;
-    document.head.appendChild(st);
-  }
-  function mount() {
-    css();
-    if (plate || !lcdFrame) return;
-    plate = document.createElement('div'); plate.id = 'rushHudPlate';
-    plate.innerHTML = '<div class="t">RUSH</div><div class="n"><span id="rhN">1</span><small>連</small></div><div class="d"><span id="rhD">0</span> 個</div>';
-    lcdFrame.appendChild(plate);
-    nEl = plate.querySelector('#rhN'); dEl = plate.querySelector('#rhD');
-  }
-  function stamp(n) {
-    if (!lcdFrame || stampBusy > performance.now()) return;
-    stampBusy = performance.now() + 700;
-    let el = document.getElementById('rushHudStamp');
-    if (!el) { el = document.createElement('div'); el.id = 'rushHudStamp'; lcdFrame.appendChild(el); }
-    const big = n % 5 === 0, W = lcdFrame.offsetWidth || 320;
-    el.textContent = `RUSH ×${n}`;
-    el.style.fontSize = Math.round(W * (big ? 0.17 : 0.12)) + 'px';
-    el.getAnimations().forEach(a => a.cancel());
-    el.animate([{ opacity: 0, transform: 'scale(2.4)' }, { opacity: 1, transform: 'scale(.92)', offset: .18 }, { transform: 'scale(1)', opacity: 1, offset: .3 }, { opacity: 1, offset: .72 }, { opacity: 0, transform: 'scale(1.06) translateY(-6px)' }],
-      { duration: big ? 1200 : 900, easing: 'cubic-bezier(.16,1,.3,1)' });
-    if (big) { try { FxCanvas.spawnRing('#fef08a', 260, 7); FxCanvas.burstGold(26); } catch (e) {} }
-  }
-  function update() {
-    mount(); if (!plate) return;
-    const on = rushMetaHud && !rushMetaHud.classList.contains('hidden') && state.rushChains > 0;
-    plate.style.display = on ? 'block' : 'none';
-    if (!on) { lastChains = 0; return; }
-    nEl.textContent = state.rushChains; dEl.textContent = state.rushDisp.toLocaleString();
-    if (state.rushChains > lastChains) { if (lastChains > 0 && state.rushChains >= 2) stamp(state.rushChains); lastChains = state.rushChains; }
-  }
-  return { update, stamp };
-})();
-
-function notifyHamari(spins) {
-  try { const r = Records.noteHamari(spins); if (r > 0) showToast(`🕳️ ハマり ${Number(spins).toLocaleString()}回転 → 歴代${r}位に記録`, 3200); } catch (e) {}
-}
-function enterOnigakariRush(hitSpin, is3000) {
-  notifyHamari(hitSpin);
-  state.rushHits++; state.rushChains = 1;
-  state.rushDisp = is3000 ? SPEC.DISP_3000 : SPEC.DISP_1500;
-  state.rushNet = is3000 ? SPEC.NET_3000 : SPEC.NET_1500;
-  state.balls += state.rushNet; updateSessionBest(); LiveSlump.record(true);
-  state.rush6000Count = 0; state.rushWeddingCount = 0; state.rushHoryurenCount = 0; state.rushRestartCount = 0;
-  state.rushIwakanNotes = []; state.rushStartSpin = hitSpin; state.currentSpin = 0; state.excellentFired = false;
-  state.hasVStock = false; state.hasVStockRed = false; state.remSakibareActive = false; state.stLookaheadQueue = []; state.pendingResultRevival = false;
-
-  if (rushMetaHud) rushMetaHud.classList.remove('hidden');
-  if (rushModeBar) rushModeBar.classList.remove('hidden');
-  if (rushStatusBar) rushStatusBar.classList.remove('hidden');
-  setVStockBadge(false);
-  afterBonusReserveCheck(is3000 ? 'INIT_3000' : 'INIT_1500');
-}
-
-async function afterBonusReserveCheck(prevType) {
-  const tok = ++seqToken;
-  const slots = drawReserve4Slots();
-  let hitSlot = slots.find(s => s.hit) || null;
-
-  // ★ウェディング判定窓：6000獲得直後だけ、残保留4個の先（5〜WEDDING_WINDOW回転目）も前倒しで抽選して判定する。
-  //   ・6000が当たっていればウェディング（払出は通常の6000と同じ1回分）
-  //   ・6000以外の当選は、そのまま通常のST消化キュー(extSlots)に載せて5回転目以降に消化＝内部確率・出玉は不変
-  let extSlots = [];
-  if (prevType === 'BONUS_6000' && !hitSlot) {
-    extSlots = drawWeddingWindowExt();
-    const extHit = extSlots.find(s => s.hit);
-    if (extHit && extHit.bonusType === 'BONUS_6000') { hitSlot = extHit; extSlots = []; }
-  }
-  if (TestMode.active && DevForce.wedding && prevType === 'BONUS_6000') {   // テスト専用：ウェディング強制
-    DevForce.wedding = false; extSlots = [];
-    hitSlot = { hit: true, hitIndex: 1, bonusType: 'BONUS_6000', isReserve: true, remSakibare: false, remPat: 'NORMAL' };
-  }
-  updateRes4Dots(SPEC.ST_RESERVE);
-  state.hasVStock = false; state.hasVStockRed = false; state.remSakibareActive = false; state.stLookaheadQueue = [];
-  setVStockBadge(false);
-
-  try {
-    if (hitSlot) {
-      // ★残保留6,000連荘 → 0.85秒だけST＆BGMが始まって油断した瞬間に全画面暗転 WEDDING 12,000!!★
-      if (prevType === 'BONUS_6000' && hitSlot.bonusType === 'BONUS_6000') {
-        state.rushHoryurenCount++;
-        state.reserveQueue = []; state.stRemaining = SPEC.ST_TOTAL;
-        state.phase = 'RUSH'; setControlMode('BUSY');
-        clearVisualEffects(); setActiveScene('rush-idle'); applyRushModeVisuals(); updateStatsUI();
-        await wait(850, tok);
-
-        state.phase = 'ANIMATING';
-        await playWeddingLeadIn(tok);
-        await playWedding12000Cinema(tok);
-
-        hideFullscreenOverlay();
-        state.rushChains++; state.rush6000Count++; state.rushWeddingCount++;
-        state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000;
-        try { Records.noteWedding({ disp: state.rushDisp, chains: state.rushChains }); } catch (e) {}
-        updateSessionBest(); LiveSlump.record(true); updateStatsUI();
-        afterBonusReserveCheck('BONUS_6000');
-        return;
-      }
-
-      if (hitSlot.bonusType !== 'RESTART') {
-        if (Math.random() < SPEC.HORYUREN_NOTICE_RATE) {
-          state.rushHoryurenCount++; state.reserveQueue = [];
-          state.phase = 'ANIMATING'; setControlMode('BUSY'); BgmEngine.cut();
-          await wait(520, tok);
-          const isB6 = hitSlot.bonusType === 'BONUS_6000', isB300 = hitSlot.bonusType === 'BONUS_300';
-
-          StudioAudio.playPokyun(isB6); setAmbientBg('rainbow'); setSunburst(true);
-          triggerLamp('rainbow', `残保${hitSlot.hitIndex}連!!`); FxCanvas.burstRainbow(68);
-          const label = isB6 ? '超・鬼がかり 6,000 BONUS!!' : isB300 ? '鬼がかり 300 BONUS!!' : '鬼がかり 1,500 BONUS!!';
-          if (isB6) StudioAudio.play6000Fanfare(false);
-          else if (isB300) StudioAudio.play300Sound();
-          else StudioAudio.play1500Jackpot(true);
-
-          showFullscreenOverlay({
-            mode: 'rainbow', sub: `保留連!!（残保留${hitSlot.hitIndex}個目）`, main: label,
-            logoKey: isB6 ? get6000LogoKey(state.rushMode) : (isB300 ? 'rezeroPurple' : 'rezeroChain'), premia: isB6,
-            extra: '大当り直後の奇跡の連荘!!'
-          });
-          await wait(1750, tok); hideFullscreenOverlay();
-
-          if (isB6) { state.rushChains++; state.rush6000Count++; state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000; }
-          else if (!isB300) { state.rushChains++; state.rushDisp += SPEC.DISP_1500; state.rushNet += SPEC.NET_1500; state.balls += SPEC.NET_1500; }
-          else { state.rushChains++; state.rushDisp += SPEC.DISP_300; state.rushNet += SPEC.NET_300; state.balls += SPEC.NET_300; }
-          updateSessionBest(); LiveSlump.record(true); updateStatsUI();
-          afterBonusReserveCheck(hitSlot.bonusType);
-          return;
-        } else if (Math.random() < 0.55) {
-          state.phase = 'ANIMATING'; setControlMode('BUSY'); BgmEngine.cut();
-          const isRed = hitSlot.bonusType !== 'BONUS_300';
-          await playVStockNotice({ isRed, token: tok });
-          state.hasVStock = true; state.hasVStockRed = isRed;
-          setVStockBadge(true, isRed);
-        }
-      }
-    }
-
-    state.reserveQueue = slots; updateRes4Dots(SPEC.ST_RESERVE);
-    state.stLookaheadQueue = extSlots;      // 判定窓で前倒し抽選した5回転目以降（6000以外の当選を含む）をそのまま消化
-    state.stRemaining = SPEC.ST_TOTAL; state.phase = 'RUSH';
-    clearVisualEffects(); setActiveScene('rush-idle'); applyRushModeVisuals(); setControlMode('RUSH'); updateStatsUI();
-  } catch (e) {}
-}
-
-function applyRushModeVisuals() {
-  // 予告・演出で付いた虹の縁／揺れ／プレミア枠がRUSH通常画面に残らないよう、ここで必ず掃除する
-  lcdFrame.classList.remove('fx-gold', 'fx-rainbow', 'shake-burst', 'shake-intense', 'shake-mid', 'bonus-theme-brain', 'bonus-theme-rem');
-  if (state.phase !== 'RUSH') return;
-  try { setPremiaFrame(false); setSunburst(false); } catch (e) {}
-  syncRushStages(); BgmEngine.resume(state.rushMode);
-
-  if (state.rushMode === 'onigakari') {
-    FxCanvas.setAmbient('none'); setAmbientBg('rush'); setCabinetGlow('gold'); setYakumonoColor('gold');
-    lcdFrame.classList.add('fx-gold'); setLed('red');
-    updateReserveSlots('NORMAL'); randomOniMissReels(false);
-  } else if (state.rushMode === 'brain') {
-    FxCanvas.setAmbient('none'); setAmbientBg('brain'); setCabinetGlow('idle'); setYakumonoColor('white');
-    setLed('brain');
-    updateReserveSlots('BRAIN'); setBrainPeteLevel(0, { withFlash: false }); setBrainTextSwarm(0); setBrainButtonState('idle');
-  } else {
-    FxCanvas.setAmbient('none'); setAmbientBg('rem'); setLed('rem');
-    if (!state.remSakibareActive) {
-      setCabinetGlow('idle'); setYakumonoColor('white');
-      updateReserveSlots('NORMAL'); setRemLampVisual('idle', { bringFront: false });
-    }
-    randomRemMissReels(false);
-  }
-}
-
-function spinRushOnce() {
-  if (state.phase !== 'RUSH' || state.stRemaining <= 0) return null;
-  if (!infiniteRushMode) state.stRemaining--;
-  else state.stRemaining = SPEC.ST_TOTAL;
-
-  if (state.rushMode === 'onigakari') randomOniMissReels(state.autoMode !== null || handleActive);
-  else if (state.rushMode === 'rem') randomRemMissReels(state.autoMode !== null || handleActive);
-
-  let slot = null;
-  if (state.reserveQueue.length > 0) {
-    slot = state.reserveQueue.shift();
-    updateRes4Dots(state.reserveQueue.length);
-    if (slot.hit) { state.reserveQueue = []; if (state.hasVStock) { state.hasVStock = false; state.hasVStockRed = false; setVStockBadge(false); } }
-  } else {
-    fillStLookaheadQueue(1);
-    slot = state.stLookaheadQueue.shift();
-    if (state.stRemaining > 0) fillStLookaheadQueue();
-  }
-
-  if (TestMode.active && DevForce.nextRushHit) {            // テスト専用：次の当選を強制（隠しコマンド用）
-    slot = { hit: true, bonusType: DevForce.nextRushHit, isReserve: false, remSakibare: false, remPat: 'NORMAL' };
-    DevForce.nextRushHit = null; state.reserveQueue = []; state.stLookaheadQueue = [];
-    if (state.hasVStock) { state.hasVStock = false; state.hasVStockRed = false; setVStockBadge(false); }
-  }
-
-  if (state.rushMode === 'rem' && state.remSakibareActive && !slot.hit) {
-    const idx = state.stLookaheadQueue.findIndex(s => s.hit && s.remSakibare);
-    if (idx >= 0) {
-      const target = state.stLookaheadQueue[idx];
-      const is6 = target.bonusType === 'BONUS_6000' && target.remPat !== 'NORMAL';
-      updateReserveSlots('NORMAL', is6 ? 'RAINBOW' : 'REM_CYAN', idx);
-    }
-  }
-
-  if (slot && slot.hit) {
-    state.stLookaheadQueue = [];
-    const fromSakibare = !!slot.remSakibare; state.remSakibareActive = false;
-    return { type: slot.bonusType, fromRemSakibare: fromSakibare, remPat: slot.remPat };
-  }
-
-  if (!infiniteRushMode && state.stRemaining <= 0) return { type: 'ST_END' };
-  // ★Excellent予告：RUSH残り50回以下で、すでに先読みで確定している当選(死に戻り以外)が4回転以内にある時だけ、RUSH中1回
-  if (!state.excellentFired && state.rushMode === 'onigakari' && !infiniteRushMode && state.stRemaining <= 50 && state.stRemaining >= 1
-      && !state.rushCustNoNotice && state.stLookaheadQueue.some((s, i) => s.hit && s.bonusType !== 'RESTART' && i < state.stRemaining) && Math.random() < 0.5) {
-    state.excellentFired = true;
-    return { type: 'MISS', teaser: 'EXCELLENT' };
-  }
-  if (state.rushCustNoNotice || state.rushMode === 'rem') return { type: 'MISS', teaser: null };
-
-  let teaser = null;
-  if (state.rushMode === 'brain') {
-    const r = Math.random();
-    if (r < 0.015) teaser = 'BRAIN_HANDS_GAZE'; else if (r < 0.055) teaser = 'BRAIN_NOGA_GAZE';
-  } else if (state.rushMode === 'onigakari') {
-    const r = Math.random();
-    if (r < 0.008) teaser = 'ONI_CD_GAZE'; else if (r < 0.018) teaser = 'ONI_TENPAI_GAZE'; else if (r < 0.030) teaser = 'ONI_BLINK_GAZE';
-  }
-  if (!teaser && state.rushCustTrust && Math.random() < 0.022) teaser = 'TRUST_GAZE';
-  return { type: 'MISS', teaser };
-}
-
-function pickTrustPercent({ isHit, is6000 }) {
-  if (!isHit) {
-    const r = Math.random();
-    if (r < 0.55) return { txt: '1%', cls: 'border-slate-500 text-slate-300' };
-    if (r < 0.85) return { txt: '25%', cls: 'border-sky-400 text-sky-300' };
-    return { txt: '50%', cls: 'border-amber-400 text-amber-300' };
-  }
-  if (is6000 && Math.random() < 0.35) return { txt: '6000%!!', cls: 'border-yellow-200 rainbow-grad-text' };
-  const r = Math.random();
-  if (r < 0.45) return { txt: '99%!!', cls: 'border-amber-300 text-amber-200' };
-  if (r < 0.78) return { txt: '80%!', cls: 'border-rose-400 text-rose-200' };
-  return { txt: '50%', cls: 'border-amber-400 text-amber-300' };
-}
-
-async function playRushTeaserAndResume(teaser, resumeAuto = false) {
-  const tok = ++seqToken;
-  state.phase = 'ANIMATING'; setControlMode('BUSY');
-  try {
-    if (state.rushCustTrust && teaser === 'TRUST_GAZE') {
-      const tr = pickTrustPercent({ isHit: false });
-      rushTopBadge.classList.remove('hidden'); rushTopBadge.textContent = `信頼度 ${tr.txt}`;
-      rushTopBadge.className = `pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/90 border shadow-lg whitespace-nowrap ${tr.cls}`;
-      await wait(620, tok); rushTopBadge.classList.add('hidden');
-    } else if (teaser === 'BRAIN_HANDS_GAZE' || teaser === 'BRAIN_NOGA_GAZE') {
-      await playBrainModeSequence({ isHit: false, is6000: false, bonusType: null, isHands: teaser === 'BRAIN_HANDS_GAZE', token: tok });
-    } else if (teaser === 'ONI_CD_GAZE') {
-      await playOnigakariCountdown({ isHit: false, is6000: false, token: tok });
-    } else if (teaser === 'ONI_TENPAI_GAZE') {
-      await playOniTenpaiAori({ isHit: false, is6000: false, token: tok });
-    } else if (teaser === 'EXCELLENT') {
-      state.rushIwakanNotes.push('Excellent予告'); await playExcellentYokoku(tok);
-    } else if (teaser === 'ONI_BLINK_GAZE') {
-      updateReserveSlots('NORMAL', 'BLINK', 0); await wait(480, tok); updateReserveSlots('NORMAL', null);
-    }
-    state.phase = 'RUSH'; clearIwakanEffects(); applyRushModeVisuals(); setControlMode('RUSH'); updateStatsUI();
-    if (resumeAuto) startRushAutoLoop();
-  } catch (e) {}
-}
-
-function award6000AndContinue() {
-  state.rushChains++; state.rush6000Count++;
-  state.rushDisp += SPEC.DISP_6000; state.rushNet += SPEC.NET_6000; state.balls += SPEC.NET_6000;
-  updateSessionBest(); LiveSlump.record(true); updateStatsUI();
-  afterBonusReserveCheck('BONUS_6000');
-}
-
-async function handleRushHitSequence(bonusType, { fromRemSakibare = false, remPat = null } = {}) {
-  const tok = ++seqToken;
-  const is6000 = bonusType === 'BONUS_6000';
-  state.phase = 'ANIMATING'; state.pendingRushHit = { type: bonusType, okRevealed: false };
-  setControlMode('BUSY'); updateStatsUI();
-
-  let currentIwakan = '', direct6000AlreadyAnnounced = false, alarmAlreadyPlaying = false, alignedDig = null;
-
-  try {
-    if (bonusType === 'RESTART') {
-      clearIwakanEffects(); state.pendingRushHit = null;
-      await runNormalRushBonusSequence('RESTART', '');
-      return;
-    }
-
-    if (is6000 && !fromRemSakibare) {
-      const surpriseRoll = Math.random();
-      const surpriseCap = state.rushMode === 'brain' ? 0.12 : state.rushMode === 'rem' ? 0.20 : 0.62;
-      if (surpriseRoll < surpriseCap) {
-        const sub = Math.random();
-        if (state.rushMode === 'onigakari' && sub < 0.24) {
-          state.rushIwakanNotes.push('鬼レム接近'); state.pendingRushHit = null;
-          await playOniRemApproach6000(tok); award6000AndContinue(); return;
-        }
-        if (sub < 0.44) {
-          state.rushIwakanNotes.push('突発落ちブル警報'); state.pendingRushHit = null;
-          await runSuddenOchiburu6000({ sub: state.rushMode === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH', rushMode: state.rushMode, token: tok });
-          award6000AndContinue(); return;
-        }
-        if (sub < 0.53) {
-          clearIwakanEffects(); state.pendingRushHit = null;
-          await runRush6000Sequence({ forceFake: 'restart', iwakanAnswer: '' }); return;
-        }
-        if (sub < 0.62) {   // 300から6000へ昇格（実機は300が出ればほぼ6000に発展する体感）
-          clearIwakanEffects(); state.pendingRushHit = null;
-          await runRush6000Sequence({ forceFake: '300', iwakanAnswer: '' }); return;
-        }
-        if (sub < 0.80) {
-          state.rushIwakanNotes.push('液晶暗転フリーズ'); state.pendingRushHit = null;
-          await runSudden3sFreeze6000(tok); award6000AndContinue(); return;
-        }
-        state.rushIwakanNotes.push('出玉カウントアップ突破'); state.pendingRushHit = null;
-        await runCountUpBreak6000({ rushMode: state.rushMode, iwakanAnswer: '', token: tok });
-        award6000AndContinue(); return;
-      }
-    }
-
-    if (state.rushCustTrust) {
-      const tr = pickTrustPercent({ isHit: true, is6000 });
-      rushTopBadge.classList.remove('hidden'); rushTopBadge.textContent = `信頼度 ${tr.txt}`;
-      rushTopBadge.className = `pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black bg-black/95 border shadow-lg pop-in whitespace-nowrap ${tr.cls}`;
-      await wait(500, tok);
-    }
-
-    const iwakanChance = state.rushCustIwakan ? 0.68 : 0.24;
-    if (!fromRemSakibare && Math.random() < iwakanChance) {
-      currentIwakan = await playIwakanEffect({ is6000, rushMode: state.rushMode, token: tok });
-      if (currentIwakan) state.rushIwakanNotes.push(currentIwakan);
-    }
-
-    if (state.rushCustNoNotice && !is6000) {
-      clearIwakanEffects(); state.pendingRushHit = null;
-      await runNormalRushBonusSequence(bonusType, currentIwakan);
-      return;
-    }
-
-    if (state.rushMode === 'rem') {
-      const remNote = await playRemTougaiBurst({ is6000, bonusType, fromSakibare: fromRemSakibare, forcePat: remPat, token: tok });
-      if (remNote) { if (!currentIwakan) currentIwakan = remNote; state.rushIwakanNotes.push(remNote); }
-      if (is6000 && (state.pendingRushHit.okRevealed || Math.random() < (state.custOchiburu ? 0.45 : 0.16))) {
-        direct6000AlreadyAnnounced = true; alarmAlreadyPlaying = state.pendingRushHit.okRevealed;
-      }
-    } else if (state.rushMode === 'brain') {
-      const isHands = is6000 && Math.random() < 0.44;
-      const bRes = await playBrainModeSequence({ isHit: true, is6000, bonusType, isHands, custOchiburu: state.custOchiburu, token: tok });
-      if (bRes.note) { if (!currentIwakan) currentIwakan = bRes.note; state.rushIwakanNotes.push(bRes.note); }
-      if (bRes.triggeredOchiburu || state.pendingRushHit.okRevealed) { direct6000AlreadyAnnounced = true; alarmAlreadyPlaying = true; }
-    } else {
-      if (is6000 && Math.random() < 0.28) { updateReserveSlots('NORMAL', 'BLINK_RED', 0); await wait(420, tok); }
-      const r = Math.random();
-      if (r < 0.38) {
-        const tp = await playOniTenpaiAori({ isHit: true, is6000, bonusType, token: tok });
-        alignedDig = tp.winDig;
-        if (tp.note) { if (!currentIwakan) currentIwakan = tp.note; state.rushIwakanNotes.push(tp.note); }
-      } else if (r < 0.72) {
-        const cd = await playOnigakariCountdown({ isHit: true, is6000, bonusType, token: tok });
-        alignedDig = cd.winDig;
-        if (cd.note) { if (!currentIwakan) currentIwakan = cd.note; state.rushIwakanNotes.push(cd.note); }
-      } else {
-        alignedDig = await playOniTotsuAtariPause({ is6000, bonusType, hadNotice: !!currentIwakan, token: tok });
-      }
-      if (is6000 && (alignedDig === 7 || alignedDig === 3 || alignedDig === 0 || state.pendingRushHit.okRevealed)) {
-        direct6000AlreadyAnnounced = true; alarmAlreadyPlaying = state.pendingRushHit.okRevealed;
-      }
-    }
-
-    clearIwakanEffects(); state.pendingRushHit = null;
-
-    if (is6000) {
-      if (direct6000AlreadyAnnounced) {
-        await triggerYakumonoDrop({ color: 'rainbow', holdMs: 650, withNiziiroBack: true, withSound: !alarmAlreadyPlaying, token: tok });
-        await runSuddenOchiburu6000({ sub: state.rushMode === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH', rushMode: state.rushMode, skipAlarm: alarmAlreadyPlaying, token: tok });
-        award6000AndContinue();
-      } else if (alignedDig !== null && alignedDig % 2 === 0 && alignedDig !== 0) {
-        await runRush6000Sequence({ forceFake: '300', iwakanAnswer: currentIwakan });
-      } else if (alignedDig === 1 || alignedDig === 5) {
-        if (Math.random() < 0.45) {
-          await runCountUpBreak6000({ rushMode: state.rushMode, iwakanAnswer: currentIwakan, token: tok });
-          award6000AndContinue();
-        } else {
-          await runRush6000Sequence({ forceFake: '1500', iwakanAnswer: currentIwakan });
-        }
-      } else if (Math.random() < 0.32) {
-        await runCountUpBreak6000({ rushMode: state.rushMode, iwakanAnswer: currentIwakan, token: tok });
-        award6000AndContinue();
-      } else {
-        await runRush6000Sequence({ forceFake: null, iwakanAnswer: currentIwakan });
-      }
-    } else {
-      await runNormalRushBonusSequence(bonusType, currentIwakan);
-    }
-  } catch (e) {
-    state.pendingRushHit = null; clearGlobalChaosEffects();
-  }
-}
-
-function handleRushEvent(ev, { fromAuto = false } = {}) {
-  if (!ev) return;
-  if (ev.type === 'MISS') {
-    if (!infiniteRushMode && state.stRemaining <= 10) {
-      hudRushRemain.className = 'text-lg sm:text-xl font-black crimson-grad-text leading-none animate-pulse num-fixed';
-      setAmbientBg('redbare');
-      if (state.stRemaining === 10 || state.stRemaining <= 3) StudioAudio.playSoftHeartbeat();
-    } else if (state.stRemaining <= 15) {
-      hudRushRemain.className = 'text-lg sm:text-xl font-black crimson-grad-text leading-none num-fixed';
-    } else {
-      hudRushRemain.className = 'text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed';
-    }
-    updateStatsUI();
-    if (ev.teaser) { stopAuto(); stopHandleHold(true); playRushTeaserAndResume(ev.teaser, fromAuto); }
-    return;
-  }
-  stopAuto(); stopHandleHold(true);
-  if (ev.type === 'ST_END') { finishRush(); return; }
-  handleRushHitSequence(ev.type, { fromRemSakibare: !!ev.fromRemSakibare, remPat: ev.remPat || null });
-}
-
-async function runRush6000Sequence({ forceFake = null, iwakanAnswer = '' } = {}) {
-  const tok = ++seqToken;
-  state.phase = 'ANIMATING'; setControlMode('BUSY');
-
-  const rm = state.rushMode;
-  const modePrefix = rm === 'brain' ? '脳が震える' : rm === 'rem' ? '鬼化レム' : '鬼がかり';
-  const pick = forceFake || '1500';   // 偶数揃い＝300から昇格（偶数なのに最初から1500は違和感＝ネタバレ）
-
-  let opts;
-  if (pick === '300') {
-    opts = {
-      fakeSub: '右打ち 6%', fakeTitle: `${modePrefix} 300 BONUS`, fakeDesc: '純増 +280発 ＆ ST144回リセット！',
-      fakeStyle: 'despair', fakeSound: '300', fakeRestart: false, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
-      iwakanAnswer, finalSub: rm === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH',
-      finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'auto'
-    };
-  } else if (pick === 'restart') {
-    opts = {
-      fakeSub: '死に戻り', fakeTitle: 'Re:Start', fakeDesc: '出玉なし・ST144回へ巻き戻し',
-      fakeStyle: 'despair', fakeSound: 'restart', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false, rushMode: rm,
-      iwakanAnswer: '', finalSub: 'Re:Start 引き裂き昇格', finalTitle: '超・鬼がかり 6,000 BONUS!!',
-      finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'slash'
-    };
-  } else {
-    opts = {
-      fakeSub: rm === 'brain' ? '脳が震えるRUSH' : rm === 'rem' ? 'レム告知モード' : '右打ち 55%',
-      fakeTitle: '1,500 BONUS!!', fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-      fakeStyle: 'gold', fakeSound: '1500', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true, rushMode: rm,
-      iwakanAnswer, finalSub: rm === 'brain' ? '脳が震えるRUSH' : '鬼がかりRUSH',
-      finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'auto'
-    };
-  }
-
-  try {
-    await runGoldenPromotionSequence({ ...opts, token: tok });
-    award6000AndContinue();
-  } catch (e) {}
-}
-
-async function runNormalRushBonusSequence(type, iwakanAnswer = '') {
-  const tok = ++seqToken;
-  state.phase = 'ANIMATING'; setControlMode('BUSY'); BgmEngine.cut();
-  setActiveScene('bonus'); hideIwakanAnswer();
-
-  const rm = state.rushMode;
-  const modePrefix = rm === 'brain' ? '脳が震える' : rm === 'rem' ? '鬼化レム' : '鬼がかり';
-  const modeSub = rm === 'brain' ? 'BRAIN TREMBLE BONUS' : rm === 'rem' ? 'REM AWAKENING BONUS' : 'ONIGAKARI BONUS';
-
-  try {
-    if (type === 'BONUS_1500') {
-      StudioAudio.playVImpact(true); StudioAudio.play1500Jackpot(true);
-      setAmbientBg(rm === 'brain' ? 'brain' : rm === 'rem' ? 'rem' : 'rainbow'); setSunburst(true);
-      const th = applyBonusModeTheme(rm, { isDespair: false });
-      setBonusSceneBackdrop('1500');
-      setBonusLogo(Assets.getVStock('v1500') ? 'v1500' : (rm === 'brain' ? 'rezeroPurple' : 'rezeroChain'));
-      if (rm === 'brain') FxCanvas.spawnLightning('#e879f9', 5);
-      else if (rm === 'rem') FxCanvas.spawnRing('#38bdf8', 300, 8);
-      else FxCanvas.burstFlames(44);
-
-      bonusSubLabel.className = th.subCls + ' drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]';
-      bonusSubLabel.textContent = modeSub;
-      bonusMainTitle.className = 'text-lg sm:text-2xl font-black gold-grad-text drop-shadow-[0_3px_10px_rgba(0,0,0,0.98)] pop-in';
-      bonusMainTitle.textContent = `${modePrefix} 1,500 BONUS!!`;
-      bonusDesc.className = 'text-[10px] sm:text-xs font-black text-amber-100 bg-black/55 px-2.5 py-0.5 rounded-full';
-      bonusDesc.textContent = '払出 1,500個（純増 +1,400発）獲得！';
-      if (iwakanAnswer) showIwakanAnswer(iwakanAnswer, false);
-      await wait(1280, tok); setSunburst(false); setBonusSceneBackdrop(null);
-      state.rushChains++; state.rushDisp += SPEC.DISP_1500; state.rushNet += SPEC.NET_1500; state.balls += SPEC.NET_1500;
-      updateSessionBest(); LiveSlump.record(true); updateStatsUI();
-      afterBonusReserveCheck('BONUS_1500');
-    } else if (type === 'BONUS_300') {
-      StudioAudio.playVImpact(false); StudioAudio.play300Sound();
-      const th = applyBonusModeTheme(rm, { isDespair: true });
-      setBonusSceneBackdrop('300');
-      setBonusLogo(Assets.getVStock('v300') ? 'v300' : 'rezeroPurple');
-      FxCanvas.spawnRing('#38bdf8', 300, 9);
-
-      bonusSubLabel.className = th.subCls + ' drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]';
-      bonusSubLabel.textContent = '右打ち 6%';
-      bonusMainTitle.className = 'text-lg sm:text-2xl font-black cyan-grad-text drop-shadow-[0_3px_10px_rgba(0,0,0,0.98)] pop-in';
-      bonusMainTitle.textContent = `${modePrefix} 300 BONUS`;
-      bonusDesc.className = 'text-[10px] sm:text-xs font-black text-sky-100 bg-black/55 px-2.5 py-0.5 rounded-full';
-      bonusDesc.textContent = '純増 +280発 ＆ ST144回リセット！';
-      if (iwakanAnswer) showIwakanAnswer(iwakanAnswer, false);
-      await wait(1200, tok); setBonusSceneBackdrop(null);
-      state.rushChains++; state.rushDisp += SPEC.DISP_300; state.rushNet += SPEC.NET_300; state.balls += SPEC.NET_300;
-      updateSessionBest(); LiveSlump.record(true); updateStatsUI();
-      afterBonusReserveCheck('BONUS_300');
-    } else {
-      StudioAudio.playReStart(); setBonusLogo(null);
-      setBonusSceneBackdrop('restart');
-      if (Assets.getVStock('restart')) {
-        bonusSubLabel.textContent = ''; bonusMainTitle.textContent = ''; bonusDesc.textContent = '';
-        FxCanvas.burstFlames(38);
-      } else {
-        lcdFrame.classList.add('fx-restart', 'mode-despair-bg');
-        bonusSubLabel.textContent = '死に戻り'; bonusSubLabel.className = 'text-[10px] font-black tracking-[0.18em] text-slate-400 leading-none';
-        bonusMainTitle.textContent = 'Re:Start'; bonusMainTitle.className = 'text-4xl font-black text-slate-200 pop-in';
-        bonusDesc.textContent = '出玉なし・ST144回へ巻き戻し';
-      }
-      await wait(1260, tok);
-      setBonusSceneBackdrop(null); lcdFrame.classList.remove('fx-restart');
-      state.rushRestartCount++; updateStatsUI();
-      afterBonusReserveCheck('RESTART');
-    }
-  } catch (e) { setBonusSceneBackdrop(null); }
-}
-
-function finishRush() {
-  BgmEngine.cut(); StudioAudio.playFail();
-  state.phase = 'ANIMATING'; setControlMode('BUSY');
-  setAmbientBg(''); setCabinetGlow('idle'); setSunburst(false); setVStockBadge(false); setPremiaFrame(false); FxCanvas.setAmbient('ember');
-  state.pendingResultRevival = Math.random() < 0.03;
-
-  const logoHolder = document.getElementById('resModalLogoHolder');
-  if (logoHolder) {
-    const logoUrl = state.rushMode === 'brain' ? (Assets.getLogo('brainRush') || Assets.getLogo('oniRush')) : Assets.getLogo('oniRush');
-    logoHolder.innerHTML = logoUrl ? `<div class="logo-alive-wrap"><div class="logo-alive-halo"></div><img src="${logoUrl}" alt="RUSH RESULT" class="logo-alive-img max-h-24"></div>` : '';
-  }
-  document.getElementById('resChains').textContent = `${state.rushChains} 連`;
-  document.getElementById('res6000').textContent = `${state.rush6000Count} 回`;
-  document.getElementById('resSpecial').textContent = `${state.rushRestartCount}回 / ${state.rushHoryurenCount}回`;
-  document.getElementById('resNet').textContent = `${state.rushNet.toLocaleString()} 発`;
-  const cashEst = Math.round(state.rushNet * exchangeRate);
-  const lastIwakan = state.rushIwakanNotes.length > 0 ? `\n${state.rushIwakanNotes.slice(-2).join(' / ')}` : '';
-  document.getElementById('resSummaryText').textContent =
-    `総獲得払出 ${state.rushDisp.toLocaleString()}個（換金目安 ${cashEst.toLocaleString()}円）` +
-    (state.rushWeddingCount > 0 ? `\nWEDDING 12,000 ×${state.rushWeddingCount}回!!` : '') + lastIwakan;
-  // 記録：復活(死に戻り)が確定していない＝このRUSHが本当に終わった時だけ書き込む
-  const rkEl = document.getElementById('resRank');
-  if (rkEl) rkEl.classList.add('hidden');
-  if (!state.pendingResultRevival) {
-    let rk = null;
-    try { rk = Records.commitRush({ disp: state.rushDisp, net: state.rushNet, chains: state.rushChains, n6000: state.rush6000Count, wed: state.rushWeddingCount, spin: state.rushStartSpin }); } catch (e) {}
-    if (rk && rkEl) {
-      // 自己ベスト（端末内）は即表示、オンライン順位（本日／歴代）は取得でき次第そっと差し込む（リザルトのテンポは落とさない）
-      const myTok = ++rankTok;
-      const paint = (on) => {
-        if (myTok !== rankTok) return;
-        const parts = [];
-        if (on && on.day > 0) parts.push(`本日 ${on.day} 位`); else if (on && on.day === 0) parts.push('本日 100位圏外');
-        if (on && on.all > 0) parts.push(`🏆 歴代 ${on.all} 位`);
-        if (rk.selfRank > 0 && rk.selfRank <= 10) parts.push(`🎖 自己ベスト ${rk.selfRank} 位`);
-        if (!parts.length) return;
-        rkEl.textContent = parts.join('　/　');
-        if (on && on.all > 0 && on.all <= 10) {   // オンライン歴代TOP10入り：お祝い
-          const c = document.createElement('div'); c.className = 'gold-grad-text text-base font-black mt-1';
-          c.textContent = on.all === 1 ? '🎊 歴代1位!! おめでとうございます!! 🎊' : `🎉 歴代TOP10入り!! おめでとう!! 🎉`;
-          rkEl.appendChild(c);
-          try { FxCanvas.burstRainbow(60); StudioAudio.playPokyun(true); } catch (e) {}
-        }
-        rkEl.classList.remove('hidden');
-      };
-      paint(null);
-      try { Records.fetchRanks(state.rushDisp, rk.id).then(paint).catch(() => {}); } catch (e) {}
-    }
-  }
-  resultModal.classList.remove('hidden'); updateStatsUI();
-}
-
-// =========================================================================
-// スマホ親指＆PCスペース共通「長押しハンドル」
-// =========================================================================
-let handleActive = false, handleDelay = null, handleLoop = null, handleLocked = false;
-
-function setHandleVisual(on) {
-  ['btnTouchHandle', 'btnRushTouchHandle'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('handle-btn-active', on); });
-}
-function stopHandleHold(lockUntilRelease = false) {
-  if (handleDelay) { clearTimeout(handleDelay); handleDelay = null; }
-  if (handleLoop) { clearInterval(handleLoop); handleLoop = null; }
-  if (lockUntilRelease) handleLocked = true;
-  setHandleVisual(false);
-  if (state.phase === 'NORMAL' && !state.autoMode) randomMissReels();
-  else if (state.phase === 'RUSH' && !state.autoMode) {
-    if (state.rushMode === 'onigakari') randomOniMissReels(false);
-    else if (state.rushMode === 'rem') randomRemMissReels(false);
-  }
-}
-function stepHandleSpin(isContinuous) {
-  if (!resultModal.classList.contains('hidden') || !settingsModal.classList.contains('hidden') || !dataModal.classList.contains('hidden')) { stopHandleHold(true); return; }
-  if (state.phase === 'NORMAL') {
-    stopAuto();
-    const res = drawNormalSpin();
-    if (res.bareType || res.isHit) { stopHandleHold(true); startNormalReach(res); }
-    else {
-      clearVisualEffects(); setActiveScene('normal');
-      if (isContinuous) {
-        setReels(Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, { spinning: [true, true, true] });
-        normalTitle.textContent = `${state.currentSpin.toLocaleString()} 回転`; normalTitle.className = 'text-lg sm:text-2xl font-black text-white num-fixed';
-        normalSub.textContent = '連続回転中…（演出で自動停止）';
-      } else {
-        randomMissReels();
-        normalTitle.textContent = `${state.currentSpin.toLocaleString()} 回転`; normalTitle.className = 'text-lg sm:text-2xl font-black text-white num-fixed';
-        normalSub.textContent = '通常変動中…（長押しで連続回転）';
-      }
-      updateStatsUI();
-    }
-    return;
-  }
-  if (state.phase === 'RUSH') {
-    stopAuto();
-    const ev = spinRushOnce();
-    if (!ev) { stopHandleHold(true); return; }
-    if (ev.type !== 'MISS' || ev.teaser) stopHandleHold(true);
-    handleRushEvent(ev, { fromAuto: false });
-    return;
-  }
-  stopHandleHold(true);
-}
-function beginHandlePress() {
-  if (handleActive || handleLocked) return;
-  handleActive = true; setHandleVisual(true);
-  if (canTapUniBotan()) { handleLocked = true; triggerUniBotanTap(); setHandleVisual(false); return; }
-  if (state.phase === 'REACH') {
-    if (!pushButtonArea.classList.contains('hidden')) { handleLocked = true; btnOniPush.click(); setHandleVisual(false); }
-    return;
-  }
-  stepHandleSpin(false);
-  if (!handleLocked) {
-    handleDelay = setTimeout(() => {
-      if (!handleActive || handleLocked) return;
-      handleLoop = setInterval(() => { if (!handleActive || handleLocked) { stopHandleHold(false); return; } stepHandleSpin(true); }, 60);
-    }, 210);
-  }
-}
-function endHandlePress() { handleActive = false; handleLocked = false; stopHandleHold(false); }
-
-['btnTouchHandle', 'btnRushTouchHandle'].forEach(id => {
-  const el = document.getElementById(id); if (!el) return;
-  el.addEventListener('pointerdown', (e) => { e.preventDefault(); beginHandlePress(); });
-  el.addEventListener('pointerup', endHandlePress);
-  el.addEventListener('pointercancel', endHandlePress);
-  el.addEventListener('pointerleave', endHandlePress);
-});
-
-window.addEventListener('keydown', (e) => {
-  const tag = (e.target && e.target.tagName) || '';
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (e.code === 'KeyO' && !e.repeat) { btnSecretOk.click(); return; }
-  if (e.code !== 'Space') return;
-  e.preventDefault();
-  if (!e.repeat) beginHandlePress();
-});
-window.addEventListener('keyup', (e) => { if (e.code === 'Space') endHandlePress(); });
-window.addEventListener('blur', endHandlePress);
-
-// =========================================================================
-// 🧪 テストモード（記録されない別枠）＆設定モーダル
-//   ・通常時（待機中）にだけ入れる。入った瞬間の遊技データをスナップショット保存し、終了時に完全復元する
-//   ・テスト中の出玉・履歴・差玉グラフ・ランキング記録は一切残さない（records.js 側も TestMode.active を見て書き込みを拒否）
-//   ・無限ST／強制当選などの開発用機能は、テストモード中だけ有効
-// =========================================================================
-const promoTestMenu = document.getElementById('promoTestMenu');
-
-const DevForce = { nextRushHit: null, wedding: false, cleanReserve: false, normalHit: null };
-function resetDevForce() { DevForce.nextRushHit = null; DevForce.wedding = false; DevForce.cleanReserve = false; DevForce.normalHit = null; }
-
-const TEST_DATA_KEYS = [
-  'phase', 'activeScene', 'currentSpin', 'totalNormalSpins', 'firstHits', 'rushHits', 'sakibareTotal', 'sakibareWins',
-  'totalInvestYen', 'balls', 'unspentFrac', 'pendingReach', 'pendingRushHit', 'pendingResultRevival', 'hasVStock', 'hasVStockRed',
-  'reserveQueue', 'stLookaheadQueue', 'remSakibareActive', 'stRemaining', 'rushChains', 'rushDisp', 'rushNet', 'rush6000Count',
-  'rushWeddingCount', 'rushHoryurenCount', 'rushRestartCount', 'rushIwakanNotes', 'rushStartSpin', 'sessionGraphPoints',
-  'sessionMaxChains', 'sessionMaxOneShot', '_spinsSinceGraphSample', 'history'
-];
-
-function showToast(msg, ms = 2300) {
-  let el = document.getElementById('appToast');
-  if (!el) {
-    el = document.createElement('div'); el.id = 'appToast';
-    el.style.cssText = 'position:fixed;left:50%;bottom:16%;transform:translateX(-50%);z-index:1100;padding:8px 14px;border-radius:999px;'
-      + 'font-size:11px;font-weight:900;background:rgba(0,0,0,.92);border:1px solid rgba(251,191,36,.8);color:#fef3c7;'
-      + 'box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:none;opacity:0;transition:opacity .3s;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    document.body.appendChild(el);
-  }
-  el.textContent = msg; el.style.opacity = '1';
-  clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, ms);
-}
-
-// 通常時の画面へ強制的に戻す（テストモード専用の内部処理。実戦データには触れない）
-function devReturnToNormal() {
-  seqToken++; stopAuto(); stopHandleHold(false); resetDevForce();
-  hideFullscreenOverlay(); resultModal.classList.add('hidden');
-  state.phase = 'NORMAL'; state.pendingReach = null; state.pendingRushHit = null; state.pendingResultRevival = false;
-  state.reserveQueue = []; state.stLookaheadQueue = []; state.remSakibareActive = false; state.hasVStock = false; state.hasVStockRed = false; state.stRemaining = 0;
-  clearVisualEffects(); FxCanvas.clearAll(); FxCanvas.setAmbient('ember'); updateReserveSlots('NORMAL');
-  if (rushMetaHud) rushMetaHud.classList.add('hidden');
-  if (rushModeBar) rushModeBar.classList.add('hidden');
-  if (rushStatusBar) rushStatusBar.classList.add('hidden');
-  if (rushTopBadge) rushTopBadge.classList.add('hidden');
-  pushButtonArea.classList.add('hidden');
-  setVStockBadge(false); setActiveScene('normal'); setReels(7, 3, 7);
-  normalTitle.textContent = 'STANDBY'; normalTitle.className = 'text-lg sm:text-2xl font-black text-white';
-  normalSub.textContent = '長押しハンドル・オートで開始！';
-  setControlMode('NORMAL'); BgmEngine.resume('normal'); updateStatsUI();
-}
-
-const TestMode = (() => {
-  let active = false, snapJson = null;
-
-  function paint() {
-    document.documentElement.classList.toggle('is-test-mode', active);
-    const pill = document.getElementById('testPill'); if (pill) pill.classList.toggle('hidden', !active);
-    const btn = document.getElementById('btnToggleTestMode');
-    if (btn) {
-      btn.textContent = active ? '🧪 テストモードを終了して元に戻す' : '🧪 テストモードに入る';
-      btn.className = active
-        ? 'w-full py-2.5 rounded-xl text-[11px] font-black bg-emerald-600 border border-emerald-200 text-white shadow active:scale-95 transition'
-        : 'w-full py-2.5 rounded-xl text-[11px] font-black bg-slate-900 border border-emerald-500/70 text-emerald-300 active:scale-95 transition';
-    }
-    const st = document.getElementById('testModeState');
-    if (st) st.textContent = active ? '🟢 テスト中：出玉・履歴・ランキングには一切記録されません' : '⚪ 通常：実戦データを記録しています';
-    const tools = document.getElementById('btnOpenTestTools'); if (tools) tools.classList.toggle('hidden', !active);
-    const inf = document.getElementById('btnDevInfRush');
-    if (inf) {
-      inf.textContent = `♾️ 無限ST: ${infiniteRushMode ? 'ON' : 'OFF'}`;
-      inf.className = infiniteRushMode
-        ? 'py-2 px-2 rounded-xl font-black bg-emerald-600 border border-yellow-200 text-white shadow active:scale-95 transition'
-        : 'py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition';
-    }
-  }
-
-  function enter() {
-    if (active) return true;
-    if (state.phase !== 'NORMAL' || !resultModal.classList.contains('hidden')) { showToast('通常時（待機中）にだけ切り替えできます'); return false; }
-    stopAuto(); stopHandleHold(false);
-    const snap = {}; TEST_DATA_KEYS.forEach(k => { snap[k] = state[k]; });
-    snapJson = JSON.stringify(snap);
-    active = true; infiniteRushMode = false; resetDevForce(); paint();
-    return true;
-  }
-
-  function exit() {
-    if (!active) return;
-    devReturnToNormal();                                   // 進行中の演出を止めて通常画面へ
-    try { Object.assign(state, JSON.parse(snapJson)); } catch (e) { console.error('test snapshot restore failed', e); }
-    active = false; snapJson = null; infiniteRushMode = false; resetDevForce();
-    promoTestMenu.classList.add('hidden');
-    paint();
-    state.phase = 'NORMAL'; setActiveScene('normal'); setControlMode('NORMAL');
-    updateStatsUI(); LiveSlump.draw(); DataPanel.refresh();
-  }
-
-  paint();
-  return { get active() { return active; }, enter, exit, paint };
-})();
-
-document.getElementById('btnOpenSettings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
-document.getElementById('btnCloseSettings').addEventListener('click', () => settingsModal.classList.add('hidden'));
-settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
-document.getElementById('btnClosePromoMenu').addEventListener('click', () => promoTestMenu.classList.add('hidden'));
-document.getElementById('testPill').addEventListener('click', () => promoTestMenu.classList.toggle('hidden'));
-document.getElementById('btnOpenTestTools').addEventListener('click', () => { settingsModal.classList.add('hidden'); promoTestMenu.classList.remove('hidden'); });
-document.getElementById('btnToggleTestMode').addEventListener('click', () => {
-  if (TestMode.active) { TestMode.exit(); showToast('テストモードを終了しました（元の状態に戻りました）'); return; }
-  if (TestMode.enter()) { settingsModal.classList.add('hidden'); promoTestMenu.classList.remove('hidden'); showToast('🧪 テストモード開始：記録されません'); }
-});
-document.getElementById('btnDevExitTest').addEventListener('click', () => { TestMode.exit(); showToast('テストモードを終了しました（元の状態に戻りました）'); });
-
-function devGuard() { if (!TestMode.active) { showToast('テストモード中のみ使えます'); return false; } return true; }
-
-document.getElementById('btnDevToNormal').addEventListener('click', () => {
-  if (!devGuard()) return;
-  promoTestMenu.classList.add('hidden'); devReturnToNormal(); showToast('通常時へ移行しました');
-});
-function devForceInitialHit(kind) {
-  if (!devGuard()) return;
-  promoTestMenu.classList.add('hidden'); devReturnToNormal();
-  DevForce.normalHit = kind;
-  stepHandleSpin(false);                                   // 強制された初当たりを通常の流れで再生
-  handleLocked = false; handleActive = false;              // ボタン操作なのでハンドルの長押しロックは残さない
-}
-document.getElementById('btnDevHit1500R').addEventListener('click', () => devForceInitialHit('1500R'));
-document.getElementById('btnDevHit1500N').addEventListener('click', () => devForceInitialHit('1500N'));
-document.getElementById('btnDevHit3000').addEventListener('click', () => devForceInitialHit('3000'));
-document.getElementById('btnDevInstantRush').addEventListener('click', () => {
-  if (!devGuard()) return;
-  promoTestMenu.classList.add('hidden'); devReturnToNormal();
-  enterOnigakariRush(state.currentSpin || 1, false);
-});
-document.getElementById('btnDevInfRush').addEventListener('click', () => {
-  if (!devGuard()) return;
-  infiniteRushMode = !infiniteRushMode;
-  TestMode.paint();
-  if (infiniteRushMode && state.phase === 'RUSH') { state.stRemaining = SPEC.ST_TOTAL; updateStatsUI(); }
-});
-
-// ★隠しコマンド用：RUSH突入→実際に6,000を獲得→（その直後に）ウェディング演出へ入るまでの本番どおりの流れを自動再生
-//   テストモードへ自動で入り（記録されない）、終了は画面上部の「TEST」から。メニューには一切表示しない。
-async function runRealFlowTest() {
-  if (!TestMode.active && !TestMode.enter()) return;
-  settingsModal.classList.add('hidden'); promoTestMenu.classList.add('hidden');
-  devReturnToNormal();
-  DevForce.cleanReserve = true; DevForce.nextRushHit = 'BONUS_6000'; DevForce.wedding = true;
-  showToast('🧪 TEST', 1400);
-  enterOnigakariRush(1, false);
-  const t0 = Date.now();
-  while (state.phase !== 'RUSH' && Date.now() - t0 < 4000) await new Promise(r => setTimeout(r, 60));
-  if (state.phase !== 'RUSH') return;
-  await new Promise(r => setTimeout(r, 900));              // RUSH突入直後の「いつもの間」
-  if (state.phase !== 'RUSH') return;
-  handleRushEvent(spinRushOnce(), { fromAuto: false });    // 以降は本番と同じ：6,000獲得演出 → 加算 → ST開始 → 0.85秒後に暗転ウェディング
-  handleLocked = false; handleActive = false;
-}
-
-let randomCrashIdx = 0, brainTestLvIdx = 0, vTestCycleIdx = 0, yakumonoTestIdx = 0;
-
-document.querySelectorAll('.promo-test-item').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    if (!devGuard()) return;
-    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
-    promoTestMenu.classList.add('hidden');
-    stopAuto();
-
-    const kind = btn.dataset.test;
-    const prevPhase = state.phase, prevScene = state.activeScene, prevRMode = state.rushMode;
-    const tok = ++seqToken;
-    state.phase = 'ANIMATING'; setControlMode('BUSY');
-
-    try {
-      if (kind === 'yakumonoDrop') {
-        const cols = ['red', 'gold', 'rainbow'];
-        const col = cols[yakumonoTestIdx++ % cols.length];
-        await triggerYakumonoDrop({ color: col, holdMs: 1200, withNiziiroBack: col === 'rainbow', token: tok });
-      } else if (kind === 'restartRip') {
-        await runGoldenPromotionSequence({
-          fakeSub: '死に戻り', fakeTitle: 'Re:Start', fakeDesc: '出玉なし・ST144回へ巻き戻し',
-          fakeStyle: 'despair', fakeSound: 'restart', fakeRestart: true, fakeIsRush: true, fakeBurstGold: false, rushMode: prevRMode,
-          iwakanAnswer: '', finalSub: 'Re:Start 引き裂き昇格', finalTitle: '超・鬼がかり 6,000 BONUS!!',
-          finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!', finalSound: '6000', crashType: 'slash', token: tok
-        });
-      } else if (kind === 'vstockCycle') {
-        const isRed = (vTestCycleIdx++ % 2) === 1;
-        await playVStockNotice({ isRed, token: tok });
-      } else if (kind === 'freeze3s') {
-        await runSudden3sFreeze6000(tok);
-      } else if (kind === 'countup6000') {
-        await runCountUpBreak6000({ rushMode: prevPhase === 'RUSH' ? prevRMode : 'onigakari', iwakanAnswer: '残り回数巻き戻り(+1)', token: tok });
-      } else if (kind === 'brain4') {
-        brainTestOverride = true; state.rushMode = 'brain';
-        clearVisualEffects(); setActiveScene('rush-idle'); setAmbientBg('brain'); setLed('brain');
-        setBrainPeteLevel(0, { withFlash: false }); setBrainTextSwarm(0); setBrainButtonState('idle');
-        await wait(800, tok);
-        const lvs = [5, 4, 3];
-        await playBrainModeSequence({ isHit: true, is6000: true, bonusType: 'BONUS_6000', isHands: brainTestLvIdx % 3 === 0, custOchiburu: true, forceTargetLv: lvs[brainTestLvIdx++ % lvs.length], token: tok });
-        await runSuddenOchiburu6000({ sub: '脳が震えるRUSH', rushMode: 'brain', skipAlarm: true, token: tok });
-        brainTestOverride = false;
-      } else if (kind === 'remLamp') {
-        remTestOverride = true; state.rushMode = 'rem';
-        clearVisualEffects(); setActiveScene('rush-idle'); setAmbientBg('rem'); setLed('rem'); setRemLampVisual('idle', { bringFront: false }); randomRemMissReels(false);
-        await wait(450, tok);
-        triggerRemSakibareBack({ is6000: true, pat: 'RAINBOW', countdownSpins: 3 });
-        for (let step = 3; step >= 1; step--) { randomRemMissReels(true); updateReserveSlots('NORMAL', 'RAINBOW', step); await wait(360, tok); }
-        await playRemTougaiBurst({ is6000: true, bonusType: 'BONUS_6000', fromSakibare: true, token: tok });
-        remTestOverride = false;
-      } else if (kind === 'oniApproach') {
-        oniTestOverride = true; state.rushMode = 'onigakari';
-        clearVisualEffects(); setActiveScene('rush-idle'); setAmbientBg('rush'); setLed('red');
-        await playOniTenpaiAori({ isHit: true, is6000: true, bonusType: 'BONUS_6000', fixedDig: 7, token: tok });
-        await playOniRemApproach6000(tok);
-        oniTestOverride = false;
-      } else if (kind === 'zeroAlign') {
-        oniTestOverride = true; state.rushMode = 'onigakari';
-        clearVisualEffects(); setActiveScene('rush-idle'); setAmbientBg('rush'); setLed('red');
-        await playOniTenpaiAori({ isHit: true, is6000: true, bonusType: 'BONUS_6000', fixedDig: 0, token: tok });
-        await runSuddenOchiburu6000({ sub: '0揃い特別違和感!!', rushMode: 'onigakari', token: tok });
-        oniTestOverride = false;
-      } else if (kind === 'glassFail') {
-        await playGlassShatterFail(tok);
-      } else if (kind === 'revivalResult') {
-        await runResultRevivalSequence(tok);
-      } else {
-        const modes = ['slash', 'botan', 'drop', 'shatter', 'quake'];
-        await runGoldenPromotionSequence({
-          fakeSub: '右打ち 55%', fakeTitle: '鬼がかり 1,500 BONUS!!', fakeDesc: '払出 1,500個（実質純増 +1,400発）獲得！',
-          fakeStyle: 'gold', fakeSound: '1500', fakeRestart: false, fakeIsRush: true, fakeBurstGold: true, rushMode: prevRMode,
-          iwakanAnswer: 'ひょっこり隠れレム', finalSub: '鬼がかりRUSH',
-          finalTitle: '超・鬼がかり 6,000 BONUS!!', finalExtra: '払出 6,000個（実質純増 5,600発）獲得!!',
-          finalSound: '6000', crashType: modes[randomCrashIdx++ % modes.length], token: tok
-        });
-      }
-    } catch (e) {
-    } finally {
-      brainTestOverride = false; remTestOverride = false; oniTestOverride = false;
-      state.rushMode = prevRMode; state.phase = prevPhase;
-      clearVisualEffects(); setActiveScene(prevScene);
-      if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
-      else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
-    }
-  });
-});
-
-// =========================================================================
-// 実戦操作ボタン
-// =========================================================================
-document.getElementById('btnCloseResult').addEventListener('click', async () => {
-    resultModal.classList.add('hidden');
-  if (state.pendingResultRevival) {
-    state.pendingResultRevival = false;
-    const tok = ++seqToken; state.phase = 'ANIMATING'; setControlMode('BUSY');
-    try {
-      await runResultRevivalSequence(tok);
-      state.rushIwakanNotes.push('リザルト死に戻り復活');
-      award6000AndContinue();
-      return;
-    } catch (e) {}
-  }
-
-  const tags = [];
-  if (state.rush6000Count > 0) tags.push(`鬼6000×${state.rush6000Count}`);
-  if (state.rushWeddingCount > 0) tags.push(`WEDDING12000×${state.rushWeddingCount}`);
-  if (state.rushHoryurenCount > 0) tags.push(`保留連×${state.rushHoryurenCount}`);
-  if (state.rushRestartCount > 0) tags.push(`Re:Start×${state.rushRestartCount}`);
-  addLog(
-    `${state.rushStartSpin}回`, '鬼がかりRUSH', 'bg-amber-900/80 text-amber-200 border border-amber-400/60',
-    `${state.rushChains}連${tags.length ? ` (${tags.join('/')})` : ''}`,
-    `${state.rushDisp.toLocaleString()}個 (${state.rushNet.toLocaleString()}発)`, 'text-amber-300'
-  );
-
-  state.phase = 'NORMAL'; state.reserveQueue = []; state.stLookaheadQueue = []; state.remSakibareActive = false;
-  clearVisualEffects(); FxCanvas.setAmbient('ember'); updateReserveSlots('NORMAL');
-  if (rushMetaHud) rushMetaHud.classList.add('hidden');
-  if (rushModeBar) rushModeBar.classList.add('hidden');
-  if (rushStatusBar) rushStatusBar.classList.add('hidden');
-  setVStockBadge(false);
-  setActiveScene('normal');
-  normalTitle.textContent = '通常時'; normalTitle.className = 'text-lg sm:text-2xl font-black text-white';
-  normalSub.textContent = '鬼がかりRUSH終了！次の先バレを狙おう！';
-  setControlMode('NORMAL'); BgmEngine.resume('normal'); updateStatsUI(); LiveSlump.record(true);
-});
-
-document.getElementById('btnSpin1').addEventListener('click', () => { if (state.phase === 'NORMAL') { stopAuto(); stepHandleSpin(false); } });
-
-document.getElementById('btnAutoSakibare').addEventListener('click', () => {
-  if (state.phase !== 'NORMAL') return;
-  if (state.autoMode === 'SAKIBARE') { stopAuto(); randomMissReels(); return; }
-  stopAuto(); state.autoMode = 'SAKIBARE'; setActiveScene('normal');
-  document.getElementById('btnAutoSakibare').textContent = '⏹ 停止';
-  state.autoTimer = setInterval(() => {
-    for (let i = 0; i < 5; i++) { const res = drawNormalSpin(); if (res.bareType || res.isHit) { startNormalReach(res); return; } }
-    setReels(Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, { spinning: [true, true, true] });
-    normalTitle.textContent = `${state.currentSpin.toLocaleString()} 回転`; normalTitle.className = 'text-lg sm:text-2xl font-black text-white num-fixed';
-    normalSub.textContent = '先バレ待機中… 高速回転中！'; updateStatsUI();
-  }, 36);
-});
-
-document.getElementById('btnAutoHit').addEventListener('click', () => {
-  if (state.phase !== 'NORMAL') return;
-  if (state.autoMode === 'HIT') { stopAuto(); randomMissReels(); return; }
-  stopAuto(); state.autoMode = 'HIT'; setActiveScene('normal');
-  document.getElementById('btnAutoHit').textContent = '⏹ 停止';
-  state.autoTimer = setInterval(() => {
-    for (let i = 0; i < 14; i++) {
-      const res = drawNormalSpin();
-      if (res.isHit) { startNormalReach(res); return; }
-      else if (res.bareType) { state.sakibareTotal++; addLog(`${state.currentSpin}回`, '先バレ', 'bg-rose-950 text-rose-300 border border-rose-700', '当りオート中スキップ', 'ハズレ', 'text-slate-400'); }
-    }
-    setReels(Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, Math.floor(Math.random()*8)+1, { spinning: [true, true, true] });
-    normalTitle.textContent = `${state.currentSpin.toLocaleString()} 回転`; normalTitle.className = 'text-lg sm:text-2xl font-black text-white num-fixed';
-    normalSub.textContent = '大当りまで高速オート消化中…'; updateStatsUI();
-  }, 36);
-});
-
-document.getElementById('btnResetPlay').addEventListener('click', () => {
-  seqToken++; stopAuto(); stopHandleHold(false); hideFullscreenOverlay(); resultModal.classList.add('hidden');
-  if (rushModeBar) rushModeBar.classList.add('hidden');
-  if (rushStatusBar) rushStatusBar.classList.add('hidden');
-  if (rushMetaHud) rushMetaHud.classList.add('hidden');
-  setVStockBadge(false);
-  Object.assign(state, {
-    phase: 'NORMAL', currentSpin: 0, totalNormalSpins: 0, firstHits: 0, rushHits: 0, sakibareTotal: 0, sakibareWins: 0,
-    totalInvestYen: 0, balls: 0, unspentFrac: 0, pendingReach: null, pendingRushHit: null, pendingResultRevival: false,
-    hasVStock: false, hasVStockRed: false, reserveQueue: [], stLookaheadQueue: [], remSakibareActive: false, stRemaining: 0,
-    rushChains: 0, rushDisp: 0, rushNet: 0, rush6000Count: 0, rushWeddingCount: 0, rushHoryurenCount: 0, rushRestartCount: 0,
-    rushIwakanNotes: [], sessionGraphPoints: [0], sessionMaxChains: 0, sessionMaxOneShot: 0, _spinsSinceGraphSample: 0, history: []
-  });
-  clearVisualEffects(); FxCanvas.clearAll(); FxCanvas.setAmbient('ember');
-  updateReserveSlots('NORMAL'); setActiveScene('normal'); setReels(7, 3, 7);
-  normalTitle.textContent = 'STANDBY'; normalTitle.className = 'text-lg sm:text-2xl font-black text-white';
-  normalSub.textContent = 'データをリセットしました。';
-  renderHistoryTable(); DataPanel.refresh();
-  setControlMode('NORMAL'); BgmEngine.resume('normal'); updateStatsUI(); LiveSlump.draw();
-});
-
-function startRushAutoLoop() {
-  if (state.phase !== 'RUSH') return;
-  stopAuto(); state.autoMode = 'RUSH';
-  document.getElementById('btnRushAuto').textContent = '⏹ 停止';
-  state.autoTimer = setInterval(() => {
-    if (state.phase !== 'RUSH') { stopAuto(); return; }
-    handleRushEvent(spinRushOnce(), { fromAuto: true });
-  }, 55);
-}
-
-document.getElementById('btnRush1').addEventListener('click', () => { if (state.phase === 'RUSH') { stopAuto(); handleRushEvent(spinRushOnce(), { fromAuto: false }); } });
-document.getElementById('btnRushAuto').addEventListener('click', () => { if (state.phase !== 'RUSH') return; if (state.autoMode === 'RUSH') { stopAuto(); return; } startRushAutoLoop(); });
-document.getElementById('btnRushSkip').addEventListener('click', () => {
-  if (state.phase !== 'RUSH') return;
-  stopAuto(); let guard = 0;
-  while (state.phase === 'RUSH' && state.stRemaining > 0 && guard < 1500) {
-    guard++; const ev = spinRushOnce();
-    if (!ev || ev.type !== 'MISS') { handleRushEvent(ev, { fromAuto: false }); return; }
-  }
-});
-
-// カスタム切替
-document.getElementById('toggleSakibare').addEventListener('click', e => {
-  state.custSakibare = !state.custSakibare;
-  e.target.textContent = `🔥 先バレ40%: ${state.custSakibare ? 'ON' : 'OFF'}`;
-  e.target.className = state.custSakibare ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-rose-700/85 border-rose-400 text-white shadow active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-});
-document.getElementById('toggleOchiburu').addEventListener('click', e => {
-  state.custOchiburu = !state.custOchiburu;
-  e.target.textContent = `💥 落ちブルUP: ${state.custOchiburu ? 'ON' : 'OFF'}`;
-  e.target.className = state.custOchiburu ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-amber-600/70 border-amber-300 text-amber-50 active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-});
-document.getElementById('togglePremier').addEventListener('click', e => {
-  state.custPremier = !state.custPremier;
-  e.target.textContent = `🌈 プレミアUP: ${state.custPremier ? 'ON' : 'OFF'}`;
-  e.target.className = state.custPremier ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-fuchsia-700/75 border-fuchsia-300 text-white shadow active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-});
-document.querySelectorAll('.rmode-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.rushMode = btn.dataset.rmode;
-    document.querySelectorAll('.rmode-btn').forEach(b => { b.className = 'rmode-btn py-1.5 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95 whitespace-nowrap'; });
-    btn.className = 'rmode-btn py-1.5 px-1 rounded-xl text-[11px] font-black border transition bg-rose-700/80 border-amber-300 text-white active:scale-95 whitespace-nowrap';
-    applyRushModeVisuals();
-  });
-});
-document.getElementById('toggleRushTrust').addEventListener('click', e => {
-  state.rushCustTrust = !state.rushCustTrust;
-  e.target.textContent = `🎯 信頼度先バレ: ${state.rushCustTrust ? 'ON' : 'OFF'}`;
-  e.target.className = state.rushCustTrust ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-cyan-700/80 border-cyan-300 text-white shadow active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-});
-document.getElementById('toggleRushIwakan').addEventListener('click', e => {
-  state.rushCustIwakan = !state.rushCustIwakan;
-  e.target.textContent = `👁️ 違和感UP: ${state.rushCustIwakan ? 'ON' : 'OFF'}`;
-  e.target.className = state.rushCustIwakan ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-purple-700/80 border-fuchsia-300 text-white shadow active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-});
-document.getElementById('toggleRushNoNotice').addEventListener('click', e => {
-  state.rushCustNoNotice = !state.rushCustNoNotice;
-  e.target.textContent = `🤫 予告無し: ${state.rushCustNoNotice ? 'ON' : 'OFF'}`;
-  e.target.className = state.rushCustNoNotice ? 'py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-amber-700/80 border-amber-300 text-white shadow active:scale-95' : 'py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95';
-  applyRushModeVisuals();
-});
-
-// =========================================================================
-// タブ2：初当たり100回高速シミュレーター
-// =========================================================================
-let lastSimPoints = [];
-function runSim100() {
-  const HITS = 100;
-  let totalSpins = 0, maxHamari = 0, whaleCount = 0, rushCount = 0;
-  let totalRushWins = 0, count6000 = 0, horyurenCount = 0, weddingCount = 0;
-  let maxPayoutDisp = 0, maxPayoutNet = 0, cumDiff = 0;
-  const points = [0], diffs = [];
-  const densa140Prob = 1 - Math.pow(1 - SPEC.ST_PROB, SPEC.ST_DENSA);
-
-  for (let i = 0; i < HITS; i++) {
-    const spins = Math.floor(Math.log(1 - Math.random()) / Math.log(1 - SPEC.NORMAL_PROB)) + 1;
-    totalSpins += spins; if (spins > maxHamari) maxHamari = spins;
-    const investBalls = spins * (250 / rotRate);
-    let payoutDisp = 0, payoutNet = 0, inRush = false, prevType = null;
-
-    const rH = Math.random();
-    if (rH < SPEC.H_3000_RUSH) { whaleCount++; payoutDisp = SPEC.DISP_3000; payoutNet = SPEC.NET_3000; inRush = true; prevType = 'INIT_3000'; }
-    else if (rH < SPEC.RUSH_ENTRY) { payoutDisp = SPEC.DISP_1500; payoutNet = SPEC.NET_1500; inRush = true; prevType = 'INIT_1500'; }
-    else { payoutDisp = SPEC.DISP_1500; payoutNet = SPEC.NET_1500; }
-
-    if (inRush) {
-      rushCount++; let active = true;
-      while (active) {
-        const r4 = drawReserve4(); let hitBonus = null;
-        if (r4.hit) {
-          hitBonus = r4.bonusType;
-          const isWed = (prevType === 'BONUS_6000' && hitBonus === 'BONUS_6000');
-          if (isWed) { weddingCount++; horyurenCount++; }
-          else if (hitBonus !== 'RESTART' && Math.random() < SPEC.HORYUREN_NOTICE_RATE) horyurenCount++;
-        } else if (Math.random() < densa140Prob) hitBonus = drawRushBonusType();
-        else { active = false; break; }
-        totalRushWins++;
-        if (hitBonus === 'BONUS_6000') { count6000++; payoutDisp += SPEC.DISP_6000; payoutNet += SPEC.NET_6000; }
-        else if (hitBonus === 'BONUS_1500') { payoutDisp += SPEC.DISP_1500; payoutNet += SPEC.NET_1500; }
-        else if (hitBonus === 'BONUS_300') { payoutDisp += SPEC.DISP_300; payoutNet += SPEC.NET_300; }
-        prevType = hitBonus;
-      }
-    }
-    if (payoutDisp > maxPayoutDisp) { maxPayoutDisp = payoutDisp; maxPayoutNet = payoutNet; }
-    const oneDiff = payoutNet - investBalls;
-    diffs.push(oneDiff); cumDiff += oneDiff; points.push(Math.round(cumDiff));
-  }
-
-  lastSimPoints = points;
-  const mean = diffs.reduce((a, b) => a + b, 0) / HITS;
-  const stdDev = Math.round(Math.sqrt(diffs.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / HITS));
-
-  document.getElementById('simTotalSpins').textContent = `${totalSpins.toLocaleString()} (1/${(totalSpins / HITS).toFixed(1)})`;
-  document.getElementById('simMaxHamari').textContent = `${maxHamari.toLocaleString()} 回`;
-  document.getElementById('simWhaleCount').textContent = `${whaleCount} 回 (理論10)`;
-  document.getElementById('simRushRate').textContent = `${rushCount}% (${rushCount}回)`;
-  const pct6000 = totalRushWins > 0 ? ((count6000 / totalRushWins) * 100).toFixed(1) : '0.0';
-  document.getElementById('sim6000Count').textContent = `${count6000}回 (${pct6000}%)`;
-  document.getElementById('simHoryurenCount').textContent = `${horyurenCount} 回`;
-  document.getElementById('simWeddingCount').textContent = `${weddingCount} 回`;
-  document.getElementById('simMaxPayout').textContent = `${maxPayoutDisp.toLocaleString()} (${maxPayoutNet.toLocaleString()})`;
-  document.getElementById('simStdDev').textContent = `±${stdDev.toLocaleString()}発`;
-
-  const finalBalls = points[points.length - 1], finalYen = Math.round(finalBalls * exchangeRate);
-  const balEl = document.getElementById('simFinalBalance');
-  balEl.textContent = `${finalBalls >= 0 ? '+' : ''}${finalBalls.toLocaleString()}発 (${finalYen >= 0 ? '+' : ''}${finalYen.toLocaleString()}円)`;
-  balEl.className = `text-xs sm:text-sm font-black mt-0.5 num-fixed ${finalBalls >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-  const peak = Math.max(...points), bottom = Math.min(...points);
-  document.getElementById('simPeakBottom').textContent = `最高: ${peak >= 0 ? '+' : ''}${peak.toLocaleString()} / 最低: ${bottom >= 0 ? '+' : ''}${bottom.toLocaleString()}`;
-  const exp6000 = totalRushWins * SPEC.R_6000, diff6000 = count6000 - exp6000;
-  document.getElementById('simDiagnosis').innerHTML = `
-    <div class="font-black text-amber-300 mb-1">🎯 鬼がかり6000＆残保留WEDDING 12,000 診断</div>
-    <p>右打ち総当選 <strong>${totalRushWins}回</strong> 中、鬼がかり6000は <strong>${count6000}回（${pct6000}%）</strong>（理論 ${exp6000.toFixed(1)}回 ／ 差 <strong class="${diff6000 >= 0 ? 'text-emerald-300' : 'text-rose-400'}">${diff6000 >= 0 ? '+' : ''}${diff6000.toFixed(1)}回</strong>）。保留連告知 <strong>${horyurenCount}回</strong>、WEDDING 12,000は <strong>${weddingCount}回</strong> でした。</p>
-  `;
-  drawSlumpChart(points);
-}
-
-function drawSlumpChart(points) {
-  const canvas = document.getElementById('slumpChartCanvas');
-  if (!canvas || !points || points.length === 0) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
-  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
-  const w = rect.width, h = rect.height, padL = 48, padR = 12, padT = 16, padB = 22, chartW = w - padL - padR, chartH = h - padT - padB;
-  ctx.clearRect(0, 0, w, h);
-
-  const minVal = Math.min(0, ...points), maxVal = Math.max(0, ...points), range = Math.max(25000, maxVal - minVal);
-  const yMin = minVal - range * 0.08, yMax = maxVal + range * 0.08;
-  const toX = i => padL + (i / (points.length - 1)) * chartW, toY = v => padT + ((yMax - v) / (yMax - yMin)) * chartH, zeroY = toY(0);
-
-  ctx.strokeStyle = 'rgba(250, 204, 21, 0.12)'; ctx.lineWidth = 1; ctx.font = '10px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right';
-  for (let i = 0; i <= 4; i++) { const val = yMin + ((yMax - yMin) / 4) * i, y = toY(val); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillText(`${Math.round(val / 1000)}k`, padL - 5, y + 3); }
-  ctx.strokeStyle = 'rgba(250, 204, 21, 0.55)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(padL, zeroY); ctx.lineTo(w - padR, zeroY); ctx.stroke(); ctx.setLineDash([]);
-  ctx.textAlign = 'center'; [0, 25, 50, 75, 100].forEach(idx => ctx.fillText(`${idx}回`, toX(idx), h - 5));
-
-  function fillArea(pos) {
-    ctx.save(); ctx.beginPath();
-    if (pos) ctx.rect(padL, padT, chartW, Math.max(0, zeroY - padT)); else ctx.rect(padL, zeroY, chartW, Math.max(0, (h - padB) - zeroY));
-    ctx.clip(); ctx.beginPath(); points.forEach((v, i) => { const x = toX(i), y = toY(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-    ctx.lineTo(toX(points.length - 1), zeroY); ctx.lineTo(toX(0), zeroY); ctx.closePath();
-    const grad = ctx.createLinearGradient(0, padT, 0, h - padB);
-    if (pos) { grad.addColorStop(0, 'rgba(250, 204, 21, 0.50)'); grad.addColorStop(1, 'rgba(250, 204, 21, 0.05)'); }
-    else { grad.addColorStop(0, 'rgba(225, 29, 72, 0.12)'); grad.addColorStop(1, 'rgba(225, 29, 72, 0.52)'); }
-    ctx.fillStyle = grad; ctx.fill(); ctx.restore();
-  }
-  fillArea(true); fillArea(false);
-
-  ctx.lineWidth = 2.2;
-  for (let i = 1; i < points.length; i++) {
-    ctx.beginPath(); ctx.moveTo(toX(i - 1), toY(points[i - 1])); ctx.lineTo(toX(i), toY(points[i]));
-    ctx.strokeStyle = (points[i] >= 0 && points[i - 1] >= 0) ? '#facc15' : (points[i] < 0 && points[i - 1] < 0) ? '#f43f5e' : '#fb923c';
-    ctx.stroke();
-  }
-}
-
-// =========================================================================
-// 設定・サウンド・タブ同期
-// =========================================================================
-document.getElementById('btnTestPokyun').addEventListener('click', () => {
-  StudioAudio.playPokyun(false); setAmbientBg('redbare'); triggerLamp('red', 'ポキュ↑ーン↓');
-  lcdFrame.classList.remove('fx-redbare', 'shake-burst'); void lcdFrame.offsetWidth;
-  lcdFrame.classList.add('fx-redbare', 'shake-burst'); FxCanvas.burstFlames(34);
-  setTimeout(() => { if (state.phase === 'NORMAL') { setAmbientBg(''); setCabinetGlow('idle'); setYakumonoColor('white'); } }, 1100);
-});
-document.getElementById('btnTest1500').addEventListener('click', () => StudioAudio.play1500Jackpot(true));
-document.getElementById('btnTestOchiburu').addEventListener('click', () => StudioAudio.playOchiburu(true));
-document.getElementById('btnTestPuchun').addEventListener('click', () => { BgmEngine.cut(); StudioAudio.playPuchun(); });
-
-document.getElementById('btnToggleBgm').addEventListener('click', e => {
-  const on = BgmEngine.toggle();
-  e.target.textContent = on ? '🎵 BGM ON' : '🔇 BGM OFF';
-  e.target.className = on ? 'py-1.5 rounded-lg text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 active:scale-95' : 'py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700 active:scale-95';
-});
-document.getElementById('sliderReverbWet').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valReverbWet').textContent = `${v}%`; StudioAudio.setReverbWet(v / 100); });
-document.getElementById('sliderPeakBright').addEventListener('input', e => { const v = parseFloat(e.target.value); document.getElementById('valPeakBright').textContent = `${v.toFixed(2)}x`; StudioAudio.setPeakBright(v); });
-document.getElementById('sliderDownBend').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valDownBend').textContent = `${v}%`; StudioAudio.setDownBend(v / 100); });
-document.getElementById('sliderPoEmphasis').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valPoEmphasis').textContent = `${v}%`; StudioAudio.setPoEmphasis(v / 100); });
-document.getElementById('sliderGrit').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valGrit').textContent = `${v}%`; StudioAudio.setGrit(v / 100); });
-document.getElementById('sliderVolume').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valVolume').textContent = `${v}%`; StudioAudio.setVolume(v / 100); });
-document.getElementById('sliderBgmVolume').addEventListener('input', e => { const v = parseInt(e.target.value, 10); document.getElementById('valBgmVolume').textContent = `${v}%`; BgmEngine.setVolume(v / 100); });
-
-document.getElementById('btnResetTuner').addEventListener('click', () => {
-  document.getElementById('sliderReverbWet').value = 44; document.getElementById('valReverbWet').textContent = '44%'; StudioAudio.setReverbWet(AUDIO_DEFAULTS.reverbWet);
-  document.getElementById('sliderPeakBright').value = 0.73; document.getElementById('valPeakBright').textContent = '0.73x'; StudioAudio.setPeakBright(AUDIO_DEFAULTS.peakBright);
-  document.getElementById('sliderDownBend').value = 115; document.getElementById('valDownBend').textContent = '115%'; StudioAudio.setDownBend(AUDIO_DEFAULTS.downBend);
-  document.getElementById('sliderPoEmphasis').value = 160; document.getElementById('valPoEmphasis').textContent = '160%'; StudioAudio.setPoEmphasis(AUDIO_DEFAULTS.poEmphasis);
-  document.getElementById('sliderGrit').value = 115; document.getElementById('valGrit').textContent = '115%'; StudioAudio.setGrit(AUDIO_DEFAULTS.grit);
-  document.getElementById('sliderVolume').value = 80; document.getElementById('valVolume').textContent = '80%'; StudioAudio.setVolume(AUDIO_DEFAULTS.volume);
-  document.getElementById('sliderBgmVolume').value = 65; document.getElementById('valBgmVolume').textContent = '65%'; BgmEngine.setVolume(0.65);
-  StudioAudio.playPokyun(false);
-});
-document.getElementById('btnMute').addEventListener('click', e => {
-  const m = StudioAudio.toggleMute(); BgmEngine.setGlobalMute(m);
-  e.target.textContent = m ? '🔇 全音 OFF' : '🔊 全音 ON';
-  e.target.className = m ? 'py-1.5 rounded-lg text-[10px] font-black bg-slate-900 text-rose-400 border border-slate-700 active:scale-95' : 'py-1.5 rounded-lg text-[10px] font-black bg-slate-800 text-emerald-300 border border-slate-600 active:scale-95';
-});
-// ---- 📊 台データ（データ／履歴／100回シミュ）。開いている間だけ描画する軽量実装 ----
-const DataPanel = (() => {
-  let tab = 'stats', opened = false, timer = null;
-  const $ = (id) => document.getElementById(id);
-  const num = (n) => Math.round(n).toLocaleString();
-  const signed = (n) => `${n >= 0 ? '+' : ''}${num(n)}`;
-
-  function paintTabs() {
-    document.querySelectorAll('.data-tab').forEach(b => {
-      const on = b.dataset.dtab === tab;
-      b.className = 'data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap '
-        + (on ? 'bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white border-yellow-200/60 shadow'
-              : 'bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60');
-    });
-    document.querySelectorAll('.data-pane').forEach(p => p.classList.toggle('hidden', p.id !== `dataPane-${tab}`));
-  }
-
-  function renderStats() {
-    const s = state;
-    const set = (id, v, cls) => { const el = $(id); if (!el) return; el.textContent = v; if (cls) el.className = cls; };
-    const hitProb = s.firstHits > 0 ? `1/${(s.totalNormalSpins / s.firstHits).toFixed(1)}` : '-';
-    const rushRate = s.firstHits > 0 ? `${Math.round((s.rushHits / s.firstHits) * 100)}%` : '-';
-    const sb = s.sakibareTotal > 0 ? `${s.sakibareWins}/${s.sakibareTotal} (${Math.round((s.sakibareWins / s.sakibareTotal) * 100)}%)` : '0/0 (-)';
-    const diff = Math.round(s.balls - (s.totalInvestYen / 500) * 125);
-    const bal = Math.round(s.balls * exchangeRate) - s.totalInvestYen;
-    set('dtSpins', num(s.totalNormalSpins));
-    set('dtHits', `${s.firstHits}回 (${hitProb})`);
-    set('dtRush', `${s.rushHits}回 (${rushRate})`);
-    set('dtSakibare', sb);
-    set('dtMaxChain', `${s.sessionMaxChains}連`);
-    set('dtMaxShot', `${num(s.sessionMaxOneShot)}個`);
-    set('dtInvest', `${num(s.totalInvestYen)}円`);
-    set('dtDiff', `${signed(diff)}発`, `text-sm font-black num-fixed ${diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-rose-400' : 'text-white'}`);
-    set('dtBalance', `${signed(bal)}円`, `text-sm font-black num-fixed ${bal > 0 ? 'text-emerald-400' : bal < 0 ? 'text-rose-400' : 'text-white'}`);
-  }
-
-  function refresh() {
-    if (!opened) return;
-    if (tab === 'stats') renderStats();
-    else if (tab === 'history') renderHistoryTable();
-    else if (tab === 'records') Records.render();
-  }
-
-  function setTab(t) {
-    tab = t; paintTabs();
-    clearInterval(timer); timer = null;
-    if (t === 'stats') { renderStats(); timer = setInterval(renderStats, 1000); }
-    else if (t === 'history') renderHistoryTable();
-    else if (t === 'records') { Records.mount(document.getElementById('recordsRoot')); }
-    else if (t === 'sim') { if (lastSimPoints.length === 0) runSim100(); else setTimeout(() => drawSlumpChart(lastSimPoints), 30); }
-  }
-  function open(t) {
-    opened = true; stopAuto(); stopHandleHold(false);
-    dataModal.classList.remove('hidden');
-    setTab(t || tab);
-  }
-  function close() {
-    opened = false; dataModal.classList.add('hidden');
-    clearInterval(timer); timer = null;
-  }
-  return { open, close, setTab, refresh, isOpen: (t) => opened && (!t || tab === t) };
-})();
-
-document.getElementById('btnOpenData').addEventListener('click', () => DataPanel.open());
-document.getElementById('btnCloseData').addEventListener('click', () => DataPanel.close());
-dataModal.addEventListener('click', (e) => { if (e.target === dataModal) DataPanel.close(); });
-document.querySelectorAll('.data-tab').forEach(b => b.addEventListener('click', () => DataPanel.setTab(b.dataset.dtab)));
-document.getElementById('btnRunSim100').addEventListener('click', runSim100);
-
-function syncRotRate(v) {
-  rotRate = parseFloat(v);
-  document.getElementById('rotRateSlider').value = rotRate; document.getElementById('simRotSlider').value = rotRate;
-  document.getElementById('rotRateDisplay').textContent = `${rotRate.toFixed(1)} 回/1k`;
-  document.getElementById('simRotDisplay').textContent = `${rotRate.toFixed(1)} 回/1k`;
-}
-document.getElementById('rotRateSlider').addEventListener('input', e => syncRotRate(e.target.value));
-document.getElementById('simRotSlider').addEventListener('input', e => syncRotRate(e.target.value));
-
-function syncExchangeRate(rate) {
-  exchangeRate = parseFloat(rate);
-  document.querySelectorAll('.rate-btn, .sim-rate-btn').forEach(b => {
-    const active = Math.abs(parseFloat(b.dataset.rate) - exchangeRate) < 0.01;
-    b.className = `${b.classList.contains('sim-rate-btn') ? 'sim-rate-btn py-1.5' : 'rate-btn py-1.5'} rounded-lg text-[10px] border transition ${active ? 'font-black bg-rose-700/75 border-amber-400 text-white' : 'font-bold bg-slate-900 border-slate-700 text-slate-400'}`;
-  });
-  updateStatsUI();
-}
-document.querySelectorAll('.rate-btn, .sim-rate-btn').forEach(btn => btn.addEventListener('click', () => syncExchangeRate(btn.dataset.rate)));
-window.addEventListener('resize', () => {
-  LiveSlump.draw();
-  if (lastSimPoints.length > 0 && DataPanel.isOpen('sim')) drawSlumpChart(lastSimPoints);
-});
-
-// =========================================================================
-// ★ウェディング12,000 超プレミア完全版（全画面暗転ジャック維持）★
-// =========================================================================
-(function initWeddingCinemaV70() {
-  const SCENE_FILES = [
-    { name: 'wed space.jpg', portrait: true,  dur: 2400, pan: 'zoomIn',  bell: true  },
-    { name: 'pur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 0     },
-    { name: 'kur.jpg',       portrait: true,  dur: 1450, pan: 'zoomOut', harp: 1     },
-    { name: 'mur.jpg',       portrait: true,  dur: 1450, pan: 'panUp',   harp: 2     },
-    { name: 'bea.jpg',       portrait: true,  dur: 1450, pan: 'zoomIn',  harp: 3     },
-    { name: 'ram.jpg',       portrait: true,  dur: 1550, pan: 'panUp',   harp: 4     },
-    { name: 'rem.jpg',       portrait: true,  dur: 1850, pan: 'zoomIn',  harp: 5     },
-    { name: 'emi.jpg',       portrait: true,  dur: 1950, pan: 'zoomIn',  harp: 6     }
-  ];
-
-  const loadedScenes = new Array(SCENE_FILES.length).fill(null);
-  let directWedBtn = null;
-
-  SCENE_FILES.forEach((item, idx) => {
-    const url = encodeURI(item.name);
-    const im = new Image(); im.onload = () => { loadedScenes[idx] = url; }; im.src = url;
-  });
-  (() => { const im = new Image(); im.onload = () => { directWedBtn = 'wed_botan.jpg'; }; im.src = 'wed_botan.jpg'; })();
-
-  const WeddingAudio = (() => {
-    let ctx = null, padNodes = [];
-    function getVol() {
-      const muteBtn = document.getElementById('btnMute');
-      if (muteBtn && muteBtn.textContent.includes('OFF')) return 0;
-      const sl = document.getElementById('sliderVolume');
-      return Math.max(0, Math.min(1, sl ? parseInt(sl.value, 10) / 100 : 0.80));
-    }
-    function ensure() {
-      if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ctx = new AC(); }
-      if (ctx.state === 'suspended') ctx.resume();
-      return ctx;
-    }
-    function startHolyPad() {
-      stopPad(); const v = getVol(); if (v <= 0.01) return; const c = ensure(); if (!c) return;
-      const now = c.currentTime + 0.02;
-      const master = c.createGain(); master.gain.setValueAtTime(0.001, now); master.gain.linearRampToValueAtTime(v * 0.22, now + 2.2);
-      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(1150, now); lp.connect(master).connect(c.destination);
-      const oscs = [174.61, 220.00, 261.63, 329.63, 392.00].map((hz, i) => {
-        const o = c.createOscillator(); o.type = i % 2 === 0 ? 'triangle' : 'sine'; o.frequency.setValueAtTime(hz, now); o.detune.value = (i - 2) * 4;
-        const g = c.createGain(); g.gain.value = i === 0 ? 0.30 : 0.16; o.connect(g).connect(lp); o.start(now); return o;
-      });
-      padNodes.push({ master, oscs, ctx: c });
-    }
-    function stopPad(fadeSec = 0.8) {
-      padNodes.forEach(p => {
-        try {
-          const now = p.ctx.currentTime;
-          p.master.gain.cancelScheduledValues(now); p.master.gain.setValueAtTime(Math.max(0.001, p.master.gain.value), now);
-          p.master.gain.exponentialRampToValueAtTime(0.0001, now + fadeSec);
-          p.oscs.forEach(o => { try { o.stop(now + fadeSec + 0.05); } catch (e) {} });
-        } catch (e) {}
-      });
-      padNodes = [];
-    }
-    function playBell(pitchMul = 1.0) {
-      const v = getVol(); if (v <= 0.01) return; const c = ensure(); if (!c) return;
-      const now = c.currentTime + 0.01, base = 523.25 * pitchMul;
-      [1, 2, 2.4, 3.0, 4.2].forEach((ratio, idx) => {
-        const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(base * ratio, now);
-        const amp = (v * 0.20) / (idx + 1), decay = 2.6 / (1 + idx * 0.55);
-        g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(amp, now + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
-        o.connect(g).connect(c.destination); o.start(now); o.stop(now + decay + 0.05);
-      });
-    }
-    function playHarpStep(stepIdx = 0) {
-      const v = getVol(); if (v <= 0.01) return; const c = ensure(); if (!c) return;
-      const now = c.currentTime + 0.01;
-      const roots = [349.23, 392.00, 440.00, 466.16, 523.25, 587.33, 698.46];
-      const root = roots[Math.min(roots.length - 1, Math.max(0, stepIdx))];
-      [root, root * 1.25, root * 1.5, root * 2.0].forEach((hz, i) => {
-        const st = now + i * 0.065, o = c.createOscillator(), g = c.createGain();
-        o.type = 'triangle'; o.frequency.setValueAtTime(hz, st);
-        g.gain.setValueAtTime(0.0001, st); g.gain.linearRampToValueAtTime(v * 0.16, st + 0.014); g.gain.exponentialRampToValueAtTime(0.0001, st + 1.25);
-        o.connect(g).connect(c.destination); o.start(st); o.stop(st + 1.30);
-      });
-    }
-    return { startHolyPad, stopPad, playBell, playHarpStep };
-  })();
-
-  if (!document.getElementById('wedding-v70-css')) {
-    const st = document.createElement('style');
-    st.id = 'wedding-v70-css';
-    st.textContent = `
-      @keyframes wedCamZoomIn  { 0% { transform: scale(1.00); } 100% { transform: scale(1.09); } }
-      @keyframes wedCamZoomOut { 0% { transform: scale(1.10); } 100% { transform: scale(1.01); } }
-      @keyframes wedCamPanUp   { 0% { transform: scale(1.08) translateY(2.2%); } 100% { transform: scale(1.08) translateY(-2.2%); } }
-      @keyframes wedRainbowBorderFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-      @keyframes wedHolyFlashSlow { 0% { opacity: 0.92; } 35% { opacity: 0.45; } 100% { opacity: 0; } }
-      @keyframes wedFeatherFall { 0% { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 0; } 12% { opacity: 0.95; } 88% { opacity: 0.92; } 100% { transform: translate3d(var(--dx), 112vh, 0) rotate(var(--rot)); opacity: 0; } }
-      @keyframes wedGensituIn { 0% { opacity: 0; transform: scale(0.94) translateY(10px); filter: brightness(1.6) blur(3px); } 55% { opacity: 0.85; transform: scale(1.00) translateY(0); filter: brightness(1.18) blur(0px); } 100% { opacity: 1; transform: scale(1.02) translateY(0); filter: brightness(1.04) blur(0px); } }
-      @keyframes wedCrystalPulse { 0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.92); } 50% { opacity: 0.94; transform: translate(-50%, -50%) scale(1.08); } }
-      @keyframes wedShockRing { 0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.55); border-width: 3px; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.58); border-width: 1px; } }
-      @keyframes wedPushFloat { 0%, 100% { transform: translate(-50%, -50%) scale(1.00); } 50% { transform: translate(-50%, -50%) scale(1.09); } }
-
-      .wed-cam-zoomIn  { animation: wedCamZoomIn  4.2s ease-out forwards; }
-      .wed-cam-zoomOut { animation: wedCamZoomOut 4.2s ease-out forwards; }
-      .wed-cam-panUp   { animation: wedCamPanUp   4.2s ease-out forwards; }
-      .wed-gensitu-in  { animation: wedGensituIn  2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-      .wed-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; opacity: 0; transition: opacity 0.65s cubic-bezier(0.37, 0, 0.63, 1); }
-      .wed-layer.wed-active { opacity: 1; }
-      .wed-rainbow-shell { position: relative; z-index: 10; padding: 4px; border-radius: 18px; background: linear-gradient(125deg, #fffbeb, #fef08a, #f472b6, #c084fc, #7dd3fc, #6ee7b7, #facc15, #fffbeb); background-size: 300% 300%; animation: wedRainbowBorderFlow 2.2s linear infinite; box-shadow: 0 0 28px rgba(254,240,138,0.85), 0 0 60px rgba(244,114,182,0.55), 0 0 90px rgba(125,211,252,0.45); display: flex; align-items: center; justify-content: center; }
-      .wed-rainbow-inner { position: relative; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; background: #140804; }
-      .wed-rainbow-inner::after { content: ''; position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: 15; box-shadow: inset 0 0 22px 4px rgba(254, 249, 195, 0.52); }
-      .wed-shell-portrait { width: calc(100vw - 12px); height: calc(100dvh - 12px); max-width: 100vw; max-height: 100dvh; }
-      @media (min-width: 640px) { .wed-shell-portrait { width: auto; height: 94vh; aspect-ratio: 9 / 16; max-width: 92vw; } }
-      .wed-shell-landscape { max-width: calc(100vw - 14px); max-height: 86dvh; }
-      @media (min-width: 640px) { .wed-shell-landscape { max-width: 88vw; max-height: 90vh; } }
-      .wed-btn-tap-zone { position: absolute; bottom: 0; left: 0; right: 0; height: 55%; border: none; background: transparent; padding: 0; z-index: 25; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
-      .wed-btn-visual-anchor { position: absolute; top: 44%; left: 50%; transform: translate(-50%, -50%); width: 72%; aspect-ratio: 1.25 / 1; pointer-events: none; transition: transform 0.08s ease; }
-      .wed-btn-tap-zone:active .wed-btn-visual-anchor { transform: translate(-50%, -50%) scale(0.94); }
-      .wed-btn-crystal-glow { position: absolute; top: 50%; left: 50%; width: 72%; aspect-ratio: 1.45 / 1; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,255,255,0.95) 0%, rgba(254,249,195,0.62) 45%, rgba(250,204,21,0.18) 72%, transparent 100%); mix-blend-mode: screen; pointer-events: none; animation: wedCrystalPulse 1.1s ease-in-out infinite; }
-      .wed-btn-wave { position: absolute; top: 50%; left: 50%; width: 78%; aspect-ratio: 1.35 / 1; border-radius: 50%; border: 3px solid rgba(254, 249, 195, 0.95); box-shadow: 0 0 18px rgba(253, 224, 71, 0.85), inset 0 0 12px rgba(255, 255, 255, 0.6); pointer-events: none; animation: wedShockRing 1.35s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
-      .wed-btn-wave-2 { animation-delay: 0.67s; }
-      .wed-btn-push-text { position: absolute; top: 50%; left: 50%; font-family: 'Inter', 'Noto Sans JP', sans-serif; font-size: clamp(22px, 6.8vw, 34px); font-weight: 900; letter-spacing: 0.14em; color: #fffbeb; text-shadow: 0 2px 0 #78350f, 0 -1px 0 #78350f, 2px 0 0 #78350f, -2px 0 0 #78350f, 0 0 16px rgba(245, 158, 11, 1), 0 4px 12px rgba(0, 0, 0, 0.78); pointer-events: none; animation: wedPushFloat 1.1s ease-in-out infinite; }
-      .wed-feather { position: absolute; top: -6vh; pointer-events: none; z-index: 22; border-radius: 50%; background: radial-gradient(ellipse at center, #ffffff 30%, #fef9c3 85%, transparent 100%); box-shadow: 0 0 12px rgba(254, 240, 138, 0.9); animation: wedFeatherFall var(--dur) linear var(--delay) infinite; }
-      .wed-flash-veil { position: absolute; inset: 0; z-index: 35; pointer-events: none; background: radial-gradient(circle at center, #ffffff 0%, #fef9c3 60%, rgba(254,240,138,0.85) 100%); animation: wedHolyFlashSlow 0.85s ease-out forwards; }
-    `;
-    document.head.appendChild(st);
-  }
-
-  function buildFeathersHtml(count = 28) {
-    let html = '';
-    for (let i = 0; i < count; i++) {
-      const left = (Math.random() * 100).toFixed(1), w = (10 + Math.random() * 14).toFixed(0), h = (w * 0.34).toFixed(0);
-      const dur = (3.8 + Math.random() * 3.4).toFixed(2), delay = (-Math.random() * 5.0).toFixed(2);
-      const dx = ((Math.random() - 0.5) * 150).toFixed(0) + 'px', rot = (160 + Math.random() * 280).toFixed(0) + 'deg';
-      html += `<div class="wed-feather" style="left:${left}%;width:${w}px;height:${h}px;--dur:${dur}s;--delay:${delay}s;--dx:${dx};--rot:${rot};"></div>`;
-    }
-    return html;
-  }
-  function buildPremiaLayerHtml() {
-    const premiaUrl = Assets.getPremiaFrame();
-    return premiaUrl ? `<img src="${premiaUrl}" class="pointer-events-none absolute inset-0 w-full h-full object-fill z-[16]" style="mix-blend-mode:screen;" alt="">` : '';
-  }
-  function buildSlideInnerHtml(src, { portrait = true, pan = 'zoomIn' } = {}) {
-    const shellCls = portrait ? 'wed-rainbow-shell wed-shell-portrait' : 'wed-rainbow-shell wed-shell-landscape';
-    const imgCls = portrait ? 'w-full h-full object-cover' : 'block max-w-full max-h-[84dvh] w-auto h-auto object-contain';
-    return `
-      <img src="${src}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
-      <div class="absolute inset-0 bg-gradient-to-b from-amber-200/15 via-transparent to-amber-200/20 pointer-events-none"></div>
-      <div class="${shellCls}"><div class="wed-rainbow-inner"><img src="${src}" class="${imgCls} ${pan ? `wed-cam-${pan}` : ''}" alt="">${buildPremiaLayerHtml()}</div></div>
-    `;
-  }
-
-  // ★ウェディング前の「溜め」：BGM断→下の表示が"祝福"に変わる→ゆっくり暗転→暗闇から大きく「おめでとう」(エヴァ風)★
-  window.playWeddingLeadIn = async function (token) {
-    const el = weddingCinemaOverlay;
-    if (!el) return;
-    const bn = busyNotice, bnHtml = bn ? bn.innerHTML : '';
-    const setBn = (html, cls) => { if (!bn) return; bn.classList.remove('wed-bn-quiet', 'wed-bn-omedeto'); bn.innerHTML = html; if (cls) bn.classList.add(cls); };
-    let done = false, fade = null;
-    try {
-      BgmEngine.cut();
-      setBn('💍 ・・・ 💍', 'wed-bn-quiet');
-      await wait(650, token);
-      try { WeddingAudio.playBell(0.9); setCabinetGlow('gold'); } catch (e) {}
-      setBn('💍 おめでとう 💍', 'wed-bn-omedeto');
-      await wait(1250, token);
-
-      // ゆっくり暗転
-      try { StudioAudio.playSoftHeartbeat(); } catch (e) {}
-      el.className = 'fixed inset-0 z-[1002] bg-black flex items-center justify-center overflow-hidden';
-      el.innerHTML = '';
-      el.classList.remove('hidden');
-      fade = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1100, easing: 'ease-in', fill: 'forwards' });
-      await wait(1150, token);
-      try { fade.cancel(); } catch (e) {}
-      fade = null;
-      await wait(700, token);                       // 完全な静寂
-
-      // 暗闇から「おめでとう」：ハードカット＋明滅（エヴァ風の黒背景・明朝・縦長）
-      el.innerHTML = `<div class="wed-eva"><div class="wed-eva-sub" id="wedEvaSub1">C O N G R A T U L A T I O N S</div>
-        <div class="wed-eva-main" id="wedEvaMain" style="margin:4.2vh 0 4.8vh">おめでとう</div>
-        <div class="wed-eva-rule" id="wedEvaRule"></div>
-        <div class="wed-eva-sub" id="wedEvaSub2" style="margin-top:2.6vh">祝　福　の　刻</div></div>`;
-      const main = document.getElementById('wedEvaMain'), s1 = document.getElementById('wedEvaSub1'), s2 = document.getElementById('wedEvaSub2'), rule = document.getElementById('wedEvaRule');
-      try { StudioAudio.playSoftHeartbeat(); setTimeout(() => { try { StudioAudio.playSoftHeartbeat(); } catch (e) {} }, 180); setTimeout(() => { try { WeddingAudio.playBell(0.75); } catch (e) {} }, 520); } catch (e) {}
-      main.animate([{ opacity: 0, offset: 0 }, { opacity: 0, offset: .08 }, { opacity: 1, offset: .0801 }, { opacity: 1, offset: .15 }, { opacity: 0, offset: .1501 }, { opacity: 0, offset: .22 }, { opacity: 1, offset: .2201 }, { opacity: 1, offset: .30 }, { opacity: 0, offset: .3001 }, { opacity: 0, offset: .34 }, { opacity: 1, offset: .3401 }, { opacity: 1, offset: 1 }], { duration: 560, easing: 'linear', fill: 'forwards' });
-      main.animate([{ transform: 'scale(.92,1.65)' }, { transform: 'scale(.98,1.76)' }], { duration: 3200, easing: 'linear', fill: 'forwards' });
-      [s1, s2].forEach(n => n.animate([{ opacity: 0 }, { opacity: .9 }], { duration: 900, delay: 520, easing: 'ease-out', fill: 'forwards' }));
-      rule.animate([{ opacity: .85, transform: 'scaleX(0)' }, { opacity: .85, transform: 'scaleX(1)' }], { duration: 700, delay: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
-      await wait(3200, token);
-
-      // 一瞬で黒へ（ここから本編の暗転演出に入る）
-      el.innerHTML = '';
-      await wait(380, token);
-      done = true;
-    } finally {
-      try { if (fade) fade.cancel(); } catch (e) {}
-      if (bn) { bn.classList.remove('wed-bn-quiet', 'wed-bn-omedeto'); bn.innerHTML = bnHtml; }
-      try { setCabinetGlow('idle'); } catch (e) {}
-      if (!done) { el.classList.add('hidden'); el.innerHTML = ''; }
-    }
-  };
-
-  window.playWedding12000Cinema = async function (token) {
-    const el = weddingCinemaOverlay;
-    if (!el) return;
-    el.className = 'fixed inset-0 z-[1002] bg-black flex items-center justify-center overflow-hidden';
-    el.innerHTML = `
-      <div id="wedAmbientRays" class="mystic-prism-rays"></div>
-      <div id="wedSlot0" class="wed-layer" style="z-index: 10;"></div>
-      <div id="wedSlot1" class="wed-layer" style="z-index: 10;"></div>
-      <div id="wedFeatherHost" class="pointer-events-none absolute inset-0 overflow-hidden z-[22] opacity-0 transition-opacity duration-1000"></div>
-      <div id="wedTopUiHost" class="pointer-events-none absolute inset-0 z-[28] flex items-center justify-center"></div>
-      <div id="wedFlashHost" class="pointer-events-none absolute inset-0 z-[35]"></div>
-    `;
-    el.classList.remove('hidden');
-
-    const slots = [document.getElementById('wedSlot0'), document.getElementById('wedSlot1')];
-    const ambientRays = document.getElementById('wedAmbientRays'), featherHost = document.getElementById('wedFeatherHost');
-    const topUiHost = document.getElementById('wedTopUiHost'), flashHost = document.getElementById('wedFlashHost');
-    let curSlot = 0;
-
-    function fireSoftFlash(strong = false) {
-      const f = document.createElement('div'); f.className = 'wed-flash-veil';
-      if (!strong) f.style.opacity = '0.55';
-      flashHost.appendChild(f); setTimeout(() => f.remove(), 900);
-    }
-    function crossfadeTo(innerHtml, { flash = true, strongFlash = false } = {}) {
-      const nextSlot = 1 - curSlot;
-      slots[nextSlot].innerHTML = innerHtml; slots[nextSlot].style.zIndex = '12'; slots[curSlot].style.zIndex = '10';
-      void slots[nextSlot].offsetWidth;
-      slots[nextSlot].classList.add('wed-active'); slots[curSlot].classList.remove('wed-active');
-      if (flash) fireSoftFlash(strongFlash); curSlot = nextSlot;
-    }
-
-    try {
-      BgmEngine.cut(); StudioAudio.playPuchun(); setLed('off'); setAmbientBg(''); setSunburst(false);
-      await waitFreeze(700, token);
-      SoftSparkle.start(); WeddingAudio.startHolyPad(); await waitFreeze(950, token);
-
-      const bg1 = Assets.getWedding('bg1'), gensitu = Assets.getWedding('gensitu');
-      WeddingAudio.playBell(1.0); ambientRays.classList.add('rays-on');
-      crossfadeTo(bg1 ? buildSlideInnerHtml(bg1, { portrait: true, pan: 'zoomIn' }) : `<div class="w-full h-full overlay-wedding"></div>`, { flash: true, strongFlash: true });
-      await waitFreeze(1350, token);
-
-      fireSoftFlash(false);
-      topUiHost.innerHTML = gensitu
-        ? `<div class="logo-alive-wrap wed-gensitu-in px-3"><div class="logo-alive-halo"></div><img src="${gensitu}" class="logo-alive-img max-w-[90vw] sm:max-w-[540px] max-h-[38vh]" alt="言質、取りました"></div>`
-        : `<div class="font-mincho text-3xl sm:text-5xl font-black gold-grad-text wed-gensitu-in text-center px-4">言質、取りました<br>もう引っ込められませんよ？</div>`;
-      await waitFreeze(3800, token);
-
-      topUiHost.innerHTML = ''; featherHost.innerHTML = buildFeathersHtml(24); featherHost.style.opacity = '0.85';
-      const fallback9 = Assets.getWedding9();
-      for (let i = 0; i < SCENE_FILES.length; i++) {
-        const cfg = SCENE_FILES[i], src = loadedScenes[i] || encodeURI(cfg.name) || fallback9[i] || null;
-        if (!src) continue;
-        if (cfg.bell) WeddingAudio.playBell(1.25);
-        if (typeof cfg.harp === 'number') WeddingAudio.playHarpStep(cfg.harp);
-        crossfadeTo(buildSlideInnerHtml(src, { portrait: cfg.portrait, pan: cfg.pan }), { flash: true, strongFlash: i === 0 || i >= SCENE_FILES.length - 2 });
-        await waitFreeze(cfg.dur, token);
-      }
-
-      const stairs = Assets.getWedding('stairs');
-      if (stairs) { WeddingAudio.playBell(1.12); crossfadeTo(buildSlideInnerHtml(stairs, { portrait: false, pan: 'panUp' }), { flash: true, strongFlash: true }); await waitFreeze(2100, token); }
-      const arch = Assets.getWedding('arch');
-      if (arch) { WeddingAudio.playHarpStep(6); crossfadeTo(buildSlideInnerHtml(arch, { portrait: false, pan: 'zoomIn' }), { flash: true, strongFlash: true }); await waitFreeze(2300, token); }
-
-      WeddingAudio.stopPad(1.2); StudioAudio.playSoftHeartbeat();
-      const wedBtn = directWedBtn || Assets.getWedding('btn') || 'wed_botan.jpg';
-      crossfadeTo(`
-        <img src="${wedBtn}" class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-55 scale-115 pointer-events-none" alt="">
-        <div class="absolute inset-0 bg-gradient-to-b from-amber-300/15 via-transparent to-amber-300/20 pointer-events-none"></div>
-        <div class="wed-rainbow-shell wed-shell-portrait"><div class="wed-rainbow-inner">
-          <img src="${wedBtn}" class="w-full h-full object-cover" alt="ウェディングボタン">${buildPremiaLayerHtml()}
-          <button id="weddingTapHotspot" class="wed-btn-tap-zone" aria-label="ウェディングボタンを押す">
-            <div class="wed-btn-visual-anchor"><span class="wed-btn-wave"></span><span class="wed-btn-wave wed-btn-wave-2"></span><span class="wed-btn-crystal-glow"></span><span class="wed-btn-push-text">PUSH</span></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+        <button id="btnDevToNormal" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-700 to-slate-800 border border-slate-300/70 text-white active:scale-95 transition">🏠 即通常へ</button>
+        <button id="btnDevInstantRush" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-300/80 text-white active:scale-95 transition">🚀 即RUSH突入</button>
+        <button id="btnDevInfRush" class="py-2 px-2 rounded-xl font-black bg-slate-900 border border-emerald-500/60 text-emerald-300 active:scale-95 transition">♾️ 無限ST: OFF</button>
+        <button id="btnDevHit1500R" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-rose-700 border border-amber-300/80 text-white active:scale-95 transition">🎯 即初当たり 1,500<br><span class="text-[9px] font-bold opacity-80">RUSH突入</span></button>
+        <button id="btnDevHit1500N" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-800 to-stone-700 border border-amber-300/60 text-white active:scale-95 transition">🎯 即初当たり 1,500<br><span class="text-[9px] font-bold opacity-80">通常（RUSHなし）</span></button>
+        <button id="btnDevHit3000" class="py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-700 to-indigo-800 border border-sky-200/80 text-white active:scale-95 transition">🐋 即初当たり 3,000<br><span class="text-[9px] font-bold opacity-80">白鯨直行</span></button>
+        <button data-test="yakumonoDrop" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-500 via-rose-600 to-purple-700 border border-yellow-200 text-white active:scale-95 transition">✨ ロゴ役物落下 (赤/金/虹)</button>
+        <button data-test="restartRip" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-rose-800 to-amber-700 border border-yellow-200/80 text-white active:scale-95 transition">⚔️ Re:Start引き裂き</button>
+        <button data-test="vstockCycle" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-700 to-rose-700 border border-amber-200/80 text-white active:scale-95 transition">⚡ V-STOCK (青300/赤1500)</button>
+        <button data-test="freeze3s" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-900 to-rose-900 border border-amber-300/70 text-amber-100 active:scale-95 transition">💀 液晶暗転→鬼がかってますね</button>
+        <button data-test="countup6000" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-600 via-rose-600 to-fuchsia-700 border border-yellow-200/80 text-white active:scale-95 transition">📈 出玉カウントアップ6,000</button>
+        <button data-test="brain4" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-purple-800 via-fuchsia-800 to-rose-900 border border-fuchsia-300/80 text-fuchsia-100 active:scale-95 transition">🧠 脳が震える4層＆震えるロゴ</button>
+        <button data-test="remLamp" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-sky-800 via-blue-800 to-fuchsia-900 border border-sky-300/80 text-sky-100 active:scale-95 transition">💙 レム入賞先バレ→当該覚醒</button>
+        <button data-test="oniApproach" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-700 to-red-800 border border-amber-300/80 text-amber-100 active:scale-95 transition">🔥 7テンパイ→鬼レム6,000</button>
+        <button data-test="zeroAlign" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-yellow-600 to-amber-800 border border-yellow-200/80 text-white active:scale-95 transition">0️⃣ 0揃い違和感→6,000</button>
+        <button data-test="glassFail" class="promo-test-item py-2 px-2 rounded-xl font-black bg-slate-800 border border-slate-500 text-slate-200 active:scale-95 transition">💥 ハズレ画面割れテスト</button>
+        <button data-test="revivalResult" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-slate-800 to-purple-900 border border-fuchsia-400/70 text-fuchsia-100 active:scale-95 transition">⏪ リザルト死に戻り強制復活</button>
+        <button data-test="randomCrash" class="promo-test-item py-2 px-2 rounded-xl font-black bg-gradient-to-r from-amber-900 to-rose-950 border border-amber-400/70 text-amber-200 active:scale-95 transition">⚔️ 一刀両断 / 粉砕 / ボタン昇格</button>
+      </div>
+      <button id="btnDevExitTest" class="w-full py-2.5 rounded-xl text-[11px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-200/80 text-white shadow active:scale-95 transition">🧪 テストを終了して元の状態に戻す</button>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       ⚙️ 設定モーダル
+       ======================================================================= -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-[900] bg-black/86 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto">
+    <div class="w-full max-w-md my-auto rounded-3xl bg-gradient-to-b from-[#2a1008] via-[#18080a] to-[#0c0406] border-2 border-amber-500/80 p-4 shadow-2xl space-y-3">
+      <div class="flex items-center justify-between border-b border-amber-800/60 pb-2">
+        <h3 class="text-sm font-black text-amber-300">⚙️ ゲームカスタム＆台設定</h3>
+        <button id="btnCloseSettings" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-black/60 text-amber-200 border border-amber-700/70 active:scale-95">閉じる</button>
+      </div>
+
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-black text-amber-200">通常時カスタム</div>
+        <div id="normalCustomPanel" class="grid grid-cols-3 gap-1.5">
+          <button id="toggleSakibare" class="py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-rose-700/85 border-rose-400 text-white shadow active:scale-95">🔥 先バレ40%: ON</button>
+          <button id="toggleOchiburu" class="py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-amber-600/70 border-amber-300 text-amber-50 active:scale-95">💥 落ちブルUP: ON</button>
+          <button id="togglePremier" class="py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">🌈 プレミアUP: OFF</button>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-black text-fuchsia-300">RUSH中カスタム</div>
+        <div id="rushExtraCustomRow" class="grid grid-cols-3 gap-1.5">
+          <button id="toggleRushTrust" class="py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">🎯 信頼度先バレ: OFF</button>
+          <button id="toggleRushIwakan" class="py-2.5 px-1 rounded-xl text-[10px] font-black border transition bg-purple-700/80 border-fuchsia-300 text-white shadow active:scale-95">👁️ 違和感UP: ON</button>
+          <button id="toggleRushNoNotice" class="py-2.5 px-1 rounded-xl text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95">🤫 予告無し: OFF</button>
+        </div>
+      </div>
+
+      <div class="rounded-xl bg-black/50 border border-amber-800/50 p-2.5 space-y-2">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label for="rotRateSlider" class="text-[10px] font-bold text-amber-200">通常回転率 (回/1k)</label>
+            <span id="rotRateDisplay" class="text-[11px] font-black text-white bg-black/70 px-2 py-0.5 rounded border border-amber-700/70 num-fixed">16.5 回/1k</span>
+          </div>
+          <input id="rotRateSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+        </div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button data-rate="4.0" class="rate-btn py-1.5 rounded-lg text-[10px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
+          <button data-rate="3.6363636" class="rate-btn py-1.5 rounded-lg text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
+          <button data-rate="3.5714286" class="rate-btn py-1.5 rounded-lg text-[10px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
+        </div>
+      </div>
+
+      <details class="rounded-xl bg-black/45 border border-amber-900/60 p-2.5 group">
+        <summary class="cursor-pointer text-[11px] font-black text-amber-200/80 flex items-center justify-between list-none">
+          <span>🎛️ システム・音響チューナーを開く</span>
+          <span class="text-[10px] text-amber-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div class="mt-2.5 pt-2.5 border-t border-amber-900/50 space-y-2.5">
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btnToggleBgm" class="py-1.5 rounded-lg text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 active:scale-95">🎵 BGM ON</button>
+            <button id="btnMute" class="py-1.5 rounded-lg text-[10px] font-black bg-slate-800 text-emerald-300 border border-slate-600 active:scale-95">🔊 全音 ON</button>
+            <button id="btnResetTuner" class="py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-200 border border-slate-600 active:scale-95">初期値戻し</button>
+          </div>
+          <div class="grid grid-cols-4 gap-1">
+            <button id="btnTestPokyun" class="py-1 rounded text-[10px] font-black bg-rose-700/80 text-white border border-rose-400/60 active:scale-95">ポキュン</button>
+            <button id="btnTest1500" class="py-1 rounded text-[10px] font-black bg-amber-800/80 text-yellow-200 border border-amber-400/60 active:scale-95">1500音</button>
+            <button id="btnTestOchiburu" class="py-1 rounded text-[10px] font-black bg-rose-900/80 text-amber-200 border border-amber-400/60 active:scale-95">落ちブル</button>
+            <button id="btnTestPuchun" class="py-1 rounded text-[10px] font-black bg-slate-900 text-slate-200 border border-slate-600 active:scale-95">プチュン</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[10px]">
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-amber-100">リバーブ深さ</span><span id="valReverbWet" class="font-black text-amber-300">44%</span></div>
+              <input id="sliderReverbWet" type="range" min="0" max="100" step="1" value="44" class="w-full accent-rose-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-amber-100">高音ピッチ</span><span id="valPeakBright" class="font-black text-amber-300">0.73x</span></div>
+              <input id="sliderPeakBright" type="range" min="0.60" max="1.30" step="0.01" value="0.73" class="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-amber-100">「ーン↓」落ち幅</span><span id="valDownBend" class="font-black text-amber-300">115%</span></div>
+              <input id="sliderDownBend" type="range" min="0" max="150" step="5" value="115" class="w-full accent-fuchsia-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-amber-200">「ポ」の強さ</span><span id="valPoEmphasis" class="font-black text-amber-300">160%</span></div>
+              <input id="sliderPoEmphasis" type="range" min="50" max="200" step="5" value="160" class="w-full accent-orange-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-rose-300">ジャリジャリ感</span><span id="valGrit" class="font-black text-amber-300">115%</span></div>
+              <input id="sliderGrit" type="range" min="0" max="160" step="5" value="115" class="w-full accent-red-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><span class="text-amber-100">SE 音量</span><span id="valVolume" class="font-black text-amber-300">80%</span></div>
+              <input id="sliderVolume" type="range" min="0" max="100" step="5" value="80" class="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+            <div class="col-span-2">
+              <div class="flex justify-between mb-0.5"><span class="text-emerald-300 font-bold">🎵 BGM 音量</span><span id="valBgmVolume" class="font-black text-emerald-300">65%</span></div>
+              <input id="sliderBgmVolume" type="range" min="0" max="100" step="5" value="65" class="w-full accent-emerald-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+          </div>
+          <div class="text-[9px] text-amber-100/75 pt-1 border-t border-amber-900/40">
+            ⌨️ PC：<strong>Space単押し</strong> 1回転 ／ <strong>長押し</strong> 連続回転 ／ <strong>Oキー</strong> 裏OK
+          </div>
+        </div>
+      </details>
+
+      <details class="rounded-xl bg-black/45 border border-emerald-900/60 p-2.5 group">
+        <summary class="cursor-pointer text-[11px] font-black text-emerald-300/90 flex items-center justify-between list-none">
+          <span>🧪 テストモード（動作確認用）</span>
+          <span class="text-[10px] text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div class="mt-2.5 pt-2.5 border-t border-emerald-900/50 space-y-2">
+          <p class="text-[10px] leading-relaxed text-emerald-100/80">演出確認用の別枠です。テスト中の出玉・履歴・差玉グラフ・ランキングには<strong>一切記録されず</strong>、終了すると開始前の状態にそのまま戻ります（開始できるのは通常時の待機中のみ）。</p>
+          <div id="testModeState" class="text-[10px] font-black text-emerald-200">⚪ 通常：実戦データを記録しています</div>
+          <button id="btnToggleTestMode" class="w-full py-2.5 rounded-xl text-[11px] font-black bg-slate-900 border border-emerald-500/70 text-emerald-300 active:scale-95 transition">🧪 テストモードに入る</button>
+          <button id="btnOpenTestTools" class="hidden w-full py-2 rounded-xl text-[11px] font-black bg-emerald-950 border border-emerald-400/70 text-emerald-200 active:scale-95 transition">🛠️ テストツールを開く</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       📊 台データ（データ／履歴／100回シミュ）：開いている間だけ描画する軽量設計
+       ======================================================================= -->
+  <div id="dataModal" class="hidden fixed inset-0 z-[880] bg-black/90 backdrop-blur-sm flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="w-full max-w-lg sm:max-w-3xl my-2 rounded-3xl bg-gradient-to-b from-[#2a1008] via-[#18080a] to-[#0c0406] border-2 border-amber-500/80 p-3 shadow-2xl space-y-2.5">
+      <div class="flex items-center justify-between border-b border-amber-800/60 pb-2">
+        <h3 class="text-sm font-black text-amber-300">📊 台データ</h3>
+        <button id="btnCloseData" class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-black/60 text-amber-200 border border-amber-700/70 active:scale-95">閉じる</button>
+      </div>
+      <div class="flex gap-1.5">
+        <button data-dtab="stats" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-gradient-to-r from-rose-700 via-amber-600 to-yellow-600 text-white border-yellow-200/60 shadow">📈 データ</button>
+        <button data-dtab="history" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">📜 履歴</button>
+        <button data-dtab="records" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🏆 記録</button>
+        <button data-dtab="sim" class="data-tab flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-black border transition whitespace-nowrap bg-[#1e0d08]/90 text-amber-200/70 border-amber-900/60">🚀 100回</button>
+      </div>
+
+      <div id="dataPane-stats" class="data-pane space-y-2">
+        <p class="text-[10px] text-amber-200/70">直近セッション（「リセット」からの実戦データ）</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総回転</div><div id="dtSpins" class="text-sm font-black text-white mt-0.5 num-fixed">0</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">初当たり（実測確率）</div><div id="dtHits" class="text-sm font-black text-amber-200 mt-0.5 num-fixed">0回 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">RUSH突入（突入率）</div><div id="dtRush" class="text-sm font-black text-rose-300 mt-0.5 num-fixed">0回 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">先バレ勝率</div><div id="dtSakibare" class="text-sm font-black text-amber-300 mt-0.5 num-fixed">0/0 (-)</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大連チャン</div><div id="dtMaxChain" class="text-sm font-black text-fuchsia-300 mt-0.5 num-fixed">0連</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大一撃（払出）</div><div id="dtMaxShot" class="text-sm font-black text-amber-300 mt-0.5 num-fixed">0個</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総投資</div><div id="dtInvest" class="text-sm font-black text-rose-400 mt-0.5 num-fixed">0円</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">差玉</div><div id="dtDiff" class="text-sm font-black text-white mt-0.5 num-fixed">+0発</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">収支（換金）</div><div id="dtBalance" class="text-sm font-black text-white mt-0.5 num-fixed">+0円</div></div>
+        </div>
+        <p class="text-[10px] text-slate-500 leading-relaxed">※差玉グラフは遊技画面の一番下にあります。「リセット」で実戦データは初期化されます。</p>
+      </div>
+
+      <div id="dataPane-history" class="data-pane hidden">
+        <div class="flex items-center justify-between mb-1.5"><h2 class="text-xs font-black text-amber-300">📜 実戦履歴ログ</h2><span class="text-[10px] text-amber-200/70">最新が上・直近50件</span></div>
+        <div class="overflow-x-auto max-h-[62vh] overflow-y-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="text-amber-300/80 border-b border-amber-900/70 sticky top-0 bg-[#1a0a07]">
+              <tr><th class="py-1.5 px-1.5">回転</th><th class="py-1.5 px-1.5">種別</th><th class="py-1.5 px-1.5">演出 / 内訳</th><th class="py-1.5 px-1.5 text-right">結果 / 出玉</th></tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-amber-950/80">
+              <tr><td colspan="4" class="py-4 text-center text-amber-200/50">まだ履歴はありません。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="dataPane-records" class="data-pane hidden space-y-2.5"><div id="recordsRoot" class="space-y-2.5"></div></div>
+
+      <div id="dataPane-sim" class="data-pane hidden space-y-3">
+      <section class="rounded-2xl bg-[#1a0a07]/95 border border-amber-700/60 p-3.5 shadow-xl space-y-3.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h2 class="text-sm sm:text-base font-black text-amber-300">🚀 初当たり100回 高速シミュレーター</h2>
+            <p class="text-[11px] text-amber-100/70 mt-0.5">1/3,499白鯨直行・残保留4個厳密独立抽選（3.94%）・ウェディング12,000（6000獲得ごと約1/101）を<strong>実機基準</strong>で再現。※遊技画面のウェディングは演出用に判定窓10（内部確率・出玉は同一）のため、この数値より少し出やすくなります。</p>
+          </div>
+          <button id="btnRunSim100" class="px-5 py-3 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 hover:from-rose-500 text-slate-950 shadow-lg active:scale-95 transition whitespace-nowrap">🚀 100回シミュレーション実行</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center bg-black/45 p-2.5 rounded-xl border border-amber-950">
+          <div>
+            <div class="flex justify-between items-center mb-1"><span class="text-[11px] font-bold text-amber-200">回転率 (12〜24回/1k)</span><span id="simRotDisplay" class="text-xs font-black text-white num-fixed">16.5 回/1k</span></div>
+            <input id="simRotSlider" type="range" min="12.0" max="24.0" step="0.1" value="16.5" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button data-rate="4.0" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-black border transition bg-rose-700/75 border-amber-400 text-white">等価(4.0)</button>
+            <button data-rate="3.6363636" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">27.5玉</button>
+            <button data-rate="3.5714286" class="sim-rate-btn py-1.5 rounded-lg text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400">28玉</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">総回転 / 平均確率</div><div id="simTotalSpins" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大ハマり</div><div id="simMaxHamari" class="text-xs sm:text-sm font-black text-rose-400 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">白鯨3000直行 (1/3499)</div><div id="simWhaleCount" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">RUSH突入 (理論55%)</div><div id="simRushRate" class="text-xs sm:text-sm font-black text-amber-200 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">鬼6000回数 (理論25%)</div><div id="sim6000Count" class="text-xs sm:text-sm font-black text-amber-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">保留連告知</div><div id="simHoryurenCount" class="text-xs sm:text-sm font-black text-fuchsia-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">💒 WEDDING 12,000</div><div id="simWeddingCount" class="text-xs sm:text-sm font-black text-pink-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最大一撃 (払出/純増)</div><div id="simMaxPayout" class="text-xs sm:text-sm font-black text-amber-400 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">標準偏差 (理論±9,548)</div><div id="simStdDev" class="text-xs sm:text-sm font-black text-cyan-300 mt-0.5 num-fixed">-</div></div>
+          <div class="rounded-xl bg-black/60 border border-amber-900/60 p-2.5"><div class="text-[10px] text-slate-400">最終差玉 / 金額収支</div><div id="simFinalBalance" class="text-xs sm:text-sm font-black text-white mt-0.5 num-fixed">-</div></div>
+        </div>
+        <div class="rounded-2xl bg-black/75 border border-amber-900/70 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5"><span class="text-[11px] font-bold text-amber-200">📈 累計差玉スランプグラフ</span><span id="simPeakBottom" class="text-[10px] text-slate-400 num-fixed"></span></div>
+          <div class="relative w-full h-56 sm:h-72"><canvas id="slumpChartCanvas" class="w-full h-full block"></canvas></div>
+        </div>
+        <div id="simDiagnosis" class="rounded-xl bg-gradient-to-r from-rose-950/60 via-black/75 to-amber-950/50 border border-amber-500/40 p-3 text-xs text-amber-100 leading-relaxed">ボタンを押すと初当たり100回分のスランプグラフと分析が表示されます。</div>
+      </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- リザルトモーダル -->
+  <div id="resultModal" class="hidden fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto">
+    <div class="w-full max-w-sm my-auto rounded-3xl bg-gradient-to-b from-[#331407] via-[#1c080d] to-[#0a0406] border-2 border-amber-400/90 p-5 shadow-2xl text-center">
+      <div id="resModalLogoHolder" class="w-full flex items-center justify-center mb-2"></div>
+      <div class="text-[10px] font-black tracking-[0.28em] text-amber-300 mb-1">ONIGAKARI RUSH RESULT</div>
+      <div class="text-2xl font-black gold-grad-text mb-4">鬼がかりRUSH 終了</div>
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <div class="rounded-xl bg-black/70 border border-amber-800/70 p-2.5"><div class="text-[10px] text-amber-200">連チャン数</div><div id="resChains" class="text-xl font-black text-white num-fixed">0 連</div></div>
+        <div class="rounded-xl bg-black/70 border border-amber-500/75 p-2.5"><div class="text-[10px] text-amber-300">鬼がかり6000</div><div id="res6000" class="text-xl font-black text-amber-300 num-fixed">0 回</div></div>
+        <div class="rounded-xl bg-black/70 border border-fuchsia-500/60 p-2.5"><div class="text-[10px] text-fuchsia-300">Re:Start / 残保連</div><div id="resSpecial" class="text-sm font-black text-fuchsia-300 mt-1 num-fixed">0回 / 0回</div></div>
+        <div class="rounded-xl bg-black/70 border border-cyan-500/60 p-2.5"><div class="text-[10px] text-cyan-300">獲得純増</div><div id="resNet" class="text-lg font-black text-cyan-300 num-fixed">0 発</div></div>
+      </div>
+      <div id="resRank" class="hidden mb-3 rounded-xl border border-yellow-200/70 bg-gradient-to-r from-amber-900/70 via-yellow-800/60 to-amber-900/70 py-2 text-sm font-black text-yellow-100 shadow"></div>
+      <div id="resSummaryText" class="text-xs font-bold text-amber-200 mb-4 leading-relaxed whitespace-pre-line"></div>
+      <button id="btnCloseResult" class="w-full py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 hover:from-rose-500 text-slate-950 shadow-lg border border-yellow-200/70 active:scale-95 transition">通常時へ戻る</button>
+    </div>
+  </div>
+
+  <div id="nameModal" class="hidden fixed inset-0 z-[920] bg-black/92 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-xs rounded-3xl border-2 border-yellow-300/90 bg-gradient-to-b from-[#3a1a06] via-[#1c0a08] to-[#0a0406] p-5 shadow-2xl text-center space-y-3">
+      <div id="nameModalRank" class="text-lg font-black gold-grad-text">ようこそ!!</div>
+      <div id="nameModalDisp" class="text-2xl font-black text-white num-fixed">0 個</div>
+      <div id="nameModalLabel" class="text-[11px] font-bold text-amber-200">10文字まで</div>
+      <input id="nameInput" type="text" maxlength="10" autocomplete="off" class="w-full rounded-xl bg-black/70 border border-amber-500/70 px-3 py-2.5 text-center text-base font-black text-amber-100 outline-none" placeholder="名無し">
+      <div class="flex gap-2">
+        <button id="nameSkip" class="flex-1 py-2.5 rounded-xl text-[11px] font-black bg-black/60 text-amber-200/80 border border-amber-800/70 active:scale-95">名無しのまま</button>
+        <button id="nameOk" class="flex-1 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-rose-600 via-amber-600 to-yellow-500 text-slate-950 border border-yellow-200/70 shadow active:scale-95">登録</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="relative z-10 max-w-lg sm:max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 space-y-2">
+
+    <!-- =====================================================================
+         実戦プレイモード（最上部：筐体＋巨大液晶 → RUSH3択 → 操作ボタン → 固定ステータス）
+         ===================================================================== -->
+    <div id="playModeContainer" class="space-y-2">
+
+      <!-- ① 筐体（役物レール → 縁フレーム付き液晶 → 下ベゼル） -->
+      <div id="cabinetShell">
+        <div id="yakumonoRail">
+          <div id="logoPocketShadow"></div>
+          <div id="yakumonoLogoWrap"><img id="yakumonoLogoImg" alt="Re:ゼロから始める異世界生活"></div>
+          <div id="railHud">
+            <div id="rushMetaHud" class="hidden w-full flex items-center justify-center gap-1.5">
+              <div class="rush-meta-pill px-3 py-0.5 rounded-full flex items-baseline gap-1">
+                <span class="text-[9px] font-black text-fuchsia-200">残り</span>
+                <strong id="hudRushRemain" class="text-lg sm:text-xl font-black gold-grad-text leading-none num-fixed">144</strong>
+                <span class="text-[9px] font-black text-fuchsia-200">回</span>
+              </div>
+              <div class="flex items-center gap-1 bg-black/75 px-2 py-1 rounded-full border border-amber-500/60" title="残保留4個">
+                <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+                <span class="res4-dot w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-600"></span>
+              </div>
+              <div id="hudVStockBadge" class="hidden px-2 py-0.5 rounded-full text-[9px] font-black shadow animate-pulse border border-white">V-STOCK</div>
+            </div>
+          </div>
+        </div>
+        <div id="lcdBox">
+          <div id="railRem"><div id="cabinetRemGlow"></div><div id="railRemSlot"><img id="railRemImg" alt=""></div></div>
+        <section id="lcdFrame" class="flex flex-col justify-between p-2 transition-colors duration-200">
+          <!-- 背景Canvas & 初当たり/確定時の背面 niziiro.jpg レイヤー -->
+          <canvas id="stageBgCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-[1]"></canvas>
+          <div id="lcdNiziiroBackLayer" class="hidden pointer-events-none absolute inset-0 z-[2] overflow-hidden"></div>
+
+
+          <!-- RUSH 3モード専用レイヤー -->
+          <div id="oniRushStage" class="hidden">
+            <div id="oniHaikeiLayer"><img id="oniHaikeiImg" alt=""><div id="oniHaikeiScrim"></div><div id="oniHaikeiTint"></div><div id="oniHaikeiDark"></div></div>
+            <div id="oniRemApproachWrap" class="hidden absolute inset-0 z-[2] flex items-center justify-center pointer-events-none"><img id="oniRemApproachImg" class="max-h-[92%] max-w-[92%] object-contain" alt="鬼レム接近"></div>
+            <div class="relative z-[5] flex items-center justify-center gap-0.5 sm:gap-2">
+              <div id="oniReel0" class="oni-digit-slot oni-digit-side"></div>
+              <div id="oniReel1" class="oni-digit-slot oni-digit-mid"></div>
+              <div id="oniReel2" class="oni-digit-slot oni-digit-side"></div>
+            </div>
+          </div>
+
+          <div id="brainRushStage" class="hidden">
+            <div id="brainPetePos0" class="brain-pete-pos" style="z-index: 10;"><img id="brainPeteImg0" class="brain-pete-img" alt="ペテルギウスA"></div>
+            <div id="brainPetePos1" class="brain-pete-pos" style="z-index: 10;"><img id="brainPeteImg1" class="brain-pete-img" alt="ペテルギウスB"></div>
+            <div id="brainAtmosphereVeil"></div>
+            <div id="brainBotanWrap" class="botan-stage-wrap absolute bottom-[12px] left-1/2 -translate-x-1/2 w-[150px] sm:w-[180px] max-w-[52%] z-[18]">
+              <div id="brainBotanRing" class="absolute w-[118%] h-[118%] rounded-full pointer-events-none opacity-0"></div>
+              <img id="brainBotanImg" class="botan-img-base" alt="3Dボタン">
+              <div id="brainBotanGlow" class="botan-crystal-glow"></div>
+            </div>
+            <div id="brainTextSwarm"></div>
+            <div id="brainEvoFlash"></div>
+            <div id="brainFurueruOverlay" class="hidden"><img id="brainFurueruImg" alt="震える"></div>
+          </div>
+
+          <div id="remRushStage" class="hidden">
+            <div id="remLampOuter"><img id="remLampImg" class="rem-img-idle" alt="鬼化レムランプ"><div id="remHornGlow"></div></div>
+            <div id="remDigitsLayer">
+              <div id="remReel0" class="oni-digit-slot rem-digit-side"></div>
+              <div id="remReel1" class="oni-digit-slot rem-digit-mid"></div>
+              <div id="remReel2" class="oni-digit-slot rem-digit-side"></div>
+            </div>
+          </div>
+
+          <div id="rushTopBadge" class="hidden pointer-events-none absolute top-[44px] left-1/2 -translate-x-1/2 z-[28] px-3 py-0.5 rounded-full text-xs font-black tracking-wide bg-black/90 border border-amber-400 text-amber-300 shadow-lg whitespace-nowrap"></div>
+          <div id="hiddenRemBadge" class="hidden pointer-events-none absolute bottom-3 right-4 z-[27]"></div>
+          <div id="rushNoiseVeil" class="hidden pointer-events-none absolute inset-0 z-[26] crt-scanlines bg-black/25"></div>
+
+          <!-- 中央メインステージ（左端レム避けの左右安全パディング付き） -->
+          <div class="relative z-[16] flex-1 min-h-0 flex items-center justify-center overflow-hidden px-3 pt-14 pb-2">
+            <!-- シーンA：通常時 -->
+            <div id="scene-normal" class="scene-pane w-full h-full flex flex-col items-center justify-center text-center gap-1.5">
+              <div class="flex items-center justify-center gap-1.5 sm:gap-2.5">
+                <div id="reelBox0" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum0" class="w-full h-full flex items-center justify-center"></div></div>
+                <div id="reelBox1" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum1" class="w-full h-full flex items-center justify-center"></div></div>
+                <div id="reelBox2" class="reel-box w-16 h-24 sm:w-24 sm:h-28 rounded-2xl border-2 border-amber-700/80 flex items-center justify-center overflow-hidden"><div id="reelNum2" class="w-full h-full flex items-center justify-center"></div></div>
+              </div>
+              <div id="normalTitle" class="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">STANDBY</div>
+              <p id="normalSub" class="text-[10px] sm:text-[11px] text-amber-100/85 leading-snug whitespace-nowrap">長押しハンドル・オートで開始！</p>
+              <div class="flex items-center justify-center gap-1.5 mt-1 text-[9px] sm:text-[10px] font-black">
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-amber-500/50 text-amber-200">確率 1/349.9</span>
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-rose-400/50 text-rose-200">RUSH突入 55%</span>
+                <span class="px-2 py-0.5 rounded-full bg-black/55 border border-fuchsia-400/50 text-fuchsia-200">ST 144回</span>
+              </div>
+            </div>
+
+            <!-- シーンB：通常時SPリーチ -->
+            <div id="scene-reach" class="scene-pane hidden relative w-full h-full flex flex-col items-center justify-center text-center gap-1">
+              <div id="reachActorBg"><img id="reachActorImg" alt="SPキャラ"></div>
+              <div class="relative z-10 flex items-center justify-center gap-1 shrink-0">
+                <span id="reachYokokuBadge" class="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-black/85 border border-amber-400/80 text-amber-300 shadow"></span>
+                <span id="reachStepBadge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-black/85 border border-rose-400 text-rose-200 shadow"></span>
+              </div>
+              <div class="relative z-10 leading-tight shrink-0">
+                <div id="reachSpCategory" class="text-[10px] font-black text-amber-200/90 tracking-widest"></div>
+                <div id="reachTitle" class="font-mincho text-xl sm:text-3xl font-black text-white leading-tight whitespace-nowrap"></div>
+              </div>
+              <p id="reachSub" class="relative z-10 text-[10px] text-rose-100/90 leading-snug shrink-0"></p>
+              <div id="pushButtonArea" class="hidden relative z-10 flex flex-col items-center gap-0.5 shrink-0 mt-0.5">
+                <button id="btnOniPush" class="botan-stage-wrap relative w-[98px] sm:w-[130px] cursor-pointer select-none active:scale-95 transition focus:outline-none">
+                  <div id="reachBotanRing" class="absolute w-[116%] h-[116%] rounded-full pointer-events-none opacity-0"></div>
+                  <img id="reachBotanImg" class="botan-img-base" alt="PUSH">
+                  <div id="reachBotanGlow" class="botan-crystal-glow"></div>
+                  <span id="reachBotanText" class="pointer-events-none absolute top-[34%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm sm:text-base font-black text-slate-950 drop-shadow-[0_0_8px_rgba(255,255,255,0.98)] tracking-wider">PUSH</span>
+                </button>
+                <div id="pushHintText" class="text-[9px] sm:text-[10px] font-black text-amber-300 leading-none">タップ / Spaceでジャッジ！</div>
+              </div>
+            </div>
+
+            <!-- シーンC：RUSH消化中 -->
+            <div id="scene-rush-idle" class="scene-pane hidden w-full h-full pointer-events-none"></div>
+
+            <!-- シーンD：大当たり画面 -->
+            <div id="scene-bonus" class="scene-pane hidden w-full h-full flex flex-col items-center justify-center text-center relative gap-0.5">
+              <div id="bonusSubLabel" class="text-[10px] sm:text-xs font-black tracking-[0.16em] text-amber-300 leading-none"></div>
+              <div id="bonusLogoWrap" class="hidden logo-alive-wrap">
+                <div class="logo-alive-halo"></div>
+                <img id="bonusLogoImg" class="logo-alive-img bonus-logo-img" alt="BONUS LOGO">
+              </div>
+              <div id="bonusMainTitle" class="text-lg sm:text-2xl font-black gold-grad-text tracking-tight leading-tight"></div>
+              <div id="bonusCountNum" class="hidden text-4xl sm:text-5xl font-black rainbow-grad-text tracking-tight leading-none num-fixed">1,500</div>
+              <p id="bonusDesc" class="text-[10px] sm:text-xs font-bold text-slate-100 max-w-xs leading-snug"></p>
+              <div id="subtleWhisperSlot" class="hidden absolute top-0.5 right-1 px-2 py-0.5 rounded-md bg-black/85 border border-amber-500/50 shadow-lg max-w-[78%] z-20">
+                <span id="subtleWhisperText" class="font-mincho text-[10px] sm:text-xs font-semibold text-amber-100 tracking-wider"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 汎用：鬼がかりチャレンジ・一撃ボタン -->
+          <div id="universalBotanOverlay" class="hidden absolute inset-0 z-[45] bg-black/76 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-4">
+            <div id="uniBotanLabel" class="text-xs sm:text-base font-black rainbow-grad-text tracking-wider drop-shadow text-center">一撃解放!!</div>
+            <button id="btnUniBotanTap" class="botan-stage-wrap w-[132px] sm:w-[170px] botan-rise-in cursor-pointer focus:outline-none">
+              <div id="uniBotanRing" class="absolute w-[122%] h-[122%] rounded-full pointer-events-none opacity-0"></div>
+              <img id="uniBotanImg" class="botan-img-base" alt="一撃ボタン">
+              <div id="uniBotanGlow" class="botan-crystal-glow"></div>
+            </button>
+            <div id="uniBotanHint" class="hidden text-[10px] font-black text-amber-300">タップ / Spaceでジャッジ!!</div>
+          </div>
+
+          <!-- 液晶内全画面演出オーバーレイ -->
+          <div id="fullscreenOverlay" class="hidden absolute inset-0 z-40 overlay-blackout flex flex-col items-center justify-center text-center p-4">
+            <div id="crtScanLayer" class="hidden pointer-events-none absolute inset-0 crt-scanlines"></div>
+            <div id="fsSub" class="relative z-10 text-xs sm:text-sm font-black tracking-[0.20em] text-amber-300 mb-1"></div>
+            <div id="fsLogoWrap" class="hidden relative z-10 logo-alive-wrap my-0.5">
+              <div class="logo-alive-halo"></div>
+              <img id="fsLogoImg" class="logo-alive-img fs-logo-img" alt="LOGO">
+            </div>
+            <div id="fsMain" class="relative z-10 text-xl sm:text-3xl font-black gold-grad-text tracking-wider leading-tight px-1"></div>
+            <div id="fsExtra" class="relative z-10 mt-1.5 text-[11px] sm:text-xs font-bold text-amber-100/95 max-w-xs leading-relaxed"></div>
+          </div>
+
+          <!-- 液晶内ブラックアウト＆「鬼がかってますね」専用オーバーレイ -->
+          <div id="lcdOnigakariOverlay" class="hidden absolute inset-0 z-[62] bg-black flex flex-col items-center justify-center p-3 pointer-events-none overflow-hidden"></div>
+
+          <!-- プレミア外枠・FX Canvas・引き裂きホスト -->
+          <div id="premiaFrameOverlay"><img id="premiaFrameImg" alt=""></div>
+          <canvas id="fxCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-50"></canvas>
+          <div id="slashHost" class="pointer-events-none absolute inset-0 overflow-hidden z-[55]"></div>
+        </section>
+          <div id="lampRippleHost" class="pointer-events-none absolute inset-0 z-[34]"></div>
+        </div>
+        <div id="reserveBar">
+          <span id="reserveLabel" class="text-[10px] font-black text-amber-200/90 tracking-wider whitespace-nowrap">保留</span>
+          <div class="flex items-center justify-center gap-2 flex-1">
+            <div id="resSlot0" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60 transition-all">○</div>
+            <div id="resSlot1" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60 transition-all">○</div>
+            <div id="resSlot2" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60 transition-all">○</div>
+            <div id="resSlot3" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-amber-900/80 bg-black/75 flex items-center justify-center text-[10px] font-black text-amber-200/60 transition-all">○</div>
+            <div id="resSlot4" class="hidden w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-purple-700 bg-purple-950/90 flex items-center justify-center text-[10px] font-black text-purple-300 transition-all">る</div>
+          </div>
+          <span id="lampStatusText" class="text-[10px] font-black text-amber-200 min-w-[46px] text-right whitespace-nowrap">待機中</span>
+        </div>
+      </div>
+
+      <!-- ② 数値パネル（固定枠 2×2）＋RUSH時スロット -->
+      <div id="statSlot">
+        <section id="statDash" class="grid grid-cols-2 grid-rows-2 gap-1.5">
+          <div class="stat-cell"><span class="stat-label">現在 / 総回転</span><div class="stat-val"><div id="dashCurSpin" class="text-white num-fixed" style="min-width:8ch">0</div><div id="dashTotalSpin" class="text-amber-300/80 num-fixed" style="min-width:11ch">総 0</div></div></div>
+          <div class="stat-cell"><span class="stat-label">収支</span><div class="stat-val"><div id="dashBalance" class="text-white num-fixed" style="min-width:12ch">+0円</div></div></div>
+          <div class="stat-cell"><span class="stat-label">総投資</span><div class="stat-val"><div id="dashInvest" class="text-rose-400 num-fixed" style="min-width:11ch">0円</div></div></div>
+          <div class="stat-cell"><span class="stat-label">持ち玉</span><div class="stat-val"><div id="dashBalls" class="text-cyan-300 num-fixed" style="min-width:11ch">0発</div></div></div>
+        </section>
+        <div id="rushSlot">
+      <!-- ② RUSH中のみ表示：3モード切替スリムバー -->
+      <section id="rushModeBar" class="hidden rounded-2xl bg-[#1a080d]/92 border border-amber-400/65 p-1.5 shadow-lg">
+        <div id="rushCustomPanel" class="grid grid-cols-3 gap-1.5">
+          <button data-rmode="onigakari" class="rmode-btn py-1.5 px-1 rounded-xl text-[11px] font-black border transition bg-rose-700/80 border-amber-300 text-white active:scale-95 whitespace-nowrap">🔥 鬼がかり</button>
+          <button data-rmode="brain" class="rmode-btn py-1.5 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95 whitespace-nowrap">🧠 脳が震える</button>
+          <button data-rmode="rem" class="rmode-btn py-1.5 px-1 rounded-xl text-[11px] font-bold border transition bg-slate-900 border-slate-700 text-slate-400 active:scale-95 whitespace-nowrap">💙 レム告知</button>
+        </div>
+      </section>
+      <!-- RUSH累計ステータス4枠（液晶下へ移動・固定枠） -->
+      <section id="rushStatusBar" class="hidden rounded-xl bg-gradient-to-r from-[#2c0d07] via-[#1c0814] to-[#2c0d07] border border-amber-400/70 px-2 py-1.5 shadow-lg">
+        <div class="grid grid-cols-5 gap-1 text-center items-center h-[34px]">
+          <div><div class="text-[9px] text-amber-200 font-bold leading-none">連チャン</div><div id="rushChainDisplay" class="text-xs font-black text-white leading-tight mt-0.5 num-fixed">1連</div></div>
+          <div class="border-l border-amber-800/80"><div class="text-[9px] text-amber-300 font-bold leading-none">累計払出</div><div id="rushDispDisplay" class="text-xs font-black text-amber-300 leading-tight mt-0.5 num-fixed">1,500個</div></div>
+          <div class="border-l border-amber-800/80"><div class="text-[9px] text-cyan-300 font-bold leading-none">累計純増</div><div id="rushNetDisplay" class="text-xs font-black text-cyan-300 leading-tight mt-0.5 num-fixed">1,400発</div></div>
+          <div class="border-l border-amber-800/80"><div class="text-[9px] text-fuchsia-300 font-bold leading-none">鬼6000</div><div id="rush6000Display" class="text-xs font-black text-fuchsia-300 leading-tight mt-0.5 num-fixed">0回</div></div>
+          <div class="border-l border-amber-800/80"><div class="text-[9px] text-emerald-300 font-bold leading-none">収支</div><div id="rushBalanceDisplay" class="text-xs font-black text-white leading-tight mt-0.5 num-fixed">+0円</div></div>
+        </div>
+      </section>
+        </div>
+      </div>
+
+      <!-- ③ 親指操作コントロールパネル（1文字改行ゼロ・高さ完全統一） -->
+      <section id="controlDock" class="rounded-2xl bg-[#1a0a07]/92 border border-amber-700/50 p-2 shadow-xl flex items-center gap-2">
+        <div class="flex-1 min-w-0">
+          <div id="normalControls" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+            <button id="btnTouchHandle" class="col-span-2 sm:col-span-2 h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-amber-400 via-amber-500 to-orange-600 text-slate-950 shadow border border-yellow-200/80 transition select-none touch-none whitespace-nowrap">✋ 長押しハンドル</button>
+            <button id="btnSpin1" class="h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-slate-700 to-slate-900 hover:from-slate-600 text-white shadow border border-slate-600 active:scale-95 transition whitespace-nowrap">1回転</button>
+            <button id="btnAutoSakibare" class="h-10 px-1.5 rounded-xl font-black text-[11px] sm:text-xs bg-gradient-to-b from-rose-600 to-red-800 hover:from-rose-500 text-white shadow border border-rose-400/60 active:scale-95 transition whitespace-nowrap">🔥 先バレ</button>
+            <button id="btnAutoHit" class="h-10 px-1.5 rounded-xl font-black text-[11px] sm:text-xs bg-gradient-to-b from-amber-500 to-rose-700 hover:from-amber-400 text-white shadow border border-amber-300/70 active:scale-95 transition whitespace-nowrap">⚡ 当りオート</button>
+            <button id="btnResetPlay" class="h-10 px-2 rounded-xl font-bold text-xs bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 active:scale-95 transition whitespace-nowrap">リセット</button>
+          </div>
+
+          <div id="rushControls" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <button id="btnRushTouchHandle" class="h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-amber-400 via-amber-500 to-orange-600 text-slate-950 shadow border border-yellow-200/80 transition select-none touch-none whitespace-nowrap">✋ 長押しハンドル</button>
+            <button id="btnRush1" class="h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-rose-600 to-red-800 hover:from-rose-500 text-white shadow active:scale-95 transition whitespace-nowrap">ST 1回転</button>
+            <button id="btnRushAuto" class="h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-fuchsia-700 to-purple-900 hover:from-fuchsia-600 text-white shadow active:scale-95 transition whitespace-nowrap">⚡ RUSHオート</button>
+            <button id="btnRushSkip" class="h-10 px-2 rounded-xl font-black text-xs bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 text-slate-950 shadow active:scale-95 transition whitespace-nowrap">💥 スキップ</button>
+          </div>
+
+          <div id="busyNotice" class="hidden h-[86px] sm:h-10 flex items-center justify-center text-xs font-black text-amber-300 whitespace-nowrap">🔥 演出進行中…液晶にご注目ください！ 🔥</div>
+        </div>
+
+        <div class="shrink-0 pl-1.5 border-l border-amber-900/70 flex flex-col items-center justify-center">
+          <button id="btnSecretOk" title="裏ボタン（Oキー対応）" class="secret-ok-btn w-11 h-11 rounded-full border-2 border-amber-800/80 flex flex-col items-center justify-center text-amber-200 cursor-pointer">
+            <span class="text-[11px] font-black tracking-tighter leading-none">OK</span>
+            <span class="text-[7px] text-amber-400/80 font-bold mt-0.5">裏</span>
           </button>
-        </div></div>
-        <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-1 rounded-full bg-black/75 border border-yellow-200/90 text-[11px] sm:text-xs font-black text-amber-200 whitespace-nowrap shadow-xl">ボタンをタップ / Spaceで誓いを結べ!!</div>
-      `, { flash: true, strongFlash: true });
-
-      await new Promise((resolve, reject) => {
-        const hs = document.getElementById('weddingTapHotspot');
-        const done = () => { uniBotanTapResolver = null; if (token !== seqToken) reject('CANCELLED'); else resolve(); };
-        if (hs) hs.addEventListener('click', done, { once: true });
-        uniBotanTapResolver = done;
-      });
-
-      StudioAudio.playOchiburu(true); StudioAudio.playPokyun(true); WeddingAudio.playBell(1.5);
-      setAmbientBg('rainbow'); setSunburst(true); setLed('rainbow'); triggerLamp('rainbow', '12,000!!');
-      featherHost.innerHTML = buildFeathersHtml(34); featherHost.style.opacity = '1';
-
-      const wedOni = Assets.getWedding('onigakari');
-      crossfadeTo(wedOni ? buildSlideInnerHtml(wedOni, { portrait: true, pan: 'zoomIn' }) : `<div class="font-mincho text-4xl font-black rainbow-grad-text">鬼がかってますね</div>`, { flash: true, strongFlash: true });
-      await waitFreeze(4400, token);
-
-      StudioAudio.play6000Fanfare(true); WeddingAudio.playBell(1.0);
-      setTimeout(() => WeddingAudio.playBell(1.25), 420); setTimeout(() => WeddingAudio.playBell(1.50), 860);
-      const wedLogo = Assets.getLogo('wedding');
-      crossfadeTo(`
-        <div class="relative w-full h-full overlay-wedding flex flex-col items-center justify-center text-center p-4 overflow-hidden">
-          <div class="mystic-prism-rays rays-on"></div>${buildPremiaLayerHtml()}
-          <div class="relative z-10 text-xs sm:text-base font-black tracking-[0.28em] text-rose-600 mb-2">PREMIUM WEDDING BONUS</div>
-          ${wedLogo ? `<div class="relative z-10 logo-alive-wrap"><div class="logo-alive-halo"></div><img src="${wedLogo}" class="logo-alive-img max-w-[94vw] sm:max-w-[580px] max-h-[48vh]" alt="WEDDING 12000"></div>` : `<div class="relative z-10 font-mincho text-4xl sm:text-6xl font-black text-rose-700 pop-in">WEDDING 12,000 BONUS!!</div>`}
-          <div class="relative z-10 mt-4 text-sm sm:text-base font-black text-rose-900 bg-white/80 px-5 py-2 rounded-full border-2 border-amber-300 shadow-lg">鬼がかり6,000＋6,000 ＝ 計12,000個（実質純増 +11,200発）!!</div>
         </div>
-      `, { flash: true, strongFlash: true });
-      await waitFreeze(5000, token);
-    } finally {
-      WeddingAudio.stopPad(0.6); SoftSparkle.stop();
-      el.classList.add('hidden'); el.innerHTML = ''; uniBotanTapResolver = null;
-    }
-  };
-})();
+      </section>
 
-// ★開発者用隠しコマンド（メニュー・画面には一切表示しない）★
-//   左上の「鬼2」アイコンを素早く連打：  5回＝ウェディング演出のみ  ／  9回以上＝RUSH→6,000獲得→ウェディングまでの実フロー（テストモード自動）
-(function initSecretCommands() {
-  const icon = document.querySelector('header .w-7.h-7');
-  if (!icon) return;
-  let taps = 0, idleTimer = null, running = false;
-  icon.style.cursor = 'pointer';
+    </div>
 
-  async function weddingCinemaOnly() {
-    if (state.phase === 'ANIMATING' || state.phase === 'REACH') return;
-    stopAuto(); stopHandleHold(false);
-    const prevPhase = state.phase, prevScene = state.activeScene;
-    const tok = ++seqToken; state.phase = 'ANIMATING'; setControlMode('BUSY');
-    try { await playWeddingLeadIn(tok); await playWedding12000Cinema(tok); } catch (e) {}
-    finally {
-      state.phase = prevPhase; clearVisualEffects(); setActiveScene(prevScene);
-      if (prevPhase === 'RUSH') { applyRushModeVisuals(); setControlMode('RUSH'); }
-      else { FxCanvas.setAmbient('ember'); setControlMode('NORMAL'); BgmEngine.resume('normal'); }
-    }
-  }
+  </main>
 
-  icon.addEventListener('click', () => {
-    taps++; clearTimeout(idleTimer);
-    idleTimer = setTimeout(async () => {
-      const n = taps; taps = 0;
-      if (running) return;
-      running = true;
-      try {
-        if (n === 5) await weddingCinemaOnly();
-        else if (n >= 9) await runRealFlowTest();
-      } finally { running = false; }
-    }, 520);
-  });
-})();
-
-// 初期表示
-LiveSlump.mount();
-LiveSlump.draw();
-setActiveScene('normal');
-setReels(7, 3, 7);
-updateStatsUI();
-
-// iPhone：長押しの文字選択・メニュー表示を抑止（入力欄だけは除く）
-['contextmenu', 'selectstart'].forEach(t => document.addEventListener(t, (e) => {
-  const el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
-  if (el && el.closest && el.closest('input, textarea')) return;
-  e.preventDefault();
-}, { capture: true }));
+  <script src="sound.js?v=71"></script>
+  <script src="bgm.js?v=71"></script>
+  <script src="effects.js?v=92"></script>
+  <script src="records.js?v=92"></script>
+  <script src="game.js?v=92"></script>
+</body>
+</html>
